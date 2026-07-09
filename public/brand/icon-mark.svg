@@ -16,5 +16,5 @@
     <line x1="135" y1="445" x2="255" y2="325" stroke="#1E7A46" stroke-width="26" stroke-linecap="square" />
     <polygon points="239.5,309.5 270.5,340.5 286.8,293.2" />
   </g>
-  <path d="M362 60h34v34h34v34h-34v34h-34v-34h-34v-34h34z" fill="#D4A017" />
+  <path d="M330 50h30v30h30v30h-30v30h-30v-30h-30v-30h30z" fill="#D4A017" />
 </svg>

@@ -15,7 +15,14 @@ export type UserProfileWithLeader = UserProfile & {
 export async function listUserProfiles(supabase: DB) {
   const { data, error } = await supabase
     .from("users_profiles")
-    .select("*, leaders(name)")
+    // "leaders!fk_users_profiles_leader" (não só "leaders") é obrigatório
+    // aqui: existem 3 foreign keys ligando users_profiles <-> leaders
+    // (users_profiles.leader_id -> leaders.id, leaders.user_id ->
+    // users_profiles.id, leaders.created_by -> users_profiles.id), então o
+    // PostgREST não consegue adivinhar sozinho qual usar e devolve erro
+    // "more than one relationship was found" — foi isso que quebrou a tela
+    // de Usuários em produção com "Application error".
+    .select("*, leaders!fk_users_profiles_leader(name)")
     .order("created_at", { ascending: false })
   if (error) throw new Error(`Falha ao listar usuários: ${error.message}`)
   return data as unknown as UserProfileWithLeader[]
