@@ -13,7 +13,9 @@
 // Falha na geocodificação NUNCA deve bloquear o cadastro — se o endereço
 // não for encontrado (rua nova, digitação estranha, etc.), a liderança ou
 // demanda é salva do mesmo jeito, só sem aparecer no mapa até alguém
-// preencher as coordenadas manualmente.
+// preencher as coordenadas manualmente. Todo caminho de falha grava um
+// console.error com o motivo (visível em Vercel > Logs) porque, sem isso,
+// "não achou o endereço" e "a chamada quebrou" ficam indistinguíveis.
 export async function geocodeAddress(parts: {
   address?: string | null
   neighborhood?: string | null
@@ -40,24 +42,39 @@ export async function geocodeAddress(parts: {
         // Nominatim exige um identificador de app no User-Agent — sem isso
         // as requisições podem ser bloqueadas.
         "User-Agent": "LideraPlus/1.0 (gestao territorial; contato: af4contato@gmail.com)",
+        "Accept-Language": "pt-BR",
       },
       signal: AbortSignal.timeout(5000),
     })
 
-    if (!response.ok) return null
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      console.error(
+        `[geocodeAddress] Nominatim respondeu ${response.status} para query "${query}". Corpo: ${body.slice(0, 300)}`,
+      )
+      return null
+    }
 
     const results = (await response.json()) as { lat: string; lon: string }[]
     const first = results[0]
-    if (!first) return null
+    if (!first) {
+      console.error(`[geocodeAddress] Nenhum resultado do Nominatim para query "${query}".`)
+      return null
+    }
 
     const latitude = Number(first.lat)
     const longitude = Number(first.lon)
-    if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+      console.error(`[geocodeAddress] Resultado com lat/lon inválidos para query "${query}": ${JSON.stringify(first)}`)
+      return null
+    }
 
     return { latitude, longitude }
-  } catch {
+  } catch (err) {
     // Timeout, rede fora do ar, resposta inesperada — trata como "não
-    // encontrado" em vez de derrubar o cadastro inteiro.
+    // encontrado" em vez de derrubar o cadastro inteiro, mas grava o motivo.
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    console.error(`[geocodeAddress] Falha ao geocodificar query "${query}": ${message}`)
     return null
   }
 }
