@@ -7,6 +7,7 @@
 // ============================================================================
 
 import type { Tables } from "./database.types"
+import type { BadgeTone } from "@/components/ui/badge"
 
 export type UserRole = "admin_geral" | "admin_equipe" | "lideranca"
 
@@ -57,7 +58,7 @@ export const LEADER_STATUS_LABELS: Record<LeaderStatus, string> = {
   ativa: "Ativa", em_atencao: "Em atenção", inativa: "Inativa", estrategica: "Estratégica",
 }
 // Cor sugerida no mapa territorial (Módulo 8)
-export const LEADER_STATUS_COLOR: Record<LeaderStatus, string> = {
+export const LEADER_STATUS_COLOR: Record<LeaderStatus, BadgeTone> = {
   ativa: "verde", em_atencao: "amarelo", inativa: "vermelho", estrategica: "azul",
 }
 
@@ -105,7 +106,7 @@ export const DEMAND_STATUS_LABELS: Record<DemandStatus, string> = {
   resolvida: "Resolvida", recusada: "Recusada", cancelada: "Cancelada", atrasada: "Atrasada",
 }
 // Cor sugerida no mapa territorial (Módulo 8)
-export const DEMAND_STATUS_COLOR: Record<DemandStatus, string> = {
+export const DEMAND_STATUS_COLOR: Record<DemandStatus, BadgeTone> = {
   nova: "cinza", em_analise: "cinza", encaminhada: "cinza", em_andamento: "laranja",
   aguardando_orgao_responsavel: "laranja", resolvida: "verde", recusada: "vermelho",
   cancelada: "vermelho", atrasada: "vermelho",
