@@ -19,7 +19,7 @@ export async function GET() {
   const rows = await getPessoasAtendidasReport(supabase)
   const buffer = await renderToBuffer(<PessoasAtendidasReportDocument rows={rows} generatedAt={new Date()} />)
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": 'attachment; filename="pessoas-atendidas.pdf"',

@@ -22,7 +22,11 @@ export async function GET() {
   const rows = await getLeadersByNeighborhoodReport(supabase)
   const buffer = await renderToBuffer(<LeadersReportDocument rows={rows} generatedAt={new Date()} />)
 
-  return new NextResponse(buffer, {
+  // NextResponse espera BodyInit (Uint8Array, Blob, string, etc.) — o Buffer
+  // do Node não bate estruturalmente com esse tipo no TypeScript (mesmo
+  // funcionando em runtime, por Buffer estender Uint8Array), então convertê-lo
+  // explicitamente evita o erro de build "não pode ser atribuído a BodyInit".
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": 'attachment; filename="liderancas-por-bairro.pdf"',
