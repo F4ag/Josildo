@@ -4,9 +4,17 @@
 
 import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
-export async function createClient() {
+// O retorno é forçado para SupabaseClient<Database, "public", any> (em vez de
+// deixar o TypeScript inferir sozinho): @supabase/ssr e @supabase/supabase-js
+// às vezes resolvem o tipo padrão do schema de formas incompatíveis entre si,
+// o que já quebrou o build de produção (erro "não pode ser atribuído ao tipo
+// 'public'" / propriedades somem virando "never"). Fixar aqui, na única
+// função que cria o client do lado do servidor, resolve para todo mundo que
+// usa createClient() — não só quem passa pelos services/*.ts.
+export async function createClient(): Promise<SupabaseClient<Database, "public", any>> {
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
