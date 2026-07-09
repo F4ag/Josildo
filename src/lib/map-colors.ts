@@ -6,7 +6,16 @@
 // (tailwind.config.ts), ajustar aqui também — são valores próximos, mas não
 // os mesmos tokens (aqui precisa de mais contraste em cima do mapa-múndi
 // claro do OpenStreetMap do que o usado no resto da UI).
-export const STATUS_COLOR_HEX: Record<string, string> = {
+//
+// Tipado com BadgeTone (não "string" genérico) de propósito: com
+// noUncheckedIndexedAccess ligado no tsconfig, indexar um Record<string, X>
+// com uma chave string qualquer devolve "X | undefined" (porque a chave
+// pode não existir) — e isso já quebrou o build (createDotIcon espera
+// "string", não "string | undefined"). Como BadgeTone é a união fechada de
+// exatamente as chaves abaixo, indexar com um BadgeTone garante "string".
+import type { BadgeTone } from "@/components/ui/badge"
+
+export const STATUS_COLOR_HEX: Record<BadgeTone, string> = {
   verde: "#1E7A46",
   amarelo: "#D4A017",
   vermelho: "#C0392B",
