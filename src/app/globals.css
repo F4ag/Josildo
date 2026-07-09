@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  /* Módulo 11: impressão de relatórios sem sidebar/topbar. */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+}

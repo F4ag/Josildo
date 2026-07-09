@@ -1,0 +1,77 @@
+"use server"
+
+import { revalidatePath } from "next/cache"
+import { requireSessionUser } from "@/lib/auth"
+import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { inviteUserSchema } from "@/lib/validations/user"
+import { setUserStatus } from "@/services/users"
+import type { ActionState } from "@/app/login/actions"
+
+async function assertAdminGeral() {
+  const session = await requireSessionUser()
+  if (session.profile.role !== "admin_geral") {
+    throw new Error("Apenas o Admin Geral pode gerenciar usuários.")
+  }
+  return session
+}
+
+export async function inviteUser(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  await assertAdminGeral()
+
+  const parsed = inviteUserSchema.safeParse({
+    full_name: formData.get("full_name"),
+    email: formData.get("email"),
+    phone: formData.get("phone") || undefined,
+    role: formData.get("role"),
+    leader_id: formData.get("leader_id") || undefined,
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
+  }
+
+  const { full_name, email, phone, role, leader_id } = parsed.data
+  const admin = createAdminClient()
+
+  // Cria o login e dispara o e-mail de convite (o link cai em /auth/confirm,
+  // que redireciona para /redefinir-senha — mesma tela usada na recuperação
+  // de senha comum).
+  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/confirm?next=/redefinir-senha`,
+  })
+
+  if (inviteError || !invited.user) {
+    return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
+  }
+
+  const { error: profileError } = await admin.from("users_profiles").insert({
+    id: invited.user.id,
+    full_name,
+    email,
+    phone: phone || null,
+    role,
+    leader_id: role === "lideranca" ? leader_id || null : null,
+  })
+
+  if (profileError) {
+    // Não deixar um auth.users órfão sem perfil.
+    await admin.auth.admin.deleteUser(invited.user.id)
+    return { error: `Não foi possível salvar o perfil: ${profileError.message}.` }
+  }
+
+  if (role === "lideranca" && leader_id) {
+    await admin.from("leaders").update({ user_id: invited.user.id }).eq("id", leader_id)
+  }
+
+  revalidatePath("/configuracoes/usuarios")
+  return { error: null, success: true }
+}
+
+export async function toggleUserStatus(userId: string, currentStatus: "ativo" | "inativo") {
+  await assertAdminGeral()
+  const supabase = await createClient()
+  const nextStatus = currentStatus === "ativo" ? "inativo" : "ativo"
+  await setUserStatus(supabase, userId, nextStatus)
+  revalidatePath("/configuracoes/usuarios")
+}

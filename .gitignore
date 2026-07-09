@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+.env
+.env.local
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# Gerados pelo next-pwa em build time (next.config.js) — nunca commitar.
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/fallback-*.js

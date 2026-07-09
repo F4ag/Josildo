@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Mesma marca de icon-mark.svg, com o pino em cor clara em vez de
+       navy — usado sobre fundo escuro (Sidebar, que já é bg-primary/navy).
+       Fundo transparente de propósito (diferente de icon-maskable.svg, que
+       tem o quadrado navy sólido pro ícone do PWA). -->
+  <path d="M256 24C155.6 24 74 105.6 74 206c0 132 182 282 182 282s182-150 182-282C438 105.6 356.4 24 256 24z" fill="#F5F6F8" />
+  <g stroke="#0B2545" stroke-width="7" fill="none">
+    <line x1="256" y1="158" x2="210" y2="222" />
+    <line x1="256" y1="158" x2="302" y2="222" />
+    <line x1="210" y1="222" x2="302" y2="222" />
+  </g>
+  <circle cx="256" cy="158" r="17" fill="#1E7A46" />
+  <circle cx="210" cy="222" r="15" fill="#0B2545" />
+  <circle cx="302" cy="222" r="15" fill="#0B2545" />
+  <g fill="#1E7A46">
+    <line x1="135" y1="445" x2="255" y2="325" stroke="#1E7A46" stroke-width="26" stroke-linecap="square" />
+    <polygon points="239.5,309.5 270.5,340.5 286.8,293.2" />
+  </g>
+  <path d="M362 60h34v34h34v34h-34v34h-34v-34h-34v-34h34z" fill="#D4A017" />
+</svg>

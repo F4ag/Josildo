@@ -1,0 +1,34 @@
+// Cliente Supabase para uso em Server Components, Server Actions e Route
+// Handlers. Lê/escreve cookies de sessão via `next/headers` — por isso não
+// pode ser importado num Client Component.
+
+import { cookies } from "next/headers"
+import { createServerClient } from "@supabase/ssr"
+import type { Database } from "@/types/database.types"
+
+export async function createClient() {
+  const cookieStore = await cookies()
+
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            for (const { name, value, options } of cookiesToSet) {
+              cookieStore.set(name, value, options)
+            }
+          } catch {
+            // `setAll` chamado de um Server Component (não de uma Server
+            // Action/Route Handler) não pode escrever cookies. Tudo bem
+            // ignorar aqui: o middleware.ts já cuida do refresh de sessão.
+          }
+        },
+      },
+    },
+  )
+}
