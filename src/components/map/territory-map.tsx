@@ -52,7 +52,10 @@ function FitBounds({ points }: { points: [number, number][] }) {
   useEffect(() => {
     if (points.length === 0) return
     if (points.length === 1) {
-      map.setView(points[0], 15)
+      // TypeScript não estreita points[0] pra "definido" só por causa do
+      // if acima (limitação conhecida do checker com índice de array) — o
+      // "!" é seguro aqui porque acabamos de confirmar length === 1.
+      map.setView(points[0]!, 15)
       return
     }
     map.fitBounds(L.latLngBounds(points), { padding: [32, 32] })
