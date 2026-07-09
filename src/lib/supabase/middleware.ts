@@ -4,6 +4,7 @@
 // autorização (canAccessRoute) legível e testável isoladamente.
 
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 import type { Database } from "@/types/database.types"
 import { canAccessRoute } from "@/lib/permissions"
@@ -14,6 +15,10 @@ const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/redefinir-senha", "/auth/con
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
 
+  // Cast igual ao de lib/supabase/server.ts: @supabase/ssr e
+  // @supabase/supabase-js resolvem o tipo padrão do schema de formas
+  // incompatíveis entre si em alguns combos de versão (aqui já causou
+  // "propriedade não existe no tipo 'never'" na consulta de profile abaixo).
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -33,7 +38,7 @@ export async function updateSession(request: NextRequest) {
         },
       },
     },
-  )
+  ) as SupabaseClient<Database, "public", any>
 
   // IMPORTANTE: não remover este getUser(). Ele é o que efetivamente
   // renova o token — sem essa chamada a sessão expira silenciosamente.
