@@ -7,8 +7,29 @@ import { createClient } from "@/lib/supabase/server"
 import { createDemand, getDemandById, updateDemandStatus, type DemandInput } from "@/services/demands"
 import { demandSchema, demandStatusUpdateSchema } from "@/lib/validations/demand"
 import { can } from "@/lib/permissions"
+import { geocodeAddress } from "@/lib/geocoding"
 import type { UserRole } from "@/types/domain"
 import type { ActionState } from "@/app/login/actions"
+
+/** "" -> null, "-23.5" -> -23.5. Ver comentário em liderancas/actions.ts. */
+function parseCoord(value: string | undefined): number | null {
+  return value ? Number(value) : null
+}
+
+/** Prioriza lat/lng digitados à mão; só chama o geocoder quando o campo
+ * ficou em branco no formulário. */
+async function resolveCoords(data: {
+  latitude?: string; longitude?: string; address?: string; neighborhood?: string
+}): Promise<{ latitude: number | null; longitude: number | null }> {
+  const manualLat = parseCoord(data.latitude)
+  const manualLng = parseCoord(data.longitude)
+  if (manualLat !== null && manualLng !== null) {
+    return { latitude: manualLat, longitude: manualLng }
+  }
+
+  const found = await geocodeAddress({ address: data.address, neighborhood: data.neighborhood })
+  return { latitude: found?.latitude ?? null, longitude: found?.longitude ?? null }
+}
 
 export async function createDemandAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requireSessionUser()
@@ -26,6 +47,8 @@ export async function createDemandAction(_prevState: ActionState, formData: Form
     supporter_id: formData.get("supporter_id") || "",
     address: formData.get("address") || undefined,
     neighborhood: formData.get("neighborhood") || undefined,
+    latitude: formData.get("latitude") || "",
+    longitude: formData.get("longitude") || "",
     priority: formData.get("priority") || "media",
     due_date: formData.get("due_date") || "",
     public_agency: formData.get("public_agency") || undefined,
@@ -41,6 +64,8 @@ export async function createDemandAction(_prevState: ActionState, formData: Form
     return { error: "Sua conta de liderança não está vinculada a um cadastro de liderança." }
   }
 
+  const coords = await resolveCoords(parsed.data)
+
   const supabase = await createClient()
   const input: DemandInput = {
     ...parsed.data,
@@ -48,6 +73,8 @@ export async function createDemandAction(_prevState: ActionState, formData: Form
     leader_id: leaderId,
     supporter_id: parsed.data.supporter_id || null,
     due_date: parsed.data.due_date || null,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
   }
 
   const demand = await createDemand(supabase, input, session.id)

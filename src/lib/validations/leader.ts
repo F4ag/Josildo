@@ -15,6 +15,20 @@ export const leaderSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zip_code: z.string().optional(),
+  // Usadas pelo Mapa Territorial (Módulo 8) — sem isso preenchido no
+  // cadastro, a liderança nunca aparece no mapa mesmo com endereço/bairro
+  // certos. Mantidas como string aqui (a conversão pra number|null acontece
+  // na action) de propósito: z.coerce.number() em cima de "" vira 0 em vez
+  // de falhar, e 0,0 é uma coordenada real no oceano ("Null Island") — não
+  // é o mesmo que "não preenchido".
+  latitude: z.string().optional().refine(
+    (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= -90 && Number(v) <= 90),
+    "Latitude inválida (use algo entre -90 e 90).",
+  ),
+  longitude: z.string().optional().refine(
+    (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= -180 && Number(v) <= 180),
+    "Longitude inválida (use algo entre -180 e 180).",
+  ),
   leader_type: z.enum(LEADER_TYPES).optional().or(z.literal("")),
   influence_level: z.enum(INFLUENCE_LEVELS).optional().or(z.literal("")),
   status: z.enum(LEADER_STATUSES).default("ativa"),

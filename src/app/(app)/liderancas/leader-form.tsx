@@ -87,6 +87,23 @@ export function LeaderForm({ action, defaultValues, isOwnRecord = false, cancelH
         </div>
 
         <div>
+          <label htmlFor="latitude" className="mb-1 block text-sm font-medium">Latitude</label>
+          <input id="latitude" name="latitude" inputMode="decimal" placeholder="-23.5505"
+            defaultValue={d?.latitude ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          <p className="mt-1 text-xs text-foreground/50">
+            Opcional — se deixar em branco, tentamos localizar automaticamente pelo endereço/bairro/cidade.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="longitude" className="mb-1 block text-sm font-medium">Longitude</label>
+          <input id="longitude" name="longitude" inputMode="decimal" placeholder="-46.6333"
+            defaultValue={d?.longitude ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
+
+        <div>
           <label htmlFor="leader_type" className="mb-1 block text-sm font-medium">Tipo de liderança</label>
           <select id="leader_type" name="leader_type" defaultValue={d?.leader_type ?? ""}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none">

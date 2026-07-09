@@ -7,8 +7,15 @@ import { createClient } from "@/lib/supabase/server"
 import { createLeader, updateLeader, type LeaderInput } from "@/services/leaders"
 import { leaderSchema } from "@/lib/validations/leader"
 import { can } from "@/lib/permissions"
+import { geocodeAddress } from "@/lib/geocoding"
 import type { UserRole } from "@/types/domain"
 import type { ActionState } from "@/app/login/actions"
+
+/** "" -> null, "-23.5" -> -23.5. Nunca retorna NaN nem 0 pra campo vazio
+ * (ver comentário em lib/validations/leader.ts sobre "Null Island"). */
+function parseCoord(value: string | undefined): number | null {
+  return value ? Number(value) : null
+}
 
 function parseLeaderForm(formData: FormData) {
   return leaderSchema.safeParse({
@@ -22,12 +29,32 @@ function parseLeaderForm(formData: FormData) {
     city: formData.get("city") || undefined,
     state: formData.get("state") || undefined,
     zip_code: formData.get("zip_code") || undefined,
+    latitude: formData.get("latitude") || "",
+    longitude: formData.get("longitude") || "",
     leader_type: formData.get("leader_type") || "",
     influence_level: formData.get("influence_level") || "",
     status: formData.get("status") || "ativa",
     can_view_attendances: formData.get("can_view_attendances") === "on",
     notes: formData.get("notes") || undefined,
   })
+}
+
+/** Só tenta geocodificar quando ninguém preencheu lat/lng à mão — o
+ * cadastro manual sempre vence a busca automática. */
+async function resolveCoords(data: {
+  latitude?: string; longitude?: string
+  address?: string; neighborhood?: string; city?: string; state?: string
+}): Promise<{ latitude: number | null; longitude: number | null }> {
+  const manualLat = parseCoord(data.latitude)
+  const manualLng = parseCoord(data.longitude)
+  if (manualLat !== null && manualLng !== null) {
+    return { latitude: manualLat, longitude: manualLng }
+  }
+
+  const found = await geocodeAddress({
+    address: data.address, neighborhood: data.neighborhood, city: data.city, state: data.state,
+  })
+  return { latitude: found?.latitude ?? null, longitude: found?.longitude ?? null }
 }
 
 export async function createLeaderAction(
@@ -46,11 +73,15 @@ export async function createLeaderAction(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
+  const coords = await resolveCoords(parsed.data)
+
   const supabase = await createClient()
   const input: LeaderInput = {
     ...parsed.data,
     email: parsed.data.email || null,
     birth_date: parsed.data.birth_date || null,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
     leader_type: parsed.data.leader_type || null,
     influence_level: parsed.data.influence_level || null,
   }
@@ -78,11 +109,15 @@ export async function updateLeaderAction(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
+  const coords = await resolveCoords(parsed.data)
+
   const supabase = await createClient()
   const input: Partial<LeaderInput> = {
     ...parsed.data,
     email: parsed.data.email || null,
     birth_date: parsed.data.birth_date || null,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
     leader_type: parsed.data.leader_type || null,
     influence_level: parsed.data.influence_level || null,
   }

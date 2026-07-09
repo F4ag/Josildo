@@ -94,6 +94,21 @@ export function DemandForm({ leaders, supporters, lockedToOwnNetwork = false }: 
         </div>
 
         <div>
+          <label htmlFor="latitude" className="mb-1 block text-sm font-medium">Latitude</label>
+          <input id="latitude" name="latitude" inputMode="decimal" placeholder="-23.5505"
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          <p className="mt-1 text-xs text-foreground/50">
+            Opcional — se deixar em branco, tentamos localizar automaticamente pelo endereço/bairro.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="longitude" className="mb-1 block text-sm font-medium">Longitude</label>
+          <input id="longitude" name="longitude" inputMode="decimal" placeholder="-46.6333"
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
+
+        <div>
           <label htmlFor="due_date" className="mb-1 block text-sm font-medium">Prazo</label>
           <input id="due_date" name="due_date" type="date"
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />

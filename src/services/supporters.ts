@@ -57,14 +57,34 @@ export type SupporterInput = Omit<
  * candidatos encontrados — quem decide se cadastra mesmo assim é o
  * formulário (com justificativa), nunca esta função.
  */
+// O filtro .or() do PostgREST usa vírgula, ponto e parênteses como
+// caracteres de controle da sintaxe (ex.: "and(a.eq.1,b.eq.2)"). Nome e
+// endereço digitados por um usuário quase sempre têm vírgula ("Rua Tal,
+// 123") ou ponto — sem escapar, o valor quebra a sintaxe do filtro e o
+// PostgREST responde com "failed to parse the tree" (500), derrubando a
+// tela inteira de cadastro de apoiador. A regra do PostgREST é envolver em
+// aspas duplas qualquer valor que contenha , . ( ) : " ou espaço, escapando
+// aspas/barras internas.
+function escapePostgrestValue(value: string): string {
+  if (/[,.():"\\\s]/.test(value)) {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+  }
+  return value
+}
+
 export async function findPotentialDuplicates(
   supabase: DB,
   input: Pick<SupporterInput, "phone" | "name" | "birth_date" | "address">,
 ) {
+  const phone = escapePostgrestValue(input.phone)
+  const name = escapePostgrestValue(input.name)
+  const birthDate = escapePostgrestValue(input.birth_date)
+  const address = escapePostgrestValue(input.address)
+
   const orConditions = [
-    `phone.eq.${input.phone}`,
-    `and(name.eq.${input.name},birth_date.eq.${input.birth_date})`,
-    `and(name.eq.${input.name},address.eq.${input.address})`,
+    `phone.eq.${phone}`,
+    `and(name.eq.${name},birth_date.eq.${birthDate})`,
+    `and(name.eq.${name},address.eq.${address})`,
   ].join(",")
 
   const { data, error } = await supabase
