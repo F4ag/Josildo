@@ -10,7 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export type NotificationRow = {
   id: string
@@ -71,5 +71,4 @@ export async function markAllNotificationsRead(supabase: DB, userId: string): Pr
     .update({ is_read: true })
     .eq("user_id", userId)
     .eq("is_read", false)
-  if (error) throw new Error(`Falha ao marcar notificações como lidas: ${error.message}`)
-}
+  if (error) throw new Error(`Falha ao marcar notificações como lidas: ${erro

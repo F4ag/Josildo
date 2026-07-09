@@ -15,7 +15,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 import type { LeaderStatus, DemandStatus } from "@/types/domain"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export type MapFilters = { neighborhood?: string }
 
@@ -79,6 +79,4 @@ export async function listMapDemands(supabase: DB, filters: MapFilters = {}): Pr
       status: d.status as DemandStatus,
       neighborhood: d.neighborhood,
       latitude: Number(d.latitude),
-      longitude: Number(d.longitude),
-    }))
-}
+      longitude: Number(d.longitu

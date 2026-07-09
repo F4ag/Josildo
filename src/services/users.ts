@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export async function listUserProfiles(supabase: DB) {
   const { data, error } = await supabase
@@ -16,5 +16,4 @@ export async function listUserProfiles(supabase: DB) {
 
 export async function setUserStatus(supabase: DB, userId: string, status: "ativo" | "inativo") {
   const { error } = await supabase.from("users_profiles").update({ status }).eq("id", userId)
-  if (error) throw new Error(`Falha ao atualizar status do usuário: ${error.message}`)
-}
+  if (error) throw new Error(`Falha ao atualizar status do usuário: ${erro

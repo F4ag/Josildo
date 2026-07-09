@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export async function listPessoasAtendidas(supabase: DB) {
   const [{ data: demandRows, error: demandError }, { data: attendanceRows, error: attendanceError }] =
@@ -49,6 +49,4 @@ export async function getPessoaAtendidaDetail(supabase: DB, supporterId: string)
     supporter,
     demands: demands ?? [],
     attendances: attendances ?? [],
-    interactions: interactions ?? [],
-  }
-}
+    interactions: interaction

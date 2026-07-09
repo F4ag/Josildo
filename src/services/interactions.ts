@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 import type { InteractionType } from "@/types/domain"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export async function logInteraction(
   supabase: DB,
@@ -51,5 +51,4 @@ export async function listInteractionsForLeader(supabase: DB, leaderId: string) 
     .eq("leader_id", leaderId)
     .order("created_at", { ascending: false })
   if (error) throw new Error(`Falha ao listar interações: ${error.message}`)
-  return data
-}
+ 

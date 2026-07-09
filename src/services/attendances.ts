@@ -7,7 +7,11 @@ import type { Database } from "@/types/database.types"
 import type { Attendance, AttendanceType, AttendanceStatus, Priority } from "@/types/domain"
 import { logInteraction } from "./interactions"
 
-type DB = SupabaseClient<Database>
+// O terceiro genérico é "any" de propósito: @supabase/ssr e @supabase/supabase-js
+// às vezes resolvem o tipo padrão do schema de formas incompatíveis entre si
+// (erro de build "não pode ser atribuído ao tipo 'public'"), então fixamos o
+// schema aqui em vez de depender do valor padrão de cada versão.
+type DB = SupabaseClient<Database, "public", any>
 
 export type AttendanceFilters = {
   supporterId?: string
@@ -91,12 +95,4 @@ export async function updateAttendanceStatus(
       attended_at: isConcluded ? new Date().toISOString() : undefined,
     })
     .eq("id", attendance.id)
-  if (error) throw new Error(`Falha ao atualizar status do atendimento: ${error.message}`)
-
-  await logInteraction(supabase, {
-    leaderId: attendance.leader_id, supporterId: attendance.supporter_id,
-    type: "atendimento",
-    description: `Atendimento "${attendance.title}" atualizado para: ${input.status}.`,
-    createdBy: updatedBy,
-  })
-}
+  if (error) thr

@@ -11,7 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 const OPEN_ATTENDANCE_STATUSES = [
   "novo", "em_analise", "em_andamento", "aguardando_documento", "aguardando_orgao_publico",
@@ -122,5 +122,4 @@ export async function getSupportersByNeighborhood(supabase: DB, limit = 10): Pro
   return Array.from(counts.entries())
     .map(([neighborhood, count]) => ({ neighborhood, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, limit)
-}
+    .sli

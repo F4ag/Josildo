@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 import type { Leader, LeaderType, LeaderStatus, InfluenceLevel } from "@/types/domain"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export type LeaderFilters = {
   neighborhood?: string
@@ -86,5 +86,4 @@ export async function listDistinctLeaderNeighborhoods(supabase: DB) {
     .select("neighborhood")
     .not("neighborhood", "is", null)
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
-  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
-}
+  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean)))

@@ -8,7 +8,7 @@ import type { Database } from "@/types/database.types"
 import type { Demand, DemandType, DemandStatus, Priority } from "@/types/domain"
 import { logInteraction } from "./interactions"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export type DemandFilters = {
   neighborhood?: string
@@ -121,5 +121,4 @@ export async function updateDemandStatus(
 export async function listDistinctDemandNeighborhoods(supabase: DB) {
   const { data, error } = await supabase.from("demands").select("neighborhood").not("neighborhood", "is", null)
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
-  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
-}
+  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean)))

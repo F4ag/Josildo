@@ -8,7 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 export type BirthdayRange = "hoje" | "amanha" | "semana" | "mes"
 
@@ -96,6 +96,4 @@ export async function listBirthdays(
       birthDate: s.birth_date,
       daysUntil: range === "amanha" ? 1 : daysUntil,
       alreadyGreetedToday: greetedIds.has(s.id),
-      consentWhatsapp: s.consent_whatsapp,
-    }))
-}
+      consentWhatsapp: s.consent_whats

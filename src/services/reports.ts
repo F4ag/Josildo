@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 import { listPessoasAtendidas } from "./pessoas-atendidas"
 
-type DB = SupabaseClient<Database>
+type DB = SupabaseClient<Database, "public", any>
 
 // ----------------------------------------------------------------------------
 // 11.1 — Lideranças por bairro
@@ -120,5 +120,3 @@ function maxDateBy<T extends Record<string, unknown>>(rows: T[], key: keyof T): 
     const current = map.get(groupKey)
     if (!current || createdAt > current) map.set(groupKey, createdAt)
   }
-  return map
-}
