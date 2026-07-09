@@ -71,4 +71,5 @@ export async function markAllNotificationsRead(supabase: DB, userId: string): Pr
     .update({ is_read: true })
     .eq("user_id", userId)
     .eq("is_read", false)
-  if (error) throw new Error(`Falha ao marcar notificações como lidas: ${erro
+  if (error) throw new Error(`Falha ao marcar notificações como lidas: ${error.message}`)
+}

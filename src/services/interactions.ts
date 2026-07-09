@@ -51,4 +51,5 @@ export async function listInteractionsForLeader(supabase: DB, leaderId: string) 
     .eq("leader_id", leaderId)
     .order("created_at", { ascending: false })
   if (error) throw new Error(`Falha ao listar interações: ${error.message}`)
- 
+  return data
+}

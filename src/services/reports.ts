@@ -120,3 +120,5 @@ function maxDateBy<T extends Record<string, unknown>>(rows: T[], key: keyof T): 
     const current = map.get(groupKey)
     if (!current || createdAt > current) map.set(groupKey, createdAt)
   }
+  return map
+}

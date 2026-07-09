@@ -121,4 +121,5 @@ export async function updateDemandStatus(
 export async function listDistinctDemandNeighborhoods(supabase: DB) {
   const { data, error } = await supabase.from("demands").select("neighborhood").not("neighborhood", "is", null)
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
-  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean)))
+  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
+}

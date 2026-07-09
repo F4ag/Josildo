@@ -16,4 +16,5 @@ export async function listUserProfiles(supabase: DB) {
 
 export async function setUserStatus(supabase: DB, userId: string, status: "ativo" | "inativo") {
   const { error } = await supabase.from("users_profiles").update({ status }).eq("id", userId)
-  if (error) throw new Error(`Falha ao atualizar status do usuário: ${erro
+  if (error) throw new Error(`Falha ao atualizar status do usuário: ${error.message}`)
+}

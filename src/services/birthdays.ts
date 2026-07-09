@@ -96,4 +96,6 @@ export async function listBirthdays(
       birthDate: s.birth_date,
       daysUntil: range === "amanha" ? 1 : daysUntil,
       alreadyGreetedToday: greetedIds.has(s.id),
-      consentWhatsapp: s.consent_whats
+      consentWhatsapp: s.consent_whatsapp,
+    }))
+}

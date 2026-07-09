@@ -122,4 +122,5 @@ export async function getSupportersByNeighborhood(supabase: DB, limit = 10): Pro
   return Array.from(counts.entries())
     .map(([neighborhood, count]) => ({ neighborhood, count }))
     .sort((a, b) => b.count - a.count)
-    .sli
+    .slice(0, limit)
+}

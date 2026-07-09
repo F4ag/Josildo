@@ -86,4 +86,5 @@ export async function listDistinctLeaderNeighborhoods(supabase: DB) {
     .select("neighborhood")
     .not("neighborhood", "is", null)
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
-  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean)))
+  return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
+}

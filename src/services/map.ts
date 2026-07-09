@@ -79,4 +79,6 @@ export async function listMapDemands(supabase: DB, filters: MapFilters = {}): Pr
       status: d.status as DemandStatus,
       neighborhood: d.neighborhood,
       latitude: Number(d.latitude),
-      longitude: Number(d.longitu
+      longitude: Number(d.longitude),
+    }))
+}

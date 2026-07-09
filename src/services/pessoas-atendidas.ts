@@ -49,4 +49,6 @@ export async function getPessoaAtendidaDetail(supabase: DB, supporterId: string)
     supporter,
     demands: demands ?? [],
     attendances: attendances ?? [],
-    interactions: interaction
+    interactions: interactions ?? [],
+  }
+}

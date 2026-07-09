@@ -95,4 +95,12 @@ export async function updateAttendanceStatus(
       attended_at: isConcluded ? new Date().toISOString() : undefined,
     })
     .eq("id", attendance.id)
-  if (error) thr
+  if (error) throw new Error(`Falha ao atualizar status do atendimento: ${error.message}`)
+
+  await logInteraction(supabase, {
+    leaderId: attendance.leader_id, supporterId: attendance.supporter_id,
+    type: "atendimento",
+    description: `Atendimento "${attendance.title}" atualizado para: ${input.status}.`,
+    createdBy: updatedBy,
+  })
+}
