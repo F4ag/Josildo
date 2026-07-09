@@ -5,8 +5,15 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
+import type { Supporter } from "@/types/domain"
 
 type DB = SupabaseClient<Database, "public", any>
+
+// Ver nota equivalente em services/attendances.ts sobre o cast de relações
+// embutidas (leaders) por causa do schema "any" do client.
+export type SupporterWithLeader = Supporter & {
+  leaders: { id: string; name: string; phone?: string | null } | null
+}
 
 export async function listPessoasAtendidas(supabase: DB) {
   const [{ data: demandRows, error: demandError }, { data: attendanceRows, error: attendanceError }] =
@@ -30,7 +37,7 @@ export async function listPessoasAtendidas(supabase: DB) {
     .in("id", supporterIds)
     .order("name", { ascending: true })
   if (error) throw new Error(`Falha ao listar pessoas atendidas: ${error.message}`)
-  return data
+  return data as unknown as SupporterWithLeader[]
 }
 
 export async function getPessoaAtendidaDetail(supabase: DB, supporterId: string) {
@@ -46,7 +53,7 @@ export async function getPessoaAtendidaDetail(supabase: DB, supporterId: string)
   if (!supporter) return null
 
   return {
-    supporter,
+    supporter: supporter as unknown as SupporterWithLeader,
     demands: demands ?? [],
     attendances: attendances ?? [],
     interactions: interactions ?? [],

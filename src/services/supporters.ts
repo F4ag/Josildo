@@ -16,6 +16,12 @@ export type SupporterFilters = {
   search?: string
 }
 
+// Ver nota equivalente em services/attendances.ts sobre o cast de relações
+// embutidas (leaders) por causa do schema "any" do client.
+export type SupporterWithLeader = Supporter & {
+  leaders: { name: string } | null
+}
+
 export async function listSupporters(supabase: DB, filters: SupporterFilters = {}) {
   let query = supabase.from("supporters").select("*, leaders(name)").order("name", { ascending: true })
 
@@ -26,11 +32,12 @@ export async function listSupporters(supabase: DB, filters: SupporterFilters = {
 
   const { data, error } = await query
   if (error) throw new Error(`Falha ao listar apoiadores: ${error.message}`)
+  const rows = data as unknown as SupporterWithLeader[]
 
   if (filters.birthMonth) {
-    return data.filter((s) => new Date(`${s.birth_date}T00:00:00`).getMonth() + 1 === filters.birthMonth)
+    return rows.filter((s) => new Date(`${s.birth_date}T00:00:00`).getMonth() + 1 === filters.birthMonth)
   }
-  return data
+  return rows
 }
 
 export async function getSupporterById(supabase: DB, id: string): Promise<Supporter | null> {

@@ -21,6 +21,13 @@ export type DemandFilters = {
   search?: string
 }
 
+// Ver nota equivalente em services/attendances.ts sobre o cast de relações
+// embutidas (leaders/supporters) por causa do schema "any" do client.
+export type DemandWithRelations = Demand & {
+  leaders: { id: string; name: string; phone?: string | null } | null
+  supporters: { id: string; name: string; phone?: string | null } | null
+}
+
 export async function listDemands(supabase: DB, filters: DemandFilters = {}) {
   let query = supabase
     .from("demands")
@@ -38,7 +45,7 @@ export async function listDemands(supabase: DB, filters: DemandFilters = {}) {
 
   const { data, error } = await query
   if (error) throw new Error(`Falha ao listar demandas: ${error.message}`)
-  return data
+  return data as unknown as DemandWithRelations[]
 }
 
 export async function getDemandById(supabase: DB, id: string) {
@@ -48,7 +55,7 @@ export async function getDemandById(supabase: DB, id: string) {
     .eq("id", id)
     .maybeSingle()
   if (error) throw new Error(`Falha ao buscar demanda: ${error.message}`)
-  return data
+  return data as unknown as DemandWithRelations | null
 }
 
 export async function getDemandHistory(supabase: DB, demandId: string) {

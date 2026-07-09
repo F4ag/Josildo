@@ -22,6 +22,17 @@ export type AttendanceFilters = {
   responsibleUserId?: string
 }
 
+// Linha de atendimento com os relacionamentos embutidos usados nas telas
+// (atendimentos/page.tsx e atendimentos/[id]/page.tsx). Tipado à mão porque,
+// com o schema "any" do client (ver nota em lib/supabase/server.ts), o
+// TypeScript perde a cardinalidade dessas relações embutidas e as infere
+// como array em vez de objeto único — o formato abaixo é o que o PostgREST
+// realmente devolve em runtime (supporter_id/leader_id são N:1).
+export type AttendanceWithRelations = Attendance & {
+  supporters: { id: string; name: string; neighborhood?: string | null; phone?: string; consent_whatsapp?: boolean } | null
+  leaders: { id: string; name: string } | null
+}
+
 export async function listAttendances(supabase: DB, filters: AttendanceFilters = {}) {
   let query = supabase
     .from("attendances")
@@ -37,7 +48,7 @@ export async function listAttendances(supabase: DB, filters: AttendanceFilters =
 
   const { data, error } = await query
   if (error) throw new Error(`Falha ao listar atendimentos: ${error.message}`)
-  return data
+  return data as unknown as AttendanceWithRelations[]
 }
 
 export async function getAttendanceById(supabase: DB, id: string) {
@@ -47,7 +58,7 @@ export async function getAttendanceById(supabase: DB, id: string) {
     .eq("id", id)
     .maybeSingle()
   if (error) throw new Error(`Falha ao buscar atendimento: ${error.message}`)
-  return data
+  return data as unknown as AttendanceWithRelations | null
 }
 
 export type AttendanceInput = Omit<

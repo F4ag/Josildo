@@ -92,7 +92,12 @@ export async function listBirthdays(
       phone: s.phone,
       neighborhood: s.neighborhood,
       leaderId: s.leader_id,
-      leaderName: s.leaders?.name ?? null,
+      // Cast pontual: com o schema "any" (ver nota em lib/supabase/server.ts),
+      // o TypeScript perde a cardinalidade da relação embutida leaders(...)
+      // e passa a inferir como array em vez de objeto único — mas em
+      // runtime o PostgREST devolve um objeto (leader_id é N:1), então o
+      // cast reflete o formato real.
+      leaderName: (s.leaders as { name: string } | null)?.name ?? null,
       birthDate: s.birth_date,
       daysUntil: range === "amanha" ? 1 : daysUntil,
       alreadyGreetedToday: greetedIds.has(s.id),
