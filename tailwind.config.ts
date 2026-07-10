@@ -36,6 +36,15 @@ const config: Config = {
           resolvida: "#1E7A46",
           atrasada: "#C0392B",
         },
+        // Roxo usado para representar "Apoiadores" fora do trio
+        // primária/secundária/destaque — mesmo tom do pin de apoiador no
+        // Mapa Territorial (ver SUPPORTER_PIN_COLOR em lib/map-colors.ts),
+        // só que como token do Tailwind pra poder usar em bg-supporter/
+        // text-supporter em qualquer componente (ex.: StatCard do Dashboard).
+        supporter: {
+          DEFAULT: "#7C3AED",
+          foreground: "#FFFFFF",
+        },
       },
       borderRadius: {
         lg: "0.75rem",

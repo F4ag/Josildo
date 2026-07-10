@@ -1,5 +1,6 @@
 import Link from "next/link"
 import type { Metadata } from "next"
+import { Users, UserPlus, HeartHandshake, ClipboardCheck, Stethoscope } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import {
@@ -34,11 +35,26 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Lideranças ativas" value={summary.activeLeaders} href="/liderancas?status=ativa" />
-        <StatCard label="Apoiadores" value={summary.totalSupporters} href="/apoiadores" />
-        <StatCard label="Pessoas atendidas" value={summary.totalPessoasAtendidas} href="/pessoas-atendidas" />
-        <StatCard label="Demandas resolvidas (mês)" value={summary.demandsResolvedThisMonth} href="/demandas?status=resolvida" />
-        <StatCard label="Atendimentos pendentes" value={summary.attendancesPending} href="/atendimentos" />
+        <StatCard
+          label="Lideranças ativas" value={summary.activeLeaders} href="/liderancas?status=ativa"
+          icon={Users} tone="primary"
+        />
+        <StatCard
+          label="Apoiadores" value={summary.totalSupporters} href="/apoiadores"
+          icon={UserPlus} tone="supporter"
+        />
+        <StatCard
+          label="Pessoas atendidas" value={summary.totalPessoasAtendidas} href="/pessoas-atendidas"
+          icon={HeartHandshake} tone="orange"
+        />
+        <StatCard
+          label="Demandas resolvidas (mês)" value={summary.demandsResolvedThisMonth} href="/demandas?status=resolvida"
+          icon={ClipboardCheck} tone="secondary"
+        />
+        <StatCard
+          label="Atendimentos pendentes" value={summary.attendancesPending} href="/atendimentos"
+          icon={Stethoscope} tone="accent"
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
