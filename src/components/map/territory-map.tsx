@@ -6,9 +6,9 @@
 // direto e quebra em SSR. Nunca importar este arquivo direto de um Server
 // Component.
 
-import { useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { LEADER_STATUS_COLOR, LEADER_STATUS_LABELS, DEMAND_STATUS_COLOR, DEMAND_STATUS_LABELS } from "@/types/domain"
@@ -56,6 +56,22 @@ const SUPPORTER_ICON = L.divIcon({
   popupAnchor: [0, -5],
 })
 
+/** Ícone redondo com o número de apoiadores agrupados naquele ponto da tela
+ * (ver useSupporterClusters abaixo). Cresce um pouco conforme o número fica
+ * maior, pra não virar um "1" minúsculo dentro de um círculo grande quando
+ * o grupo é de 30+ pessoas. */
+function createClusterIcon(count: number) {
+  const size = count < 10 ? 26 : count < 100 ? 32 : 38
+  const fontSize = count < 100 ? 12 : 10
+  return L.divIcon({
+    className: "",
+    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:9999px;background:${SUPPORTER_PIN_COLOR};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.45);color:white;font-weight:700;font-size:${fontSize}px;font-family:inherit;line-height:1;">${count}</span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  })
+}
+
 /** Ajusta o zoom/centro do mapa para enquadrar todos os pins ao montar. */
 function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap()
@@ -75,44 +91,139 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null
 }
 
-// Quando a geocodificação não acha o endereço exato (ver lib/geocoding.ts),
-// o fallback usa o CEP ou o centro do bairro — então é normal duas pessoas
-// diferentes do mesmo bairro caírem exatamente na mesma coordenada. Sem
-// tratar isso, o Leaflet desenha um pin exatamente em cima do outro e só o
-// último renderizado fica clicável, escondendo os demais (foi o que
-// aconteceu com dois apoiadores do mesmo bairro). Aqui a gente agrupa pins
-// que caem na mesma coordenada (arredondada a ~1m de precisão) e espalha
-// cada grupo num pequeno círculo ao redor do ponto original, só o
-// suficiente pra cada um ficar visível e clicável — não muda a posição
-// "oficial" salva no banco, é só um ajuste de exibição.
-function spreadOverlappingPoints<T extends { id: string; latitude: number; longitude: number }>(
-  items: T[],
-): Map<string, [number, number]> {
-  const groups = new Map<string, T[]>()
-  for (const item of items) {
-    const key = `${item.latitude.toFixed(5)},${item.longitude.toFixed(5)}`
-    const group = groups.get(key)
-    if (group) group.push(item)
-    else groups.set(key, [item])
-  }
+type SupporterCluster = {
+  key: string
+  latitude: number
+  longitude: number
+  items: MapSupporterPin[]
+}
 
-  const result = new Map<string, [number, number]>()
-  const RADIUS = 0.00035 // ~35m — separa visualmente sem afastar demais no zoom normal
-  for (const group of groups.values()) {
-    if (group.length === 1) {
-      const only = group[0]!
-      result.set(only.id, [only.latitude, only.longitude])
-      continue
+// Raio de agrupamento em PIXELS da tela, não em graus/metros de coordenada.
+// Tentativa anterior (fix27) espalhava pins em ~35m fixos — funciona quando
+// o mapa está bem próximo, mas em qualquer zoom mais aberto (cidade/região)
+// 35m vira menos de 1 pixel na tela e os pins voltam a ficar exatamente em
+// cima um do outro (foi o que aconteceu: geocodificação por bairro faz
+// várias pessoas caírem no mesmíssimo ponto — ver lib/geocoding.ts — e
+// nesse caso nem existe "zoom suficiente" pra separar de verdade, porque as
+// coordenadas são IDÊNTICAS, não só próximas).
+//
+// Por isso o agrupamento aqui é recalculado a cada zoom/arrasto do Leaflet
+// (useMapEvents abaixo), convertendo cada apoiador pra posição em pixel na
+// tela (map.latLngToContainerPoint) e juntando quem está a menos de
+// CLUSTER_PIXEL_RADIUS px de distância num "balão" só, com o número de
+// pessoas ali dentro. Clicar no balão mostra a lista com link pro cadastro
+// de cada um — não tem "zoom pra separar" porque, sendo o mesmo ponto
+// geográfico, não existe zoom que realmente os afaste.
+const CLUSTER_PIXEL_RADIUS = 28
+
+function useSupporterClusters(supporters: MapSupporterPin[]): SupporterCluster[] {
+  const map = useMap()
+  const [clusters, setClusters] = useState<SupporterCluster[]>([])
+
+  const recompute = useCallback(() => {
+    if (supporters.length === 0) {
+      setClusters([])
+      return
     }
-    group.forEach((item, i) => {
-      const angle = (2 * Math.PI * i) / group.length
-      result.set(item.id, [
-        item.latitude + RADIUS * Math.cos(angle),
-        item.longitude + RADIUS * Math.sin(angle),
-      ])
-    })
-  }
-  return result
+
+    const projected = supporters.map((s) => ({
+      supporter: s,
+      point: map.latLngToContainerPoint([s.latitude, s.longitude]),
+    }))
+
+    const used = new Array(projected.length).fill(false)
+    const result: SupporterCluster[] = []
+
+    for (let i = 0; i < projected.length; i++) {
+      if (used[i]) continue
+      const group = [projected[i]!]
+      used[i] = true
+
+      for (let j = i + 1; j < projected.length; j++) {
+        if (used[j]) continue
+        const dx = projected[i]!.point.x - projected[j]!.point.x
+        const dy = projected[i]!.point.y - projected[j]!.point.y
+        if (Math.sqrt(dx * dx + dy * dy) <= CLUSTER_PIXEL_RADIUS) {
+          group.push(projected[j]!)
+          used[j] = true
+        }
+      }
+
+      const avgLat = group.reduce((sum, g) => sum + g.supporter.latitude, 0) / group.length
+      const avgLng = group.reduce((sum, g) => sum + g.supporter.longitude, 0) / group.length
+      result.push({
+        key: group.map((g) => g.supporter.id).join("-"),
+        latitude: avgLat,
+        longitude: avgLng,
+        items: group.map((g) => g.supporter),
+      })
+    }
+
+    setClusters(result)
+  }, [map, supporters])
+
+  useEffect(() => {
+    recompute()
+  }, [recompute])
+
+  useMapEvents({
+    zoomend: recompute,
+    moveend: recompute,
+  })
+
+  return clusters
+}
+
+function SupporterMarkers({ supporters }: { supporters: MapSupporterPin[] }) {
+  const clusters = useSupporterClusters(supporters)
+
+  return (
+    <>
+      {clusters.map((cluster) =>
+        cluster.items.length === 1 ? (
+          <Marker
+            key={cluster.key}
+            position={[cluster.latitude, cluster.longitude]}
+            icon={SUPPORTER_ICON}
+          >
+            <Popup>
+              <div className="space-y-1 text-sm">
+                <p className="font-medium">{cluster.items[0]!.name}</p>
+                <p className="text-foreground/60">
+                  Apoiador{cluster.items[0]!.neighborhood ? ` · ${cluster.items[0]!.neighborhood}` : ""}
+                </p>
+                <Link href={`/apoiadores/${cluster.items[0]!.id}`} className="text-primary hover:underline">
+                  Abrir cadastro
+                </Link>
+              </div>
+            </Popup>
+          </Marker>
+        ) : (
+          <Marker
+            key={cluster.key}
+            position={[cluster.latitude, cluster.longitude]}
+            icon={createClusterIcon(cluster.items.length)}
+          >
+            <Popup>
+              <div className="space-y-1 text-sm">
+                <p className="font-medium">{cluster.items.length} apoiadores nesta região</p>
+                <ul className="space-y-1">
+                  {cluster.items.map((s) => (
+                    <li key={s.id}>
+                      <Link href={`/apoiadores/${s.id}`} className="text-primary hover:underline">
+                        {s.name}
+                      </Link>
+                      {s.neighborhood ? <span className="text-foreground/60"> · {s.neighborhood}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Popup>
+          </Marker>
+        ),
+      )}
+    </>
+  )
 }
 
 type TerritoryMapProps = {
@@ -122,18 +233,13 @@ type TerritoryMapProps = {
 }
 
 export function TerritoryMap({ leaders, demands, supporters }: TerritoryMapProps) {
-  // Só apoiadores costumam se acumular em massa no mesmo bairro/CEP — por
-  // isso o espalhamento é aplicado neles. Lideranças e demandas tendem a ter
-  // endereço próprio mais preciso e em volume bem menor.
-  const supporterPositions = useMemo(() => spreadOverlappingPoints(supporters), [supporters])
-
   const allPoints = useMemo<[number, number][]>(
     () => [
       ...leaders.map((l): [number, number] => [l.latitude, l.longitude]),
       ...demands.map((d): [number, number] => [d.latitude, d.longitude]),
-      ...supporters.map((s): [number, number] => supporterPositions.get(s.id) ?? [s.latitude, s.longitude]),
+      ...supporters.map((s): [number, number] => [s.latitude, s.longitude]),
     ],
-    [leaders, demands, supporters, supporterPositions],
+    [leaders, demands, supporters],
   )
 
   return (
@@ -191,25 +297,7 @@ export function TerritoryMap({ leaders, demands, supporters }: TerritoryMapProps
         </Marker>
       ))}
 
-      {supporters.map((supporter) => (
-        <Marker
-          key={`supporter-${supporter.id}`}
-          position={supporterPositions.get(supporter.id) ?? [supporter.latitude, supporter.longitude]}
-          icon={SUPPORTER_ICON}
-        >
-          <Popup>
-            <div className="space-y-1 text-sm">
-              <p className="font-medium">{supporter.name}</p>
-              <p className="text-foreground/60">
-                Apoiador{supporter.neighborhood ? ` · ${supporter.neighborhood}` : ""}
-              </p>
-              <Link href={`/apoiadores/${supporter.id}`} className="text-primary hover:underline">
-                Abrir cadastro
-              </Link>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      <SupporterMarkers supporters={supporters} />
     </MapContainer>
   )
 }
