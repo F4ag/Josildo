@@ -23,3 +23,9 @@ export const STATUS_COLOR_HEX: Record<BadgeTone, string> = {
   laranja: "#E07A1F",
   cinza: "#8A8F98",
 }
+
+// Apoiadores não têm status (ver services/map.ts) — cor fixa, roxa, pra
+// diferenciar visualmente dos pins de liderança/demanda no mapa territorial
+// sem precisar mexer em BadgeTone (que é a união fechada usada em badges de
+// status no resto da UI).
+export const SUPPORTER_PIN_COLOR = "#7C3AED"

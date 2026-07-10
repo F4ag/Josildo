@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
-import { listMapDemands, listMapLeaders } from "@/services/map"
+import { listMapDemands, listMapLeaders, listMapSupporters } from "@/services/map"
 import { listDistinctLeaderNeighborhoods } from "@/services/leaders"
 import { listDistinctDemandNeighborhoods } from "@/services/demands"
+import { listDistinctSupporterNeighborhoods } from "@/services/supporters"
 import { TerritoryMapLoader } from "@/components/map/territory-map-loader"
 import { LEADER_STATUS_LABELS, LEADER_STATUS_COLOR, DEMAND_STATUS_LABELS, DEMAND_STATUS_COLOR } from "@/types/domain"
-import { STATUS_COLOR_HEX } from "@/lib/map-colors"
+import { STATUS_COLOR_HEX, SUPPORTER_PIN_COLOR } from "@/lib/map-colors"
 
 export const metadata: Metadata = { title: "Mapa Territorial · Lidera+" }
 
@@ -15,24 +16,27 @@ export default async function MapaPage({ searchParams }: { searchParams: Promise
   const params = await searchParams
   const supabase = await createClient()
 
-  const [leaders, demands, leaderNeighborhoods, demandNeighborhoods] = await Promise.all([
-    listMapLeaders(supabase, { neighborhood: params.bairro }),
-    listMapDemands(supabase, { neighborhood: params.bairro }),
-    listDistinctLeaderNeighborhoods(supabase),
-    listDistinctDemandNeighborhoods(supabase),
-  ])
+  const [leaders, demands, supporters, leaderNeighborhoods, demandNeighborhoods, supporterNeighborhoods] =
+    await Promise.all([
+      listMapLeaders(supabase, { neighborhood: params.bairro }),
+      listMapDemands(supabase, { neighborhood: params.bairro }),
+      listMapSupporters(supabase, { neighborhood: params.bairro }),
+      listDistinctLeaderNeighborhoods(supabase),
+      listDistinctDemandNeighborhoods(supabase),
+      listDistinctSupporterNeighborhoods(supabase),
+    ])
 
-  const neighborhoods = Array.from(new Set([...leaderNeighborhoods, ...demandNeighborhoods])).sort((a, b) =>
-    a.localeCompare(b, "pt-BR"),
-  )
+  const neighborhoods = Array.from(
+    new Set([...leaderNeighborhoods, ...demandNeighborhoods, ...supporterNeighborhoods]),
+  ).sort((a, b) => a.localeCompare(b, "pt-BR"))
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-foreground">Mapa Territorial</h1>
         <p className="text-sm text-foreground/60">
-          {leaders.length} liderança(s) e {demands.length} demanda(s) com localização cadastrada
-          {params.bairro ? ` em ${params.bairro}` : ""}.
+          {leaders.length} liderança(s), {demands.length} demanda(s) e {supporters.length} apoiador(es) com
+          localização cadastrada{params.bairro ? ` em ${params.bairro}` : ""}.
         </p>
       </div>
 
@@ -72,15 +76,22 @@ export default async function MapaPage({ searchParams }: { searchParams: Promise
             </span>
           ))}
         </div>
+
+        <div className="flex flex-wrap gap-x-5 gap-y-2 rounded-lg border border-black/5 bg-white px-4 py-3 text-xs text-foreground/70">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: SUPPORTER_PIN_COLOR }} />
+            <span className="font-medium text-foreground">Apoiadores</span>
+          </span>
+        </div>
       </div>
 
-      {leaders.length === 0 && demands.length === 0 ? (
+      {leaders.length === 0 && demands.length === 0 && supporters.length === 0 ? (
         <div className="flex h-64 items-center justify-center rounded-lg border border-black/5 bg-white text-sm text-foreground/50">
           Nenhum registro com latitude/longitude cadastrada ainda
           {params.bairro ? " neste bairro" : ""}.
         </div>
       ) : (
-        <TerritoryMapLoader leaders={leaders} demands={demands} />
+        <TerritoryMapLoader leaders={leaders} demands={demands} supporters={supporters} />
       )}
     </div>
   )

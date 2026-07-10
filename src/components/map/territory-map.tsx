@@ -12,8 +12,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { LEADER_STATUS_COLOR, LEADER_STATUS_LABELS, DEMAND_STATUS_COLOR, DEMAND_STATUS_LABELS } from "@/types/domain"
-import { STATUS_COLOR_HEX } from "@/lib/map-colors"
-import type { MapLeaderPin, MapDemandPin } from "@/services/map"
+import { STATUS_COLOR_HEX, SUPPORTER_PIN_COLOR } from "@/lib/map-colors"
+import type { MapLeaderPin, MapDemandPin, MapSupporterPin } from "@/services/map"
 
 // Centro/zoom usados só quando não há nenhum pin para calcular bounds (ex.:
 // projeto recém-criado, sem lat/lng cadastrado ainda). Cada campanha deve
@@ -45,6 +45,17 @@ function createDotIcon(hexColor: string) {
   })
 }
 
+// Apoiadores tendem a ser em bem maior número que lideranças/demandas — um
+// pin menor evita que o mapa vire uma poça só da cor deles quando a rede
+// crescer, mas ainda dá pra ver a concentração/tamanho do grupo por região.
+const SUPPORTER_ICON = L.divIcon({
+  className: "",
+  html: `<span style="display:block;width:10px;height:10px;border-radius:9999px;background:${SUPPORTER_PIN_COLOR};border:1.5px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.4);opacity:0.85;"></span>`,
+  iconSize: [10, 10],
+  iconAnchor: [5, 5],
+  popupAnchor: [0, -5],
+})
+
 /** Ajusta o zoom/centro do mapa para enquadrar todos os pins ao montar. */
 function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap()
@@ -67,15 +78,17 @@ function FitBounds({ points }: { points: [number, number][] }) {
 type TerritoryMapProps = {
   leaders: MapLeaderPin[]
   demands: MapDemandPin[]
+  supporters: MapSupporterPin[]
 }
 
-export function TerritoryMap({ leaders, demands }: TerritoryMapProps) {
+export function TerritoryMap({ leaders, demands, supporters }: TerritoryMapProps) {
   const allPoints = useMemo<[number, number][]>(
     () => [
       ...leaders.map((l): [number, number] => [l.latitude, l.longitude]),
       ...demands.map((d): [number, number] => [d.latitude, d.longitude]),
+      ...supporters.map((s): [number, number] => [s.latitude, s.longitude]),
     ],
-    [leaders, demands],
+    [leaders, demands, supporters],
   )
 
   return (
@@ -126,6 +139,26 @@ export function TerritoryMap({ leaders, demands }: TerritoryMapProps) {
                 {demand.neighborhood ? ` · ${demand.neighborhood}` : ""}
               </p>
               <Link href={`/demandas/${demand.id}`} className="text-primary hover:underline">
+                Abrir cadastro
+              </Link>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+
+      {supporters.map((supporter) => (
+        <Marker
+          key={`supporter-${supporter.id}`}
+          position={[supporter.latitude, supporter.longitude]}
+          icon={SUPPORTER_ICON}
+        >
+          <Popup>
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">{supporter.name}</p>
+              <p className="text-foreground/60">
+                Apoiador{supporter.neighborhood ? ` · ${supporter.neighborhood}` : ""}
+              </p>
+              <Link href={`/apoiadores/${supporter.id}`} className="text-primary hover:underline">
                 Abrir cadastro
               </Link>
             </div>

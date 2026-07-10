@@ -37,6 +37,18 @@ export type MapDemandPin = {
   longitude: number
 }
 
+// Apoiadores não têm "status" (não são um funil como lideranças/demandas) —
+// entram no mapa só pra dar volume visual do tamanho da rede numa região,
+// por isso o pin usa uma cor fixa em vez de STATUS_COLOR_HEX (ver
+// territory-map.tsx).
+export type MapSupporterPin = {
+  id: string
+  name: string
+  neighborhood: string | null
+  latitude: number
+  longitude: number
+}
+
 export async function listMapLeaders(supabase: DB, filters: MapFilters = {}): Promise<MapLeaderPin[]> {
   let query = supabase
     .from("leaders")
@@ -80,5 +92,27 @@ export async function listMapDemands(supabase: DB, filters: MapFilters = {}): Pr
       neighborhood: d.neighborhood,
       latitude: Number(d.latitude),
       longitude: Number(d.longitude),
+    }))
+}
+
+export async function listMapSupporters(supabase: DB, filters: MapFilters = {}): Promise<MapSupporterPin[]> {
+  let query = supabase
+    .from("supporters")
+    .select("id, name, neighborhood, latitude, longitude")
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
+  if (filters.neighborhood) query = query.eq("neighborhood", filters.neighborhood)
+
+  const { data, error } = await query
+  if (error) throw new Error(`Falha ao listar apoiadores no mapa: ${error.message}`)
+
+  return (data ?? [])
+    .filter((s): s is typeof s & { latitude: number; longitude: number } => s.latitude !== null && s.longitude !== null)
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      neighborhood: s.neighborhood,
+      latitude: Number(s.latitude),
+      longitude: Number(s.longitude),
     }))
 }
