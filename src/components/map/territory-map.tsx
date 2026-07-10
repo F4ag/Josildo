@@ -75,6 +75,46 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null
 }
 
+// Quando a geocodificação não acha o endereço exato (ver lib/geocoding.ts),
+// o fallback usa o CEP ou o centro do bairro — então é normal duas pessoas
+// diferentes do mesmo bairro caírem exatamente na mesma coordenada. Sem
+// tratar isso, o Leaflet desenha um pin exatamente em cima do outro e só o
+// último renderizado fica clicável, escondendo os demais (foi o que
+// aconteceu com dois apoiadores do mesmo bairro). Aqui a gente agrupa pins
+// que caem na mesma coordenada (arredondada a ~1m de precisão) e espalha
+// cada grupo num pequeno círculo ao redor do ponto original, só o
+// suficiente pra cada um ficar visível e clicável — não muda a posição
+// "oficial" salva no banco, é só um ajuste de exibição.
+function spreadOverlappingPoints<T extends { id: string; latitude: number; longitude: number }>(
+  items: T[],
+): Map<string, [number, number]> {
+  const groups = new Map<string, T[]>()
+  for (const item of items) {
+    const key = `${item.latitude.toFixed(5)},${item.longitude.toFixed(5)}`
+    const group = groups.get(key)
+    if (group) group.push(item)
+    else groups.set(key, [item])
+  }
+
+  const result = new Map<string, [number, number]>()
+  const RADIUS = 0.00035 // ~35m — separa visualmente sem afastar demais no zoom normal
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      const only = group[0]!
+      result.set(only.id, [only.latitude, only.longitude])
+      continue
+    }
+    group.forEach((item, i) => {
+      const angle = (2 * Math.PI * i) / group.length
+      result.set(item.id, [
+        item.latitude + RADIUS * Math.cos(angle),
+        item.longitude + RADIUS * Math.sin(angle),
+      ])
+    })
+  }
+  return result
+}
+
 type TerritoryMapProps = {
   leaders: MapLeaderPin[]
   demands: MapDemandPin[]
@@ -82,13 +122,18 @@ type TerritoryMapProps = {
 }
 
 export function TerritoryMap({ leaders, demands, supporters }: TerritoryMapProps) {
+  // Só apoiadores costumam se acumular em massa no mesmo bairro/CEP — por
+  // isso o espalhamento é aplicado neles. Lideranças e demandas tendem a ter
+  // endereço próprio mais preciso e em volume bem menor.
+  const supporterPositions = useMemo(() => spreadOverlappingPoints(supporters), [supporters])
+
   const allPoints = useMemo<[number, number][]>(
     () => [
       ...leaders.map((l): [number, number] => [l.latitude, l.longitude]),
       ...demands.map((d): [number, number] => [d.latitude, d.longitude]),
-      ...supporters.map((s): [number, number] => [s.latitude, s.longitude]),
+      ...supporters.map((s): [number, number] => supporterPositions.get(s.id) ?? [s.latitude, s.longitude]),
     ],
-    [leaders, demands, supporters],
+    [leaders, demands, supporters, supporterPositions],
   )
 
   return (
@@ -149,7 +194,7 @@ export function TerritoryMap({ leaders, demands, supporters }: TerritoryMapProps
       {supporters.map((supporter) => (
         <Marker
           key={`supporter-${supporter.id}`}
-          position={[supporter.latitude, supporter.longitude]}
+          position={supporterPositions.get(supporter.id) ?? [supporter.latitude, supporter.longitude]}
           icon={SUPPORTER_ICON}
         >
           <Popup>

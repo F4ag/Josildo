@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { USER_ROLE_LABELS, type UserRole } from "@/types/domain"
 import { notificationHref } from "@/lib/notification-link"
 import { markAllNotificationsReadAction, markNotificationReadAction } from "./notification-actions"
+import { MobileNav } from "./mobile-nav"
 
 export type TopbarNotification = {
   id: string
@@ -70,8 +71,22 @@ export function Topbar({ fullName, role, unreadNotifications, notifications }: T
 
   return (
     <header className="no-print flex h-16 items-center justify-between border-b border-black/5 bg-white px-4 md:px-6">
+      {/* No celular o Sidebar (menu lateral) fica escondido — este bloco só
+          existe em telas pequenas (md:hidden) e cobre as duas coisas que
+          faltavam: menu hambúrguer com todas as páginas e a logomarca,
+          clicável para voltar ao Dashboard (home). Em telas médias/grandes
+          o Sidebar já cobre isso, por isso tudo aqui é escondido a partir
+          do breakpoint md. */}
+      <div className="flex items-center gap-2 md:hidden">
+        <MobileNav role={role} />
+        <Link href="/dashboard" aria-label="Ir para o início" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element -- SVG estático de public/, não precisa do otimizador do next/image */}
+          <img src="/brand/icon-mark.svg" alt="Lidera+" className="h-7 w-7 shrink-0" width={28} height={28} />
+        </Link>
+      </div>
+
       {/* Espaço reservado para breadcrumbs por página (Módulo "UI/UX" do prompt master). */}
-      <div className="text-sm text-foreground/60" />
+      <div className="hidden text-sm text-foreground/60 md:block" />
 
       <div className="flex items-center gap-4">
         <div ref={containerRef} className="relative">
