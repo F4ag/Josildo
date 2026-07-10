@@ -9,12 +9,38 @@ import {
 } from "@/services/supporters"
 import { supporterSchema } from "@/lib/validations/supporter"
 import { can } from "@/lib/permissions"
+import { geocodeAddress } from "@/lib/geocoding"
 import type { UserRole } from "@/types/domain"
 
 export type SupporterActionState = {
   error: string | null
   success?: boolean
   duplicates?: { id: string; name: string; phone: string; neighborhood: string | null }[]
+}
+
+/** "" -> null, "-23.5" -> -23.5. Nunca retorna NaN nem 0 pra campo vazio
+ * (ver comentário em lib/validations/supporter.ts sobre "Null Island"). */
+function parseCoord(value: string | undefined): number | null {
+  return value ? Number(value) : null
+}
+
+/** Só tenta geocodificar quando ninguém preencheu lat/lng à mão — o
+ * cadastro manual sempre vence a busca automática. */
+async function resolveCoords(data: {
+  latitude?: string; longitude?: string
+  address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string
+}): Promise<{ latitude: number | null; longitude: number | null }> {
+  const manualLat = parseCoord(data.latitude)
+  const manualLng = parseCoord(data.longitude)
+  if (manualLat !== null && manualLng !== null) {
+    return { latitude: manualLat, longitude: manualLng }
+  }
+
+  const found = await geocodeAddress({
+    address: data.address, neighborhood: data.neighborhood, city: data.city, state: data.state,
+    zipCode: data.zip_code,
+  })
+  return { latitude: found?.latitude ?? null, longitude: found?.longitude ?? null }
 }
 
 function parseSupporterForm(formData: FormData) {
@@ -28,6 +54,8 @@ function parseSupporterForm(formData: FormData) {
     city: formData.get("city") || undefined,
     state: formData.get("state") || undefined,
     zip_code: formData.get("zip_code") || undefined,
+    latitude: formData.get("latitude") || "",
+    longitude: formData.get("longitude") || "",
     leader_id: formData.get("leader_id") || "",
     origin: formData.get("origin") || "",
     gender: formData.get("gender") || undefined,
@@ -80,54 +108,17 @@ export async function createSupporterAction(
     }
   }
 
+  const coords = await resolveCoords(parsed.data)
+
   const input: SupporterInput = {
     ...parsed.data,
     email: parsed.data.email || null,
     origin: parsed.data.origin || null,
     leader_id: leaderId,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
     consent_date: new Date().toISOString(),
     consent_origin: "cadastro_interno",
   }
 
-  const supporter = await createSupporter(supabase, input, session.id)
-  revalidatePath("/apoiadores")
-  redirect(`/apoiadores/${supporter.id}`)
-}
-
-export async function updateSupporterAction(
-  supporterId: string,
-  _prevState: SupporterActionState,
-  formData: FormData,
-): Promise<SupporterActionState> {
-  const session = await requireSessionUser()
-  const role = session.profile.role as UserRole
-  const supabase = await createClient()
-
-  let isOwnNetwork = false
-  if (role === "lideranca") {
-    const existing = await getSupporterById(supabase, supporterId)
-    isOwnNetwork = existing?.leader_id === session.profile.leader_id
-  }
-
-  if (!can(role, "update", "supporters") && !isOwnNetwork) {
-    return { error: "Você não tem permissão para editar este apoiador." }
-  }
-
-  const parsed = parseSupporterForm(formData)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
-  }
-
-  const input: Partial<SupporterInput> = {
-    ...parsed.data,
-    email: parsed.data.email || null,
-    origin: parsed.data.origin || null,
-  }
-  // Liderança não transfere o apoiador para outra rede.
-  if (role === "lideranca") delete input.leader_id
-
-  await updateSupporter(supabase, supporterId, input)
-  revalidatePath("/apoiadores")
-  revalidatePath(`/apoiadores/${supporterId}`)
-  redirect(`/apoiadores/${supporterId}`)
-}
+  const supporter = await 

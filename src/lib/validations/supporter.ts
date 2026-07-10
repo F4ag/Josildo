@@ -13,18 +13,16 @@ export const supporterSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zip_code: z.string().optional(),
-  leader_id: z.string().uuid().optional().or(z.literal("")),
-  origin: z.enum(SUPPORTER_ORIGINS).optional().or(z.literal("")),
-  gender: z.string().optional(),
-  profession: z.string().optional(),
-  consent_whatsapp: z.coerce.boolean().default(false),
-  consent_email: z.coerce.boolean().default(false),
-  // Módulo 15 (LGPD): sem esta autorização o cadastro não é salvo — texto
-  // padrão sugerido no prompt master é exibido ao lado do checkbox no form.
-  consent_registration: z.coerce.boolean().refine((v) => v === true, {
-    message: "É preciso confirmar a autorização de cadastro (LGPD) para continuar.",
-  }),
-  notes: z.string().optional(),
-})
-
-export type SupporterFormInput = z.infer<typeof supporterSchema>
+  // Mesma lógica de leader.ts/demand.ts: string em vez de z.coerce.number()
+  // pra não transformar "" em 0 (Null Island) — a conversão pra number|null
+  // é feita à mão na Server Action, só depois de decidir se vamos usar o
+  // valor manual ou tentar geocodificar pelo endereço/CEP.
+  latitude: z.string().optional().refine(
+    (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= -90 && Number(v) <= 90),
+    "Latitude inválida (use algo entre -90 e 90).",
+  ),
+  longitude: z.string().optional().refine(
+    (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= -180 && Number(v) <= 180),
+    "Longitude inválida (use algo entre -180 e 180).",
+  ),
+  leader_id: z.string().uuid().optional().or(z.literal(""))
