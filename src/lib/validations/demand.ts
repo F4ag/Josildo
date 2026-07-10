@@ -20,6 +20,11 @@ export const demandSchema = z.object({
     (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= -180 && Number(v) <= 180),
     "Longitude inválida (use algo entre -180 e 180).",
   ),
+  // Demandas não têm coluna zip_code no banco (schema.sql só tem isso em
+  // leaders/supporters) — este campo existe só no formulário, pra ajudar
+  // o geocodeAddress a achar a localização; nunca é salvo no registro (ver
+  // demandas/actions.ts, que remove antes de montar o DemandInput).
+  zip_code: z.string().optional(),
   priority: z.enum(PRIORITIES).default("media"),
   due_date: z.string().optional().or(z.literal("")),
   public_agency: z.string().optional(),

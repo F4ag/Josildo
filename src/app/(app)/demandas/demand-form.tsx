@@ -1,8 +1,10 @@
 "use client"
 
+import { useRef } from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import Link from "next/link"
 import { DEMAND_TYPES, DEMAND_TYPE_LABELS, PRIORITIES, PRIORITY_LABELS } from "@/types/domain"
+import { fetchAddressByZipCode } from "@/lib/viacep"
 import { createDemandAction } from "./actions"
 import type { ActionState } from "@/app/login/actions"
 
@@ -26,6 +28,19 @@ type DemandFormProps = {
 
 export function DemandForm({ leaders, supporters, lockedToOwnNetwork = false }: DemandFormProps) {
   const [state, formAction] = useFormState(createDemandAction, initialState)
+
+  // Demandas não têm campo de cidade/estado (a tabela não guarda isso),
+  // então o autopreenchimento por CEP aqui só afeta rua e bairro — ver
+  // comentário completo em liderancas/leader-form.tsx.
+  const addressRef = useRef<HTMLInputElement>(null)
+  const neighborhoodRef = useRef<HTMLInputElement>(null)
+
+  async function handleZipCodeBlur(event: React.FocusEvent<HTMLInputElement>) {
+    const found = await fetchAddressByZipCode(event.target.value)
+    if (!found) return
+    if (addressRef.current) addressRef.current.value = found.logradouro
+    if (neighborhoodRef.current) neighborhoodRef.current.value = found.bairro
+  }
 
   return (
     <form action={formAction} className="max-w-2xl space-y-4 rounded-lg border border-black/5 bg-white p-6">
@@ -82,14 +97,23 @@ export function DemandForm({ leaders, supporters, lockedToOwnNetwork = false }: 
         )}
 
         <div>
+          <label htmlFor="zip_code" className="mb-1 block text-sm font-medium">CEP</label>
+          <input id="zip_code" name="zip_code" placeholder="53000-000" onBlur={handleZipCodeBlur}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          <p className="mt-1 text-xs text-foreground/50">
+            Preenche o endereço abaixo automaticamente e ajuda a localizar no mapa.
+          </p>
+        </div>
+
+        <div>
           <label htmlFor="neighborhood" className="mb-1 block text-sm font-medium">Bairro</label>
-          <input id="neighborhood" name="neighborhood"
+          <input id="neighborhood" name="neighborhood" ref={neighborhoodRef}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
         <div className="sm:col-span-2">
           <label htmlFor="address" className="mb-1 block text-sm font-medium">Endereço da demanda</label>
-          <input id="address" name="address"
+          <input id="address" name="address" ref={addressRef}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
@@ -98,7 +122,7 @@ export function DemandForm({ leaders, supporters, lockedToOwnNetwork = false }: 
           <input id="latitude" name="latitude" inputMode="decimal" placeholder="-23.5505"
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
           <p className="mt-1 text-xs text-foreground/50">
-            Opcional — se deixar em branco, tentamos localizar automaticamente pelo endereço/bairro.
+            Opcional — se deixar em branco, tentamos localizar automaticamente pelo endereço/CEP.
           </p>
         </div>
 

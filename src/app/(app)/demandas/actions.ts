@@ -19,7 +19,7 @@ function parseCoord(value: string | undefined): number | null {
 /** Prioriza lat/lng digitados à mão; só chama o geocoder quando o campo
  * ficou em branco no formulário. */
 async function resolveCoords(data: {
-  latitude?: string; longitude?: string; address?: string; neighborhood?: string
+  latitude?: string; longitude?: string; address?: string; neighborhood?: string; zip_code?: string
 }): Promise<{ latitude: number | null; longitude: number | null }> {
   const manualLat = parseCoord(data.latitude)
   const manualLng = parseCoord(data.longitude)
@@ -27,7 +27,9 @@ async function resolveCoords(data: {
     return { latitude: manualLat, longitude: manualLng }
   }
 
-  const found = await geocodeAddress({ address: data.address, neighborhood: data.neighborhood })
+  const found = await geocodeAddress({
+    address: data.address, neighborhood: data.neighborhood, zipCode: data.zip_code,
+  })
   return { latitude: found?.latitude ?? null, longitude: found?.longitude ?? null }
 }
 
@@ -47,6 +49,7 @@ export async function createDemandAction(_prevState: ActionState, formData: Form
     supporter_id: formData.get("supporter_id") || "",
     address: formData.get("address") || undefined,
     neighborhood: formData.get("neighborhood") || undefined,
+    zip_code: formData.get("zip_code") || undefined,
     latitude: formData.get("latitude") || "",
     longitude: formData.get("longitude") || "",
     priority: formData.get("priority") || "media",
@@ -66,9 +69,15 @@ export async function createDemandAction(_prevState: ActionState, formData: Form
 
   const coords = await resolveCoords(parsed.data)
 
+  // zip_code só existe no schema/formulário pra ajudar a geocodificação
+  // acima — a tabela demands não tem essa coluna, então ele é descartado
+  // aqui antes de montar o objeto que vai pro banco (ver comentário em
+  // lib/validations/demand.ts).
+  const { zip_code: _zipCode, ...demandFields } = parsed.data
+
   const supabase = await createClient()
   const input: DemandInput = {
-    ...parsed.data,
+    ...demandFields,
     demand_type: parsed.data.demand_type || null,
     leader_id: leaderId,
     supporter_id: parsed.data.supporter_id || null,

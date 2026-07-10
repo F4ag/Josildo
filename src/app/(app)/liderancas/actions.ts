@@ -43,7 +43,7 @@ function parseLeaderForm(formData: FormData) {
  * cadastro manual sempre vence a busca automática. */
 async function resolveCoords(data: {
   latitude?: string; longitude?: string
-  address?: string; neighborhood?: string; city?: string; state?: string
+  address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string
 }): Promise<{ latitude: number | null; longitude: number | null }> {
   const manualLat = parseCoord(data.latitude)
   const manualLng = parseCoord(data.longitude)
@@ -53,6 +53,7 @@ async function resolveCoords(data: {
 
   const found = await geocodeAddress({
     address: data.address, neighborhood: data.neighborhood, city: data.city, state: data.state,
+    zipCode: data.zip_code,
   })
   return { latitude: found?.latitude ?? null, longitude: found?.longitude ?? null }
 }

@@ -1,11 +1,13 @@
 "use client"
 
+import { useRef } from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import Link from "next/link"
 import {
   LEADER_TYPES, LEADER_TYPE_LABELS, INFLUENCE_LEVELS, INFLUENCE_LEVEL_LABELS,
   LEADER_STATUSES, LEADER_STATUS_LABELS, type Leader,
 } from "@/types/domain"
+import { fetchAddressByZipCode } from "@/lib/viacep"
 import type { ActionState } from "@/app/login/actions"
 
 const initialState: ActionState = { error: null }
@@ -34,6 +36,29 @@ type LeaderFormProps = {
 export function LeaderForm({ action, defaultValues, isOwnRecord = false, cancelHref }: LeaderFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const d = defaultValues
+
+  // Preenchidos à mão OU pelo autopreenchimento de CEP abaixo — por isso
+  // são refs (inputs não controlados) em vez de estado do React: mais
+  // simples de combinar com defaultValue/Server Actions sem duplicar a
+  // fonte da verdade do valor de cada campo.
+  const addressRef = useRef<HTMLInputElement>(null)
+  const neighborhoodRef = useRef<HTMLInputElement>(null)
+  const cityRef = useRef<HTMLInputElement>(null)
+  const stateRef = useRef<HTMLInputElement>(null)
+
+  // Dispara ao sair do campo CEP (não a cada tecla, pra não martelar o
+  // ViaCEP): busca o endereço nos Correios e preenche rua/bairro/cidade/UF
+  // se a busca achar algo. Se a pessoa já tinha digitado esses campos à
+  // mão, o autopreenchimento sobrescreve — é o comportamento padrão em
+  // formulários com CEP, e dá pra corrigir à mão depois se estiver errado.
+  async function handleZipCodeBlur(event: React.FocusEvent<HTMLInputElement>) {
+    const found = await fetchAddressByZipCode(event.target.value)
+    if (!found) return
+    if (addressRef.current) addressRef.current.value = found.logradouro
+    if (neighborhoodRef.current) neighborhoodRef.current.value = found.bairro
+    if (cityRef.current) cityRef.current.value = found.localidade
+    if (stateRef.current) stateRef.current.value = found.uf
+  }
 
   return (
     <form action={formAction} className="max-w-2xl space-y-4 rounded-lg border border-black/5 bg-white p-6">
@@ -68,22 +93,38 @@ export function LeaderForm({ action, defaultValues, isOwnRecord = false, cancelH
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
+        <div>
+          <label htmlFor="zip_code" className="mb-1 block text-sm font-medium">CEP</label>
+          <input id="zip_code" name="zip_code" placeholder="53000-000" defaultValue={d?.zip_code ?? undefined}
+            onBlur={handleZipCodeBlur}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          <p className="mt-1 text-xs text-foreground/50">
+            Preenche o endereço abaixo automaticamente e ajuda a localizar no mapa.
+          </p>
+        </div>
+
         <div className="sm:col-span-2">
           <label htmlFor="address" className="mb-1 block text-sm font-medium">Endereço</label>
-          <input id="address" name="address" defaultValue={d?.address ?? undefined}
+          <input id="address" name="address" ref={addressRef} defaultValue={d?.address ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
         <div>
           <label htmlFor="neighborhood" className="mb-1 block text-sm font-medium">Bairro</label>
-          <input id="neighborhood" name="neighborhood" defaultValue={d?.neighborhood ?? undefined}
+          <input id="neighborhood" name="neighborhood" ref={neighborhoodRef} defaultValue={d?.neighborhood ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
         <div>
           <label htmlFor="city" className="mb-1 block text-sm font-medium">Cidade</label>
-          <input id="city" name="city" defaultValue={d?.city ?? undefined}
+          <input id="city" name="city" ref={cityRef} defaultValue={d?.city ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
+
+        <div>
+          <label htmlFor="state" className="mb-1 block text-sm font-medium">Estado (UF)</label>
+          <input id="state" name="state" ref={stateRef} maxLength={2} placeholder="PE" defaultValue={d?.state ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none" />
         </div>
 
         <div>
@@ -92,7 +133,7 @@ export function LeaderForm({ action, defaultValues, isOwnRecord = false, cancelH
             defaultValue={d?.latitude ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
           <p className="mt-1 text-xs text-foreground/50">
-            Opcional — se deixar em branco, tentamos localizar automaticamente pelo endereço/bairro/cidade.
+            Opcional — se deixar em branco, tentamos localizar automaticamente pelo endereço/CEP.
           </p>
         </div>
 

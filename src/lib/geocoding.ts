@@ -13,23 +13,9 @@
 // Falha na geocodificação NUNCA deve bloquear o cadastro — se o endereço
 // não for encontrado (rua nova, digitação estranha, etc.), a liderança ou
 // demanda é salva do mesmo jeito, só sem aparecer no mapa até alguém
-// preencher as coordenadas manualmente. Todo caminho de falha grava um
-// console.error com o motivo (visível em Vercel > Logs) porque, sem isso,
-// "não achou o endereço" e "a chamada quebrou" ficam indistinguíveis.
-export async function geocodeAddress(parts: {
-  address?: string | null
-  neighborhood?: string | null
-  city?: string | null
-  state?: string | null
-}): Promise<{ latitude: number; longitude: number } | null> {
-  const query = [parts.address, parts.neighborhood, parts.city, parts.state, "Brasil"]
-    .filter(Boolean)
-    .join(", ")
+// preencher as coordenadas manualmente.
 
-  // Sem rua/bairro não vale a pena tentar — "Brasil" sozinho devolveria o
-  // centro do país, o que é pior do que não ter coordenada nenhuma.
-  if (!parts.address && !parts.neighborhood) return null
-
+async function tryNominatim(query: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
     const url = new URL("https://nominatim.openstreetmap.org/search")
     url.searchParams.set("q", query)
@@ -69,12 +55,60 @@ export async function geocodeAddress(parts: {
       return null
     }
 
+    console.log(`[geocodeAddress] Encontrado para query "${query}": ${latitude}, ${longitude}`)
     return { latitude, longitude }
   } catch (err) {
-    // Timeout, rede fora do ar, resposta inesperada — trata como "não
-    // encontrado" em vez de derrubar o cadastro inteiro, mas grava o motivo.
     const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
     console.error(`[geocodeAddress] Falha ao geocodificar query "${query}": ${message}`)
     return null
   }
+}
+
+/** Tira número/complemento de "Rua Tal, 207" -> "Rua Tal". Endereço
+ * completo com número exato costuma não estar mapeado no OpenStreetMap em
+ * cidades menores — o nome da rua sozinho, combinado com bairro/cidade,
+ * geralmente é encontrado. */
+function stripHouseNumber(address: string): string {
+  return address.split(",")[0]?.trim() ?? address
+}
+
+export async function geocodeAddress(parts: {
+  address?: string | null
+  neighborhood?: string | null
+  city?: string | null
+  state?: string | null
+  zipCode?: string | null
+}): Promise<{ latitude: number; longitude: number } | null> {
+  const address = parts.address?.trim() || undefined
+  const neighborhood = parts.neighborhood?.trim() || undefined
+  const city = parts.city?.trim() || undefined
+  const state = parts.state?.trim() || undefined
+  const zipCode = parts.zipCode?.trim() || undefined
+
+  if (!address && !neighborhood && !city && !zipCode) return null
+
+  // Escada de tentativas, da mais específica pra mais genérica — para na
+  // primeira que o Nominatim reconhecer:
+  // 1) endereço completo com número; 2) CEP sozinho (costuma achar até
+  // quando a rua/número não estão mapeados); 3) rua sem número + bairro +
+  // cidade; 4) bairro + cidade; 5) só cidade.
+  const streetOnly = address ? stripHouseNumber(address) : undefined
+  const candidates = [
+    [address, neighborhood, city, state, "Brasil"],
+    zipCode ? [zipCode, "Brasil"] : null,
+    streetOnly && streetOnly !== address ? [streetOnly, neighborhood, city, state, "Brasil"] : null,
+    [neighborhood, city, state, "Brasil"],
+    [city, state, "Brasil"],
+  ]
+    .filter((c): c is (string | undefined)[] => c !== null)
+    .map((c) => c.filter(Boolean).join(", "))
+    // Remove candidatos repetidos e o candidato "Brasil" sozinho (impreciso demais).
+    .filter((q, i, arr) => q.length > "Brasil".length && arr.indexOf(q) === i)
+
+  for (const query of candidates) {
+    const found = await tryNominatim(query)
+    if (found) return found
+  }
+
+  return null
 }
