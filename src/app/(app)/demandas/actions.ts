@@ -88,6 +88,7 @@ export async function createDemandAction(_prevState: ActionState, formData: Form
 
   const demand = await createDemand(supabase, input, session.id)
   revalidatePath("/demandas")
+  revalidatePath("/mapa")
   redirect(`/demandas/${demand.id}`)
 }
 
@@ -125,5 +126,6 @@ export async function updateDemandStatusAction(
 
   revalidatePath(`/demandas/${demandId}`)
   revalidatePath("/demandas")
+  revalidatePath("/mapa")
   return { error: null, success: true }
 }

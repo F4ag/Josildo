@@ -21,6 +21,18 @@ export async function createClient(): Promise<SupabaseClient<Database, "public",
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      // O Next.js intercepta o fetch global no servidor e, por padrão,
+      // guarda a resposta no Data Cache — inclusive as chamadas que o
+      // supabase-js faz por baixo dos panos pra ler o banco. Isso já causou
+      // o /mapa mostrar uma foto antiga dos dados depois de uma edição
+      // (ver comentário em app/(app)/mapa/page.tsx). "cache: no-store" aqui
+      // desliga esse cache pra QUALQUER leitura feita com este client, em
+      // qualquer página — não só no mapa — então esse tipo de bug não pode
+      // se repetir em outro módulo no futuro.
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, cache: "no-store" }),
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()

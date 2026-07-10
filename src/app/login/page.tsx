@@ -13,7 +13,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element -- SVG estático de public/, não precisa do otimizador do next/image */}
-          <img src="/brand/logo-lockup.svg" alt="Lidera+" className="mx-auto h-14 w-auto" width={820} height={240} />
+          <img src="/brand/logo-lockup.png" alt="Lidera+" className="mx-auto h-40 w-auto" width={1030} height={906} />
           <p className="mt-2 text-sm text-foreground/70">
             Mais liderança. Mais presença. Mais resultado.
           </p>

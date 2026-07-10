@@ -89,6 +89,7 @@ export async function createLeaderAction(
 
   const leader = await createLeader(supabase, input, session.id)
   revalidatePath("/liderancas")
+  revalidatePath("/mapa")
   redirect(`/liderancas/${leader.id}`)
 }
 
@@ -135,5 +136,6 @@ export async function updateLeaderAction(
   await updateLeader(supabase, leaderId, input)
   revalidatePath("/liderancas")
   revalidatePath(`/liderancas/${leaderId}`)
+  revalidatePath("/mapa")
   redirect(`/liderancas/${leaderId}`)
 }

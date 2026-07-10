@@ -50,8 +50,11 @@ export function MobileNav({ role }: { role: UserRole }) {
           <div className="absolute inset-y-0 left-0 flex w-72 max-w-[80vw] flex-col bg-primary text-primary-foreground shadow-xl">
             <div className="flex items-center justify-between px-4 py-4">
               <Link href="/dashboard" onClick={() => setOpen(false)} className="flex items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element -- SVG estático de public/, não precisa do otimizador do next/image */}
-                <img src="/brand/icon-mark-inverted.svg" alt="" aria-hidden className="h-8 w-8 shrink-0" width={32} height={32} />
+                {/* Mesmo chip claro do Sidebar — ver comentário lá. */}
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white p-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- PNG estático de public/, não precisa do otimizador do next/image */}
+                  <img src="/brand/icon-mark.png" alt="" aria-hidden className="h-full w-full object-contain" width={32} height={32} />
+                </span>
                 <p className="text-lg font-semibold leading-tight">Lidera+</p>
               </Link>
               <button

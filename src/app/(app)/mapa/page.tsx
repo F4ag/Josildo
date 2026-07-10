@@ -10,6 +10,17 @@ import { STATUS_COLOR_HEX, SUPPORTER_PIN_COLOR } from "@/lib/map-colors"
 
 export const metadata: Metadata = { title: "Mapa Territorial · Lidera+" }
 
+// Editar uma liderança/apoiador/demanda chama geocodeAddress() e grava
+// latitude/longitude no banco (ver actions.ts de cada módulo) — mas o
+// Next.js cacheia por padrão as chamadas fetch feitas no servidor
+// (Data Cache), inclusive as que o client do Supabase faz por baixo dos
+// panos. Sem isto, o /mapa podia continuar mostrando uma versão antiga dos
+// dados depois de uma edição (foi o que causou "editei um apoiador e o
+// outro sumiu do mapa" — não era o pin escondendo o outro, era o Next
+// servindo uma leitura desatualizada do banco). "force-dynamic" garante que
+// esta página sempre busca os dados na hora, nunca de cache.
+export const dynamic = "force-dynamic"
+
 type SearchParams = { bairro?: string }
 
 export default async function MapaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {

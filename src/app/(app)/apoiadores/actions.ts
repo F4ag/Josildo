@@ -123,6 +123,7 @@ export async function createSupporterAction(
 
   const supporter = await createSupporter(supabase, input, session.id)
   revalidatePath("/apoiadores")
+  revalidatePath("/mapa")
   redirect(`/apoiadores/${supporter.id}`)
 }
 
@@ -165,5 +166,6 @@ export async function updateSupporterAction(
   await updateSupporter(supabase, supporterId, input)
   revalidatePath("/apoiadores")
   revalidatePath(`/apoiadores/${supporterId}`)
+  revalidatePath("/mapa")
   redirect(`/apoiadores/${supporterId}`)
 }

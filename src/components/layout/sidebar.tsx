@@ -15,8 +15,14 @@ export function Sidebar({ role }: { role: UserRole }) {
     <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-black/5 bg-primary text-primary-foreground md:flex">
       <div className="px-6 py-5">
         <div className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element -- SVG estático de public/, não precisa do otimizador do next/image */}
-          <img src="/brand/icon-mark-inverted.svg" alt="" aria-hidden className="h-8 w-8 shrink-0" width={32} height={32} />
+          {/* Chip claro atrás do ícone: o "pin" da marca nova é quase da
+              mesma cor do fundo navy do menu, então sem esse fundo branco
+              ele quase some aqui (mas fica ótimo sozinho em fundo claro —
+              ver Topbar/favicon/tela de login). */}
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white p-1">
+            {/* eslint-disable-next-line @next/next/no-img-element -- PNG estático de public/, não precisa do otimizador do next/image */}
+            <img src="/brand/icon-mark.png" alt="" aria-hidden className="h-full w-full object-contain" width={32} height={32} />
+          </span>
           <p className="text-lg font-semibold leading-tight">Lidera+</p>
         </div>
         <p className="mt-1 text-xs text-primary-foreground/70">

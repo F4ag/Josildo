@@ -81,7 +81,7 @@ export function Topbar({ fullName, role, unreadNotifications, notifications }: T
         <MobileNav role={role} />
         <Link href="/dashboard" aria-label="Ir para o início" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element -- SVG estático de public/, não precisa do otimizador do next/image */}
-          <img src="/brand/icon-mark.svg" alt="Lidera+" className="h-7 w-7 shrink-0" width={28} height={28} />
+          <img src="/brand/icon-mark.png" alt="Lidera+" className="h-7 w-7 shrink-0" width={28} height={28} />
         </Link>
       </div>
 
