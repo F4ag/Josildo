@@ -1,13 +1,15 @@
 import Link from "next/link"
 import type { Metadata } from "next"
+import { ClipboardList, AlertCircle, Clock, CheckCircle2 } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { listDemands, listDistinctDemandNeighborhoods } from "@/services/demands"
+import { listDemands, listDistinctDemandNeighborhoods, getDemandStatusCounts } from "@/services/demands"
 import {
   DEMAND_STATUSES, DEMAND_STATUS_LABELS, DEMAND_STATUS_COLOR, DEMAND_TYPES, DEMAND_TYPE_LABELS,
   PRIORITIES, PRIORITY_LABELS, type DemandStatus, type DemandType, type Priority, type UserRole,
 } from "@/types/domain"
 import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/dashboard/stat-card"
 import { can } from "@/lib/permissions"
 
 export const metadata: Metadata = { title: "Demandas · Lidera+" }
@@ -30,7 +32,7 @@ export default async function DemandasPage({
   // (dm_lideranca_select_own) já libera demandas por leader_id OU por
   // supporter_id da própria rede — filtrar aqui por leader_id excluiria
   // indevidamente as demandas ligadas só via supporter_id.
-  const [demands, neighborhoods] = await Promise.all([
+  const [demands, neighborhoods, statusCounts] = await Promise.all([
     listDemands(supabase, {
       neighborhood: params.bairro,
       status: params.status,
@@ -39,6 +41,7 @@ export default async function DemandasPage({
       search: params.busca,
     }),
     listDistinctDemandNeighborhoods(supabase),
+    getDemandStatusCounts(supabase),
   ])
 
   const canCreate = can(role, "create", "demands")
@@ -56,6 +59,13 @@ export default async function DemandasPage({
             Nova demanda
           </Link>
         )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total" value={statusCounts.total} icon={ClipboardList} tone="primary" />
+        <StatCard label="Atrasadas" value={statusCounts.atrasadas} icon={AlertCircle} tone="danger" />
+        <StatCard label="Em andamento" value={statusCounts.emAndamento} href="/demandas?status=em_andamento" icon={Clock} tone="orange" />
+        <StatCard label="Resolvidas (mês)" value={statusCounts.resolvidasMes} href="/demandas?status=resolvida" icon={CheckCircle2} tone="secondary" />
       </div>
 
       <form className="flex flex-wrap gap-3 rounded-lg border border-black/5 bg-white p-4">

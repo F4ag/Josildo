@@ -126,3 +126,34 @@ export async function listDistinctSupporterNeighborhoods(supabase: DB) {
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
   return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
 }
+
+export type SupporterStats = {
+  total: number
+  comWhatsapp: number
+  comEmail: number
+  novosMes: number
+}
+
+/** Contagens pros cards de resumo no topo de /apoiadores — não é afetada
+ * pelos filtros da tela, mesma lógica de getLeaderStatusCounts em
+ * services/leaders.ts. */
+export async function getSupporterStats(supabase: DB): Promise<SupporterStats> {
+  const { data, error } = await supabase
+    .from("supporters")
+    .select("consent_whatsapp, consent_email, created_at")
+  if (error) throw new Error(`Falha ao contar apoiadores: ${error.message}`)
+
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+
+  let comWhatsapp = 0
+  let comEmail = 0
+  let novosMes = 0
+  for (const row of data) {
+    if (row.consent_whatsapp) comWhatsapp++
+    if (row.consent_email) comEmail++
+    if (row.created_at && new Date(row.created_at) >= startOfMonth) novosMes++
+  }
+  return { total: data.length, comWhatsapp, comEmail, novosMes }
+}

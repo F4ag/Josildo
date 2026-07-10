@@ -79,6 +79,33 @@ export async function updateLeader(supabase: DB, id: string, input: Partial<Lead
   return data
 }
 
+export type LeaderStatusCounts = {
+  total: number
+  ativa: number
+  em_atencao: number
+  inativa: number
+  estrategica: number
+}
+
+/** Contagem por status pra os cards de resumo no topo de /liderancas — não
+ * é afetada pelos filtros da tela (mostra o total real da rede, a pessoa
+ * usa os filtros pra explorar a tabela abaixo). Traz só a coluna "status"
+ * (não a linha inteira) porque aqui só interessa contar. */
+export async function getLeaderStatusCounts(supabase: DB): Promise<LeaderStatusCounts> {
+  const { data, error } = await supabase.from("leaders").select("status")
+  if (error) throw new Error(`Falha ao contar lideranças: ${error.message}`)
+
+  const counts: LeaderStatusCounts = { total: data.length, ativa: 0, em_atencao: 0, inativa: 0, estrategica: 0 }
+  for (const row of data) {
+    const status = row.status as LeaderStatus
+    if (status === "ativa") counts.ativa++
+    else if (status === "em_atencao") counts.em_atencao++
+    else if (status === "inativa") counts.inativa++
+    else if (status === "estrategica") counts.estrategica++
+  }
+  return counts
+}
+
 /** Distinct de bairros cadastrados em leaders — usado no filtro da listagem. */
 export async function listDistinctLeaderNeighborhoods(supabase: DB) {
   const { data, error } = await supabase

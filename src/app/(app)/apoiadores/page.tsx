@@ -1,9 +1,11 @@
 import Link from "next/link"
 import type { Metadata } from "next"
+import { UserPlus, MessageCircle, Mail, TrendingUp } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { listSupporters, listDistinctSupporterNeighborhoods } from "@/services/supporters"
+import { listSupporters, listDistinctSupporterNeighborhoods, getSupporterStats } from "@/services/supporters"
 import { SUPPORTER_ORIGINS, SUPPORTER_ORIGIN_LABELS, type SupporterOrigin, type UserRole } from "@/types/domain"
+import { StatCard } from "@/components/dashboard/stat-card"
 import { WhatsAppButton } from "@/components/whatsapp-button"
 import { can } from "@/lib/permissions"
 
@@ -21,7 +23,7 @@ export default async function ApoiadoresPage({
   const supabase = await createClient()
   const role = session?.profile.role as UserRole
 
-  const [supporters, neighborhoods] = await Promise.all([
+  const [supporters, neighborhoods, stats] = await Promise.all([
     listSupporters(supabase, {
       neighborhood: params.bairro,
       origin: params.origem,
@@ -29,6 +31,7 @@ export default async function ApoiadoresPage({
       leaderId: role === "lideranca" ? session?.profile.leader_id ?? undefined : undefined,
     }),
     listDistinctSupporterNeighborhoods(supabase),
+    getSupporterStats(supabase),
   ])
 
   const canCreate = can(role, "create", "supporters")
@@ -46,6 +49,13 @@ export default async function ApoiadoresPage({
             Novo apoiador
           </Link>
         )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total" value={stats.total} icon={UserPlus} tone="supporter" />
+        <StatCard label="Com WhatsApp" value={stats.comWhatsapp} icon={MessageCircle} tone="secondary" />
+        <StatCard label="Com e-mail" value={stats.comEmail} icon={Mail} tone="accent" />
+        <StatCard label="Novos este mês" value={stats.novosMes} icon={TrendingUp} tone="orange" />
       </div>
 
       <form className="flex flex-wrap gap-3 rounded-lg border border-black/5 bg-white p-4">

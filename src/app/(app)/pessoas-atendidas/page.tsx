@@ -1,7 +1,9 @@
 import Link from "next/link"
 import type { Metadata } from "next"
+import { HeartHandshake, ClipboardList, Stethoscope } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
-import { listPessoasAtendidas } from "@/services/pessoas-atendidas"
+import { listPessoasAtendidas, getPessoasAtendidasStats } from "@/services/pessoas-atendidas"
+import { StatCard } from "@/components/dashboard/stat-card"
 
 export const metadata: Metadata = { title: "Pessoas Atendidas · Lidera+" }
 
@@ -11,7 +13,10 @@ export const metadata: Metadata = { title: "Pessoas Atendidas · Lidera+" }
 // direto aqui.
 export default async function PessoasAtendidasPage() {
   const supabase = await createClient()
-  const pessoas = await listPessoasAtendidas(supabase)
+  const [pessoas, stats] = await Promise.all([
+    listPessoasAtendidas(supabase),
+    getPessoasAtendidasStats(supabase),
+  ])
 
   return (
     <div className="space-y-6">
@@ -20,6 +25,12 @@ export default async function PessoasAtendidasPage() {
         <p className="text-sm text-foreground/60">
           {pessoas.length} apoiador(es) com pelo menos uma demanda ou atendimento registrado.
         </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Total" value={stats.total} icon={HeartHandshake} tone="primary" />
+        <StatCard label="Com demanda" value={stats.comDemanda} icon={ClipboardList} tone="orange" />
+        <StatCard label="Com atendimento" value={stats.comAtendimento} icon={Stethoscope} tone="secondary" />
       </div>
 
       <div className="overflow-hidden rounded-lg border border-black/5 bg-white">

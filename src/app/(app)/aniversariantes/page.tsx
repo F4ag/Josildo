@@ -1,11 +1,13 @@
 import Link from "next/link"
 import type { Metadata } from "next"
+import { Cake, CalendarDays, CalendarRange } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { listBirthdays, type BirthdayRange } from "@/services/birthdays"
 import { listDistinctSupporterNeighborhoods } from "@/services/supporters"
 import { listLeaders } from "@/services/leaders"
 import { renderTemplate } from "@/lib/whatsapp"
 import { WhatsAppButton } from "@/components/whatsapp-button"
+import { StatCard } from "@/components/dashboard/stat-card"
 import { GreetButton } from "./greet-button"
 
 export const metadata: Metadata = { title: "Aniversariantes · Lidera+" }
@@ -24,13 +26,22 @@ export default async function AniversariantesPage({
   const params = await searchParams
   const range = params.periodo ?? "hoje"
   const supabase = await createClient()
+  const filters = { neighborhood: params.bairro, leaderId: params.lideranca }
 
-  const [birthdays, neighborhoods, leaders, { data: template }] = await Promise.all([
-    listBirthdays(supabase, range, { neighborhood: params.bairro, leaderId: params.lideranca }),
+  // Uma segunda chamada com range="mes" traz o superconjunto de aniversariantes
+  // do mês, do qual derivamos os 3 cards (Hoje/Esta semana/Este mês) sem
+  // precisar de 3 consultas separadas ao banco — só essa e a da tabela abaixo.
+  const [birthdays, birthdaysMonth, neighborhoods, leaders, { data: template }] = await Promise.all([
+    listBirthdays(supabase, range, filters),
+    listBirthdays(supabase, "mes", filters),
     listDistinctSupporterNeighborhoods(supabase),
     listLeaders(supabase),
     supabase.from("message_templates").select("body").eq("type", "aniversario").eq("status", "ativo").limit(1).maybeSingle(),
   ])
+
+  const statsHoje = birthdaysMonth.filter((b) => b.daysUntil === 0).length
+  const statsSemana = birthdaysMonth.filter((b) => b.daysUntil <= 7).length
+  const statsMes = birthdaysMonth.length
 
   const messageBody = template?.body ??
     "Olá, {{nome}}! Passando para desejar um feliz aniversário, com muita saúde, paz e realizações. Que seu novo ciclo seja abençoado. Um grande abraço!"
@@ -40,6 +51,12 @@ export default async function AniversariantesPage({
       <div>
         <h1 className="text-xl font-semibold text-foreground">Aniversariantes</h1>
         <p className="text-sm text-foreground/60">{birthdays.length} nesse período.</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Hoje" value={statsHoje} href="/aniversariantes?periodo=hoje" icon={Cake} tone="accent" />
+        <StatCard label="Esta semana" value={statsSemana} href="/aniversariantes?periodo=semana" icon={CalendarDays} tone="orange" />
+        <StatCard label="Este mês" value={statsMes} href="/aniversariantes?periodo=mes" icon={CalendarRange} tone="secondary" />
       </div>
 
       <div className="flex flex-wrap gap-2">

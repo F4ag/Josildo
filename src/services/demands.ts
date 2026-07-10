@@ -130,3 +130,46 @@ export async function listDistinctDemandNeighborhoods(supabase: DB) {
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
   return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
 }
+
+export type DemandStatusCounts = {
+  total: number
+  atrasadas: number
+  emAndamento: number
+  resolvidasMes: number
+}
+
+const OPEN_STATUSES_FOR_OVERDUE = ["resolvida", "cancelada", "recusada"] as const
+
+/** Contagens pros cards de resumo no topo de /demandas — mesmo cálculo de
+ * "atrasada" e "resolvida no mês" já usado em services/dashboard.ts, só que
+ * aqui via count exato (head: true) em vez de trazer as linhas inteiras,
+ * já que não precisamos do conteúdo, só do número. */
+export async function getDemandStatusCounts(supabase: DB): Promise<DemandStatusCounts> {
+  const today = new Date().toISOString().slice(0, 10)
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+
+  const [{ count: total }, { count: atrasadas }, { count: emAndamento }, { count: resolvidasMes }] =
+    await Promise.all([
+      supabase.from("demands").select("id", { count: "exact", head: true }),
+      supabase
+        .from("demands")
+        .select("id", { count: "exact", head: true })
+        .lt("due_date", today)
+        .not("status", "in", `(${OPEN_STATUSES_FOR_OVERDUE.join(",")})`),
+      supabase.from("demands").select("id", { count: "exact", head: true }).eq("status", "em_andamento"),
+      supabase
+        .from("demands")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "resolvida")
+        .gte("completed_at", startOfMonth.toISOString()),
+    ])
+
+  return {
+    total: total ?? 0,
+    atrasadas: atrasadas ?? 0,
+    emAndamento: emAndamento ?? 0,
+    resolvidasMes: resolvidasMes ?? 0,
+  }
+}

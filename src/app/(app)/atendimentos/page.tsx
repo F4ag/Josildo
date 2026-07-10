@@ -1,13 +1,15 @@
 import Link from "next/link"
 import type { Metadata } from "next"
+import { Stethoscope, Clock, CheckCircle2, XCircle } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { listAttendances } from "@/services/attendances"
+import { listAttendances, getAttendanceStatusCounts } from "@/services/attendances"
 import {
   ATTENDANCE_STATUSES, ATTENDANCE_STATUS_LABELS, ATTENDANCE_TYPES, ATTENDANCE_TYPE_LABELS,
   type AttendanceStatus, type AttendanceType, type UserRole,
 } from "@/types/domain"
 import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/dashboard/stat-card"
 import { can } from "@/lib/permissions"
 
 export const metadata: Metadata = { title: "Atendimentos · Lidera+" }
@@ -30,7 +32,10 @@ export default async function AtendimentosPage({
   const supabase = await createClient()
   const role = session?.profile.role as UserRole
 
-  const attendances = await listAttendances(supabase, { status: params.status, attendanceType: params.tipo })
+  const [attendances, statusCounts] = await Promise.all([
+    listAttendances(supabase, { status: params.status, attendanceType: params.tipo }),
+    getAttendanceStatusCounts(supabase),
+  ])
   const canCreate = can(role, "create", "attendances")
 
   return (
@@ -46,6 +51,13 @@ export default async function AtendimentosPage({
             Novo atendimento
           </Link>
         )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total" value={statusCounts.total} icon={Stethoscope} tone="primary" />
+        <StatCard label="Em aberto" value={statusCounts.emAberto} icon={Clock} tone="orange" />
+        <StatCard label="Atendidos" value={statusCounts.atendidos} href="/atendimentos?status=atendido" icon={CheckCircle2} tone="secondary" />
+        <StatCard label="Não atendidos" value={statusCounts.naoAtendidos} href="/atendimentos?status=nao_atendido" icon={XCircle} tone="danger" />
       </div>
 
       <form className="flex flex-wrap gap-3 rounded-lg border border-black/5 bg-white p-4">

@@ -1,14 +1,16 @@
 import Link from "next/link"
 import type { Metadata } from "next"
+import { Users, UserCheck, AlertTriangle, UserX } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { listLeaders, listDistinctLeaderNeighborhoods } from "@/services/leaders"
+import { listLeaders, listDistinctLeaderNeighborhoods, getLeaderStatusCounts } from "@/services/leaders"
 import {
   LEADER_TYPES, LEADER_TYPE_LABELS, INFLUENCE_LEVELS, INFLUENCE_LEVEL_LABELS,
   LEADER_STATUSES, LEADER_STATUS_LABELS, LEADER_STATUS_COLOR,
   type LeaderType, type LeaderStatus, type InfluenceLevel, type UserRole,
 } from "@/types/domain"
 import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/dashboard/stat-card"
 import { WhatsAppButton } from "@/components/whatsapp-button"
 import { can } from "@/lib/permissions"
 
@@ -31,7 +33,7 @@ export default async function LiderancasPage({
   const session = await getSessionUser()
   const supabase = await createClient()
 
-  const [leaders, neighborhoods] = await Promise.all([
+  const [leaders, neighborhoods, statusCounts] = await Promise.all([
     listLeaders(supabase, {
       neighborhood: params.bairro,
       leaderType: params.tipo,
@@ -40,6 +42,7 @@ export default async function LiderancasPage({
       search: params.busca,
     }),
     listDistinctLeaderNeighborhoods(supabase),
+    getLeaderStatusCounts(supabase),
   ])
 
   const role = session?.profile.role as UserRole
@@ -58,6 +61,13 @@ export default async function LiderancasPage({
             Nova liderança
           </Link>
         )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total" value={statusCounts.total} icon={Users} tone="primary" />
+        <StatCard label="Ativas" value={statusCounts.ativa} href="/liderancas?status=ativa" icon={UserCheck} tone="secondary" />
+        <StatCard label="Em atenção" value={statusCounts.em_atencao} href="/liderancas?status=em_atencao" icon={AlertTriangle} tone="accent" />
+        <StatCard label="Inativas" value={statusCounts.inativa} href="/liderancas?status=inativa" icon={UserX} tone="danger" />
       </div>
 
       <form className="flex flex-wrap gap-3 rounded-lg border border-black/5 bg-white p-4">

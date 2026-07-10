@@ -59,3 +59,33 @@ export async function getPessoaAtendidaDetail(supabase: DB, supporterId: string)
     interactions: interactions ?? [],
   }
 }
+
+export type PessoasAtendidasStats = {
+  total: number
+  comDemanda: number
+  comAtendimento: number
+}
+
+/** Contagens pros cards de resumo no topo de /pessoas-atendidas — reaproveita
+ * a mesma consulta de listPessoasAtendidas (supporter_id de demands e de
+ * attendances) em vez de duplicar lógica de "quem é pessoa atendida". */
+export async function getPessoasAtendidasStats(supabase: DB): Promise<PessoasAtendidasStats> {
+  const [{ data: demandRows, error: demandError }, { data: attendanceRows, error: attendanceError }] =
+    await Promise.all([
+      supabase.from("demands").select("supporter_id").not("supporter_id", "is", null),
+      supabase.from("attendances").select("supporter_id"),
+    ])
+
+  if (demandError) throw new Error(`Falha ao contar pessoas atendidas: ${demandError.message}`)
+  if (attendanceError) throw new Error(`Falha ao contar pessoas atendidas: ${attendanceError.message}`)
+
+  const comDemandaIds = new Set(demandRows.map((r) => r.supporter_id).filter(Boolean))
+  const comAtendimentoIds = new Set(attendanceRows.map((r) => r.supporter_id).filter(Boolean))
+  const totalIds = new Set([...comDemandaIds, ...comAtendimentoIds])
+
+  return {
+    total: totalIds.size,
+    comDemanda: comDemandaIds.size,
+    comAtendimento: comAtendimentoIds.size,
+  }
+}

@@ -115,3 +115,39 @@ export async function updateAttendanceStatus(
     createdBy: updatedBy,
   })
 }
+
+export type AttendanceStatusCounts = {
+  total: number
+  emAberto: number
+  atendidos: number
+  naoAtendidos: number
+}
+
+// Mesma lista de status "em aberto" usada em services/dashboard.ts
+// (OPEN_ATTENDANCE_STATUSES) — mantida separada aqui porque cada service
+// só expõe o que a própria tela precisa.
+const OPEN_ATTENDANCE_STATUSES = [
+  "novo", "em_analise", "em_andamento", "aguardando_documento", "aguardando_orgao_publico",
+] as const
+
+/** Contagens pros cards de resumo no topo de /atendimentos — não é afetada
+ * pelos filtros da tela, mesmo padrão de getDemandStatusCounts. */
+export async function getAttendanceStatusCounts(supabase: DB): Promise<AttendanceStatusCounts> {
+  const [{ count: total }, { count: emAberto }, { count: atendidos }, { count: naoAtendidos }] =
+    await Promise.all([
+      supabase.from("attendances").select("id", { count: "exact", head: true }),
+      supabase
+        .from("attendances")
+        .select("id", { count: "exact", head: true })
+        .in("status", OPEN_ATTENDANCE_STATUSES),
+      supabase.from("attendances").select("id", { count: "exact", head: true }).eq("status", "atendido"),
+      supabase.from("attendances").select("id", { count: "exact", head: true }).eq("status", "nao_atendido"),
+    ])
+
+  return {
+    total: total ?? 0,
+    emAberto: emAberto ?? 0,
+    atendidos: atendidos ?? 0,
+    naoAtendidos: naoAtendidos ?? 0,
+  }
+}

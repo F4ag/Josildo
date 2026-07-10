@@ -6,7 +6,7 @@ import { clsx } from "clsx"
 // em vez do retângulo branco anterior — pedido explícito de deixar o topo
 // do Dashboard com cara de "cards de app" (referência: telas de apps de
 // estatísticas de saúde), mas sem sair da identidade visual do Lidera+.
-export type StatCardTone = "primary" | "supporter" | "orange" | "secondary" | "accent"
+export type StatCardTone = "primary" | "supporter" | "orange" | "secondary" | "accent" | "danger"
 
 const TONE_CLASSES: Record<StatCardTone, string> = {
   primary: "bg-primary text-primary-foreground",
@@ -19,6 +19,10 @@ const TONE_CLASSES: Record<StatCardTone, string> = {
   // "amarelo" em ui/badge.tsx) — usa o texto grafite escuro já definido em
   // accent.foreground no tailwind.config.ts.
   accent: "bg-accent text-accent-foreground",
+  // Pra métricas de conotação negativa (atrasadas, inativas, não atendidas)
+  // — reaproveita o vermelho de status.atrasada, já usado no resto do app
+  // pra esse mesmo significado, em vez de inventar mais um tom.
+  danger: "bg-status-atrasada text-white",
 }
 
 export function StatCard({
