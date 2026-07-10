@@ -121,4 +121,49 @@ export async function createSupporterAction(
     consent_origin: "cadastro_interno",
   }
 
-  const supporter = await 
+  const supporter = await createSupporter(supabase, input, session.id)
+  revalidatePath("/apoiadores")
+  redirect(`/apoiadores/${supporter.id}`)
+}
+
+export async function updateSupporterAction(
+  supporterId: string,
+  _prevState: SupporterActionState,
+  formData: FormData,
+): Promise<SupporterActionState> {
+  const session = await requireSessionUser()
+  const role = session.profile.role as UserRole
+  const supabase = await createClient()
+
+  let isOwnNetwork = false
+  if (role === "lideranca") {
+    const existing = await getSupporterById(supabase, supporterId)
+    isOwnNetwork = existing?.leader_id === session.profile.leader_id
+  }
+
+  if (!can(role, "update", "supporters") && !isOwnNetwork) {
+    return { error: "Você não tem permissão para editar este apoiador." }
+  }
+
+  const parsed = parseSupporterForm(formData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
+  }
+
+  const coords = await resolveCoords(parsed.data)
+
+  const input: Partial<SupporterInput> = {
+    ...parsed.data,
+    email: parsed.data.email || null,
+    origin: parsed.data.origin || null,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+  }
+  // Liderança não transfere o apoiador para outra rede.
+  if (role === "lideranca") delete input.leader_id
+
+  await updateSupporter(supabase, supporterId, input)
+  revalidatePath("/apoiadores")
+  revalidatePath(`/apoiadores/${supporterId}`)
+  redirect(`/apoiadores/${supporterId}`)
+}

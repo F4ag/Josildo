@@ -25,4 +25,18 @@ export const supporterSchema = z.object({
     (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= -180 && Number(v) <= 180),
     "Longitude inválida (use algo entre -180 e 180).",
   ),
-  leader_id: z.string().uuid().optional().or(z.literal(""))
+  leader_id: z.string().uuid().optional().or(z.literal("")),
+  origin: z.enum(SUPPORTER_ORIGINS).optional().or(z.literal("")),
+  gender: z.string().optional(),
+  profession: z.string().optional(),
+  consent_whatsapp: z.coerce.boolean().default(false),
+  consent_email: z.coerce.boolean().default(false),
+  // Módulo 15 (LGPD): sem esta autorização o cadastro não é salvo — texto
+  // padrão sugerido no prompt master é exibido ao lado do checkbox no form.
+  consent_registration: z.coerce.boolean().refine((v) => v === true, {
+    message: "É preciso confirmar a autorização de cadastro (LGPD) para continuar.",
+  }),
+  notes: z.string().optional(),
+})
+
+export type SupporterFormInput = z.infer<typeof supporterSchema>
