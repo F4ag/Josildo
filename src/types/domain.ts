@@ -166,12 +166,22 @@ export const AGENDA_STATUS_LABELS: Record<AgendaStatus, string> = {
   agendado: "Agendado", realizado: "Realizado", cancelado: "Cancelado",
   remarcado: "Remarcado", pendente: "Pendente",
 }
+export const AGENDA_STATUS_COLOR: Record<AgendaStatus, BadgeTone> = {
+  agendado: "azul", realizado: "verde", cancelado: "vermelho",
+  remarcado: "amarelo", pendente: "cinza",
+}
 
 export const MESSAGE_TEMPLATE_TYPES = [
   "aniversario", "retorno_demanda", "demanda_resolvida", "atendimento_concluido",
   "convite_reuniao", "agradecimento", "atualizacao_cadastral", "outro",
 ] as const
 export type MessageTemplateType = (typeof MESSAGE_TEMPLATE_TYPES)[number]
+export const MESSAGE_TEMPLATE_TYPE_LABELS: Record<MessageTemplateType, string> = {
+  aniversario: "Aniversário", retorno_demanda: "Retorno de demanda",
+  demanda_resolvida: "Demanda resolvida", atendimento_concluido: "Atendimento concluído",
+  convite_reuniao: "Convite para reunião", agradecimento: "Agradecimento",
+  atualizacao_cadastral: "Atualização cadastral", outro: "Outro",
+}
 
 export const NEIGHBORHOOD_CLASSIFICATIONS = ["forte", "medio", "fraco", "descoberto"] as const
 export type NeighborhoodClassification = (typeof NEIGHBORHOOD_CLASSIFICATIONS)[number]
