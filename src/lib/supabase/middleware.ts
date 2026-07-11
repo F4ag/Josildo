@@ -28,7 +28,7 @@ const DEFAULT_ORG_SLUG = "lidera-mais"
  */
 function resolveTenantSlug(host: string | null): string {
   if (!host) return DEFAULT_ORG_SLUG
-  const hostname = host.split(":")[0].toLowerCase()
+  const hostname = (host.split(":")[0] ?? host).toLowerCase()
 
   // Ambiente local e preview da Vercel não têm subdomínio de cliente —
   // sempre tratados como a organização padrão.
