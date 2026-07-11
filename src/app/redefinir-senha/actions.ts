@@ -5,6 +5,24 @@ import { createClient } from "@/lib/supabase/server"
 import { resetPasswordSchema } from "@/lib/validations/auth"
 import type { ActionState } from "../login/actions"
 
+/**
+ * O link de recuperação/convite do Supabase (flow PKCE, padrão do projeto)
+ * chega em /redefinir-senha como `?code=xxxxx` — um código de uso único que
+ * precisa ser trocado por uma sessão de verdade. Isso só pode ser feito
+ * aqui, numa Server Action (ou Route Handler): Server Components não têm
+ * permissão do Next.js para gravar cookies, então se essa troca acontecesse
+ * lá a sessão nunca seria persistida e o formulário de troca de senha
+ * continuaria falhando mesmo com o "code" certo na URL.
+ */
+export async function exchangeRecoveryCode(code: string): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  if (error) {
+    return { error: error.message }
+  }
+  return { error: null }
+}
+
 export async function updatePassword(
   _prevState: ActionState,
   formData: FormData,
@@ -20,8 +38,9 @@ export async function updatePassword(
 
   const supabase = await createClient()
 
-  // Só funciona se houver uma sessão de recuperação ativa (criada pelo
-  // /auth/confirm a partir do link do e-mail). Sem isso, updateUser falha.
+  // Só funciona se houver uma sessão de recuperação ativa (criada pela troca
+  // do código PKCE em exchangeRecoveryCode, chamada antes deste form ser
+  // exibido). Sem isso, updateUser falha.
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
 
   if (error) {
