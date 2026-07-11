@@ -48,7 +48,7 @@ export async function getSupporterById(supabase: DB, id: string): Promise<Suppor
 
 export type SupporterInput = Omit<
   Database["public"]["Tables"]["supporters"]["Insert"],
-  "id" | "created_at" | "updated_at" | "created_by"
+  "id" | "created_at" | "updated_at" | "created_by" | "organization_id"
 >
 
 /**
@@ -97,10 +97,10 @@ export async function findPotentialDuplicates(
   return data
 }
 
-export async function createSupporter(supabase: DB, input: SupporterInput, createdBy: string) {
+export async function createSupporter(supabase: DB, input: SupporterInput, createdBy: string, organizationId: string) {
   const { data, error } = await supabase
     .from("supporters")
-    .insert({ ...input, created_by: createdBy })
+    .insert({ ...input, created_by: createdBy, organization_id: organizationId })
     .select()
     .single()
   if (error) throw new Error(`Falha ao cadastrar apoiador: ${error.message}`)

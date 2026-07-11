@@ -33,13 +33,13 @@ export async function getMessageTemplateById(supabase: DB, id: string) {
 
 export type MessageTemplateInput = Omit<
   Database["public"]["Tables"]["message_templates"]["Insert"],
-  "id" | "created_at" | "updated_at" | "created_by" | "status"
+  "id" | "created_at" | "updated_at" | "created_by" | "status" | "organization_id"
 >
 
-export async function createMessageTemplate(supabase: DB, input: MessageTemplateInput, createdBy: string) {
+export async function createMessageTemplate(supabase: DB, input: MessageTemplateInput, createdBy: string, organizationId: string) {
   const { data, error } = await supabase
     .from("message_templates")
-    .insert({ ...input, created_by: createdBy, status: "ativo" })
+    .insert({ ...input, created_by: createdBy, status: "ativo", organization_id: organizationId })
     .select()
     .single()
   if (error) throw new Error(`Falha ao criar modelo de mensagem: ${error.message}`)

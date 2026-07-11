@@ -39,7 +39,7 @@ export async function createMessageTemplateAction(_prevState: ActionState, formD
     body: parsed.data.body,
   }
 
-  await createMessageTemplate(supabase, input, session.id)
+  await createMessageTemplate(supabase, input, session.id, session.profile.organization_id)
   revalidatePath("/mensagens")
   redirect("/mensagens")
 }

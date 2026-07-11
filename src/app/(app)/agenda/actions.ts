@@ -56,7 +56,7 @@ export async function createAgendaEventAction(_prevState: ActionState, formData:
     notes: parsed.data.notes || null,
   }
 
-  await createAgendaEvent(supabase, input, session.id)
+  await createAgendaEvent(supabase, input, session.id, session.profile.organization_id)
   revalidatePath("/agenda")
   redirect("/agenda")
 }

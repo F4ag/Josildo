@@ -42,7 +42,7 @@ export async function createAttendanceAction(_prevState: ActionState, formData: 
     responsible_user_id: session.id,
   }
 
-  const attendance = await createAttendance(supabase, input, session.id)
+  const attendance = await createAttendance(supabase, input, session.id, session.profile.organization_id)
   revalidatePath("/atendimentos")
   redirect(`/atendimentos/${attendance.id}`)
 }
@@ -83,6 +83,7 @@ export async function updateAttendanceStatusAction(
       returnChannel: parsed.data.return_channel || undefined,
     },
     session.id,
+    session.profile.organization_id,
   )
 
   revalidatePath(`/atendimentos/${attendanceId}`)

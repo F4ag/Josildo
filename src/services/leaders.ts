@@ -55,13 +55,13 @@ export async function listLeadersWithoutAccount(supabase: DB) {
 
 export type LeaderInput = Omit<
   Database["public"]["Tables"]["leaders"]["Insert"],
-  "id" | "created_at" | "updated_at" | "created_by"
+  "id" | "created_at" | "updated_at" | "created_by" | "organization_id"
 >
 
-export async function createLeader(supabase: DB, input: LeaderInput, createdBy: string) {
+export async function createLeader(supabase: DB, input: LeaderInput, createdBy: string, organizationId: string) {
   const { data, error } = await supabase
     .from("leaders")
-    .insert({ ...input, created_by: createdBy })
+    .insert({ ...input, created_by: createdBy, organization_id: organizationId })
     .select()
     .single()
   if (error) throw new Error(`Falha ao cadastrar liderança: ${error.message}`)

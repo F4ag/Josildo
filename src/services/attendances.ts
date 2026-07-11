@@ -63,20 +63,20 @@ export async function getAttendanceById(supabase: DB, id: string) {
 
 export type AttendanceInput = Omit<
   Database["public"]["Tables"]["attendances"]["Insert"],
-  "id" | "created_at" | "updated_at" | "created_by" | "status" | "attended_at"
+  "id" | "created_at" | "updated_at" | "created_by" | "status" | "attended_at" | "organization_id"
 >
 
-export async function createAttendance(supabase: DB, input: AttendanceInput, createdBy: string) {
+export async function createAttendance(supabase: DB, input: AttendanceInput, createdBy: string, organizationId: string) {
   const { data, error } = await supabase
     .from("attendances")
-    .insert({ ...input, created_by: createdBy, status: "novo" })
+    .insert({ ...input, created_by: createdBy, status: "novo", organization_id: organizationId })
     .select()
     .single()
   if (error) throw new Error(`Falha ao registrar atendimento: ${error.message}`)
 
   await logInteraction(supabase, {
     leaderId: input.leader_id, supporterId: input.supporter_id,
-    type: "atendimento", description: `Atendimento registrado: ${input.title}`, createdBy,
+    type: "atendimento", description: `Atendimento registrado: ${input.title}`, createdBy, organizationId,
   })
 
   return data
@@ -93,6 +93,7 @@ export async function updateAttendanceStatus(
     returnChannel?: string
   },
   updatedBy: string,
+  organizationId: string,
 ) {
   const isConcluded = input.status === "atendido" || input.status === "nao_atendido"
 
@@ -113,6 +114,7 @@ export async function updateAttendanceStatus(
     type: "atendimento",
     description: `Atendimento "${attendance.title}" atualizado para: ${input.status}.`,
     createdBy: updatedBy,
+    organizationId,
   })
 }
 

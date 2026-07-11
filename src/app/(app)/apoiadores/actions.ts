@@ -121,7 +121,7 @@ export async function createSupporterAction(
     consent_origin: "cadastro_interno",
   }
 
-  const supporter = await createSupporter(supabase, input, session.id)
+  const supporter = await createSupporter(supabase, input, session.id, session.profile.organization_id)
   revalidatePath("/apoiadores")
   revalidatePath("/mapa")
   redirect(`/apoiadores/${supporter.id}`)

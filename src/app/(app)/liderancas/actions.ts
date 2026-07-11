@@ -87,7 +87,7 @@ export async function createLeaderAction(
     influence_level: parsed.data.influence_level || null,
   }
 
-  const leader = await createLeader(supabase, input, session.id)
+  const leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
   revalidatePath("/liderancas")
   revalidatePath("/mapa")
   redirect(`/liderancas/${leader.id}`)

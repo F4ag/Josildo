@@ -16,6 +16,7 @@ export async function logInteraction(
     type: InteractionType
     description: string
     createdBy: string
+    organizationId: string
   },
 ) {
   if (!input.leaderId && !input.supporterId) return // nada a vincular, não registra
@@ -27,6 +28,7 @@ export async function logInteraction(
     interaction_type: input.type,
     description: input.description,
     created_by: input.createdBy,
+    organization_id: input.organizationId,
   })
 
   // Falha ao registrar histórico não deve derrubar a ação principal (criar

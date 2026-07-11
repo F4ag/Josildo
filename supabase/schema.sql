@@ -22,10 +22,28 @@ end;
 $$ language plpgsql set search_path = public;
 
 -- ----------------------------------------------------------------------------
+-- organizations — multi-tenant (docs/07-migracao-multi-tenant.md). Cada
+-- cliente (liderança que contrata o Lidera+) é uma organização isolada por
+-- RLS; identificada por subdomínio (slug.lideramais.app.br).
+-- ----------------------------------------------------------------------------
+create table organizations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  status text not null default 'ativa' check (status in ('ativa', 'suspensa', 'cancelada')),
+  plan text not null default 'padrao',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create trigger trg_organizations_updated_at before update on organizations
+  for each row execute function set_updated_at();
+
+-- ----------------------------------------------------------------------------
 -- users_profiles — espelha auth.users, guarda role e status
 -- ----------------------------------------------------------------------------
 create table users_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  organization_id uuid not null references organizations(id),
   full_name text not null,
   phone text,
   email text,
@@ -35,6 +53,7 @@ create table users_profiles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create index idx_users_profiles_org on users_profiles(organization_id);
 create trigger trg_users_profiles_updated_at before update on users_profiles
   for each row execute function set_updated_at();
 
@@ -43,6 +62,7 @@ create trigger trg_users_profiles_updated_at before update on users_profiles
 -- ----------------------------------------------------------------------------
 create table neighborhoods (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   name text not null,
   city text,
   state text,
@@ -52,12 +72,14 @@ create table neighborhoods (
   created_at timestamptz not null default now(),
   unique (name, city)
 );
+create index idx_neighborhoods_org on neighborhoods(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- leaders — Módulo 3
 -- ----------------------------------------------------------------------------
 create table leaders (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   user_id uuid references users_profiles(id), -- se a liderança tem login
   name text not null,
   nickname text,
@@ -96,6 +118,7 @@ create index idx_leaders_influence on leaders(influence_level);
 create index idx_leaders_user on leaders(user_id);
 create index idx_leaders_neighborhood_id on leaders(neighborhood_id);
 create index idx_leaders_created_by on leaders(created_by);
+create index idx_leaders_org on leaders(organization_id);
 
 alter table users_profiles
   add constraint fk_users_profiles_leader foreign key (leader_id) references leaders(id);
@@ -106,6 +129,7 @@ create index idx_users_profiles_leader on users_profiles(leader_id);
 -- ----------------------------------------------------------------------------
 create table supporters (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   name text not null,
   phone text not null,
   email text,
@@ -146,12 +170,14 @@ create index idx_supporters_name_birth on supporters(name, birth_date);
 create index idx_supporters_name_address on supporters(name, address);
 create index idx_supporters_neighborhood_id on supporters(neighborhood_id);
 create index idx_supporters_created_by on supporters(created_by);
+create index idx_supporters_org on supporters(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- demands — Módulo 6
 -- ----------------------------------------------------------------------------
 create table demands (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   title text not null,
   description text,
   demand_type text check (demand_type in (
@@ -194,12 +220,14 @@ create index idx_demands_due_date on demands(due_date);
 create index idx_demands_responsible on demands(responsible_user_id);
 create index idx_demands_neighborhood_id on demands(neighborhood_id);
 create index idx_demands_created_by on demands(created_by);
+create index idx_demands_org on demands(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- demand_updates — histórico de status (exigido pelo Módulo 6)
 -- ----------------------------------------------------------------------------
 create table demand_updates (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   demand_id uuid not null references demands(id) on delete cascade,
   status text not null,
   comment text,
@@ -208,12 +236,14 @@ create table demand_updates (
 );
 create index idx_demand_updates_demand on demand_updates(demand_id);
 create index idx_demand_updates_updated_by on demand_updates(updated_by);
+create index idx_demand_updates_org on demand_updates(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- attendances — Módulo 7 (todo atendimento é vinculado a uma pessoa: not null)
 -- ----------------------------------------------------------------------------
 create table attendances (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   supporter_id uuid not null references supporters(id),
   leader_id uuid references leaders(id),
   responsible_user_id uuid references users_profiles(id),
@@ -248,12 +278,14 @@ create index idx_attendances_status on attendances(status);
 create index idx_attendances_due_date on attendances(due_date);
 create index idx_attendances_responsible on attendances(responsible_user_id);
 create index idx_attendances_created_by on attendances(created_by);
+create index idx_attendances_org on attendances(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- interactions — Módulo 14 (timeline de contato)
 -- ----------------------------------------------------------------------------
 create table interactions (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   person_type text check (person_type in ('lideranca','apoiador')),
   leader_id uuid references leaders(id),
   supporter_id uuid references supporters(id),
@@ -270,12 +302,14 @@ create index idx_interactions_leader on interactions(leader_id);
 create index idx_interactions_supporter on interactions(supporter_id);
 create index idx_interactions_created_at on interactions(created_at);
 create index idx_interactions_created_by on interactions(created_by);
+create index idx_interactions_org on interactions(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- attachments — anexos genéricos (fotos de demanda, documentos etc.)
 -- ----------------------------------------------------------------------------
 create table attachments (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   related_table text not null check (related_table in (
     'leaders','supporters','demands','attendances','agenda_events'
   )),
@@ -287,12 +321,14 @@ create table attachments (
 );
 create index idx_attachments_related on attachments(related_table, related_id);
 create index idx_attachments_uploaded_by on attachments(uploaded_by);
+create index idx_attachments_org on attachments(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- notifications — Módulo 10 (alertas)
 -- ----------------------------------------------------------------------------
 create table notifications (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   user_id uuid references users_profiles(id),
   title text not null,
   message text,
@@ -307,12 +343,14 @@ create table notifications (
   created_at timestamptz not null default now()
 );
 create index idx_notifications_user on notifications(user_id, is_read);
+create index idx_notifications_org on notifications(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- agenda_events — Módulo 13
 -- ----------------------------------------------------------------------------
 create table agenda_events (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   title text not null,
   description text,
   event_date date not null,
@@ -341,12 +379,14 @@ create index idx_agenda_events_demand on agenda_events(demand_id);
 create index idx_agenda_events_attendance on agenda_events(attendance_id);
 create index idx_agenda_events_responsible on agenda_events(responsible_user_id);
 create index idx_agenda_events_created_by on agenda_events(created_by);
+create index idx_agenda_events_org on agenda_events(organization_id);
 
 -- ----------------------------------------------------------------------------
 -- message_templates — Módulo 12
 -- ----------------------------------------------------------------------------
 create table message_templates (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id),
   name text not null,
   type text not null check (type in (
     'aniversario','retorno_demanda','demanda_resolvida','atendimento_concluido',
@@ -362,6 +402,7 @@ create table message_templates (
 create trigger trg_message_templates_updated_at before update on message_templates
   for each row execute function set_updated_at();
 create index idx_message_templates_created_by on message_templates(created_by);
+create index idx_message_templates_org on message_templates(organization_id);
 
 -- ============================================================================
 -- Seeds mínimos (modelos de mensagem citados no prompt master, Módulos 9 e 12)

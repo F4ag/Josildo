@@ -86,7 +86,7 @@ export async function createDemandAction(_prevState: ActionState, formData: Form
     longitude: coords.longitude,
   }
 
-  const demand = await createDemand(supabase, input, session.id)
+  const demand = await createDemand(supabase, input, session.id, session.profile.organization_id)
   revalidatePath("/demandas")
   revalidatePath("/mapa")
   redirect(`/demandas/${demand.id}`)
@@ -122,6 +122,7 @@ export async function updateDemandStatusAction(
     { id: demand.id, leader_id: demand.leader_id, supporter_id: demand.supporter_id, title: demand.title },
     { status: parsed.data.status, comment: parsed.data.comment, resultDescription: parsed.data.result_description },
     session.id,
+    session.profile.organization_id,
   )
 
   revalidatePath(`/demandas/${demandId}`)

@@ -55,13 +55,13 @@ export async function getAgendaEventById(supabase: DB, id: string) {
 
 export type AgendaEventInput = Omit<
   Database["public"]["Tables"]["agenda_events"]["Insert"],
-  "id" | "created_at" | "updated_at" | "created_by" | "status"
+  "id" | "created_at" | "updated_at" | "created_by" | "status" | "organization_id"
 >
 
-export async function createAgendaEvent(supabase: DB, input: AgendaEventInput, createdBy: string) {
+export async function createAgendaEvent(supabase: DB, input: AgendaEventInput, createdBy: string, organizationId: string) {
   const { data, error } = await supabase
     .from("agenda_events")
-    .insert({ ...input, created_by: createdBy, status: "agendado" })
+    .insert({ ...input, created_by: createdBy, status: "agendado", organization_id: organizationId })
     .select()
     .single()
   if (error) throw new Error(`Falha ao registrar compromisso: ${error.message}`)

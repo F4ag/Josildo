@@ -70,23 +70,24 @@ export async function getDemandHistory(supabase: DB, demandId: string) {
 
 export type DemandInput = Omit<
   Database["public"]["Tables"]["demands"]["Insert"],
-  "id" | "created_at" | "updated_at" | "created_by" | "status" | "completed_at"
+  "id" | "created_at" | "updated_at" | "created_by" | "status" | "completed_at" | "organization_id"
 >
 
-export async function createDemand(supabase: DB, input: DemandInput, createdBy: string) {
+export async function createDemand(supabase: DB, input: DemandInput, createdBy: string, organizationId: string) {
   const { data, error } = await supabase
     .from("demands")
-    .insert({ ...input, created_by: createdBy, status: "nova" })
+    .insert({ ...input, created_by: createdBy, status: "nova", organization_id: organizationId })
     .select()
     .single()
   if (error) throw new Error(`Falha ao registrar demanda: ${error.message}`)
 
   await supabase.from("demand_updates").insert({
     demand_id: data.id, status: "nova", comment: "Demanda registrada.", updated_by: createdBy,
+    organization_id: organizationId,
   })
   await logInteraction(supabase, {
     leaderId: input.leader_id, supporterId: input.supporter_id,
-    type: "demanda", description: `Demanda registrada: ${input.title}`, createdBy,
+    type: "demanda", description: `Demanda registrada: ${input.title}`, createdBy, organizationId,
   })
 
   return data
@@ -102,6 +103,7 @@ export async function updateDemandStatus(
   demand: Pick<Demand, "id" | "leader_id" | "supporter_id" | "title">,
   input: { status: DemandStatus; comment?: string; resultDescription?: string },
   updatedBy: string,
+  organizationId: string,
 ) {
   const { error } = await supabase
     .from("demands")
@@ -115,6 +117,7 @@ export async function updateDemandStatus(
 
   await supabase.from("demand_updates").insert({
     demand_id: demand.id, status: input.status, comment: input.comment || null, updated_by: updatedBy,
+    organization_id: organizationId,
   })
 
   await logInteraction(supabase, {
@@ -122,6 +125,7 @@ export async function updateDemandStatus(
     type: "demanda",
     description: `Demanda "${demand.title}" atualizada para: ${input.status}.`,
     createdBy: updatedBy,
+    organizationId,
   })
 }
 

@@ -17,7 +17,7 @@ async function assertAdminGeral() {
 }
 
 export async function inviteUser(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-  await assertAdminGeral()
+  const session = await assertAdminGeral()
 
   const parsed = inviteUserSchema.safeParse({
     full_name: formData.get("full_name"),
@@ -46,8 +46,12 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
     return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
   }
 
+  // organization_id vem sempre do admin_geral que está convidando — o
+  // convidado nunca pode entrar em outra organização (multi-tenant, ver
+  // docs/07-migracao-multi-tenant.md). Não é um campo do formulário.
   const { error: profileError } = await admin.from("users_profiles").insert({
     id: invited.user.id,
+    organization_id: session.profile.organization_id,
     full_name,
     email,
     phone: phone || null,
