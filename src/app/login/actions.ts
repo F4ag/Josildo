@@ -40,7 +40,14 @@ export async function requestPasswordReset(
 
   const supabase = await createClient()
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/confirm?next=/redefinir-senha`,
+    // Aponta direto pra /redefinir-senha (não mais pra /auth/confirm) —
+    // com o template de e-mail padrão (ainda não customizado, ver conversa
+    // sobre SMTP/Resend), o Supabase devolve a sessão embutida no fragmento
+    // da URL (#access_token=...). Passando por /auth/confirm no meio, esse
+    // fragmento se perdia no redirecionamento de servidor daquela rota
+    // antes de chegar em reset-password-form.tsx, que é quem sabe lê-lo.
+    // Indo direto num pulo só, o fragmento chega intacto.
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
   })
 
   // Não expor se o e-mail existe na base — sempre retorna sucesso genérico.

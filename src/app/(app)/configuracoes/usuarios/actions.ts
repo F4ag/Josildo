@@ -34,11 +34,12 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
   const { full_name, email, phone, role, leader_id } = parsed.data
   const admin = createAdminClient()
 
-  // Cria o login e dispara o e-mail de convite (o link cai em /auth/confirm,
-  // que redireciona para /redefinir-senha — mesma tela usada na recuperação
-  // de senha comum).
+  // Cria o login e dispara o e-mail de convite. Aponta direto pra
+  // /redefinir-senha (não mais via /auth/confirm) — ver comentário
+  // equivalente em login/actions.ts sobre o fragmento da URL (#access_token=...)
+  // se perdendo no salto extra de redirecionamento.
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/confirm?next=/redefinir-senha`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
   })
 
   if (inviteError || !invited.user) {
