@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server"
 import { getSupporterById } from "@/services/supporters"
 import { SUPPORTER_ORIGIN_LABELS, type SupporterOrigin, type UserRole } from "@/types/domain"
 import { WhatsAppButton } from "@/components/whatsapp-button"
+import { DeleteButton } from "@/components/delete-button"
 import { can } from "@/lib/permissions"
+import { deleteSupporterAction } from "../actions"
 
 export const metadata: Metadata = { title: "Apoiador · Lidera+" }
 
@@ -29,18 +31,31 @@ export default async function ApoiadorDetalhePage({
   const role = session?.profile.role as UserRole
   const isOwnNetwork = role === "lideranca" && supporter.leader_id === session?.profile.leader_id
   const canEdit = can(role, "update", "supporters") || isOwnNetwork
+  const canDelete = can(role, "delete", "supporters")
   const isPessoaAtendida = (demandCount ?? 0) > 0 || (attendanceCount ?? 0) > 0
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <h1 className="text-xl font-semibold text-foreground">{supporter.name}</h1>
-        {canEdit && (
-          <Link href={`/apoiadores/${id}/editar`}
-            className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
-            Editar
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <Link href={`/apoiadores/${id}/editar`}
+              className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
+              Editar
+            </Link>
+          )}
+          {canDelete && (
+            <DeleteButton
+              action={deleteSupporterAction.bind(null, id)}
+              confirmMessage={
+                isPessoaAtendida
+                  ? `${supporter.name} tem ${demandCount ?? 0} demanda(s) e ${attendanceCount ?? 0} atendimento(s) vinculados — a exclusão vai ser recusada até esses vínculos serem removidos. Tentar mesmo assim?`
+                  : `Tem certeza que deseja excluir ${supporter.name}? Essa ação não pode ser desfeita.`
+              }
+            />
+          )}
+        </div>
       </div>
 
       {isPessoaAtendida && (

@@ -79,6 +79,27 @@ export async function updateLeader(supabase: DB, id: string, input: Partial<Lead
   return data
 }
 
+/**
+ * Exclui a liderança. Reservado a admin_geral (RLS: policy ld_admin_geral_all
+ * é a única que cobre "for all", incluindo delete — ver rls_policies.sql).
+ * Não há ON DELETE CASCADE/SET NULL em leader_id nas tabelas dependentes
+ * (supporters, demands, attendances, agenda_events, users_profiles) —
+ * de propósito, para não apagar em cascata dado de eleitor/histórico. Se
+ * houver algum vínculo, o Postgres recusa com um erro de foreign key, que
+ * aqui vira uma mensagem legível em vez do código do Postgres.
+ */
+export async function deleteLeader(supabase: DB, id: string) {
+  const { error } = await supabase.from("leaders").delete().eq("id", id)
+  if (error) {
+    if (error.code === "23503") {
+      throw new Error(
+        "Não é possível excluir: essa liderança ainda tem apoiadores, demandas ou outros registros vinculados. Transfira ou remova esses vínculos antes de excluir.",
+      )
+    }
+    throw new Error(`Falha ao excluir liderança: ${error.message}`)
+  }
+}
+
 export type LeaderStatusCounts = {
   total: number
   ativa: number

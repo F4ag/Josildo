@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { createLeader, updateLeader, type LeaderInput } from "@/services/leaders"
+import { createLeader, updateLeader, deleteLeader, type LeaderInput } from "@/services/leaders"
 import { leaderSchema } from "@/lib/validations/leader"
 import { can } from "@/lib/permissions"
 import { geocodeAddress } from "@/lib/geocoding"
@@ -138,4 +138,29 @@ export async function updateLeaderAction(
   revalidatePath(`/liderancas/${leaderId}`)
   revalidatePath("/mapa")
   redirect(`/liderancas/${leaderId}`)
+}
+
+export async function deleteLeaderAction(
+  leaderId: string,
+  _prevState: ActionState,
+): Promise<ActionState> {
+  const session = await requireSessionUser()
+  const role = session.profile.role as UserRole
+
+  // Exclusão é ação sensível: só admin_geral (mesma regra da RLS —
+  // policy ld_admin_geral_all — ver comentário em services/leaders.ts).
+  if (!can(role, "delete", "leaders")) {
+    return { error: "Seu perfil não pode excluir lideranças." }
+  }
+
+  const supabase = await createClient()
+  try {
+    await deleteLeader(supabase, leaderId)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao excluir liderança." }
+  }
+
+  revalidatePath("/liderancas")
+  revalidatePath("/mapa")
+  redirect("/liderancas")
 }

@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import {
-  createSupporter, updateSupporter, findPotentialDuplicates, getSupporterById, type SupporterInput,
+  createSupporter, updateSupporter, deleteSupporter, findPotentialDuplicates, getSupporterById,
+  type SupporterInput,
 } from "@/services/supporters"
 import { supporterSchema } from "@/lib/validations/supporter"
 import { can } from "@/lib/permissions"
@@ -168,4 +169,29 @@ export async function updateSupporterAction(
   revalidatePath(`/apoiadores/${supporterId}`)
   revalidatePath("/mapa")
   redirect(`/apoiadores/${supporterId}`)
+}
+
+export async function deleteSupporterAction(
+  supporterId: string,
+  _prevState: SupporterActionState,
+): Promise<SupporterActionState> {
+  const session = await requireSessionUser()
+  const role = session.profile.role as UserRole
+
+  // Exclusão é ação sensível: só admin_geral (mesma regra da RLS —
+  // policy sp_admin_geral_all — ver comentário em services/supporters.ts).
+  if (!can(role, "delete", "supporters")) {
+    return { error: "Seu perfil não pode excluir apoiadores." }
+  }
+
+  const supabase = await createClient()
+  try {
+    await deleteSupporter(supabase, supporterId)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao excluir apoiador." }
+  }
+
+  revalidatePath("/apoiadores")
+  revalidatePath("/mapa")
+  redirect("/apoiadores")
 }

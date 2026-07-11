@@ -10,7 +10,9 @@ import {
 } from "@/types/domain"
 import { Badge } from "@/components/ui/badge"
 import { WhatsAppButton } from "@/components/whatsapp-button"
+import { DeleteButton } from "@/components/delete-button"
 import { can } from "@/lib/permissions"
+import { deleteLeaderAction } from "../actions"
 
 export const metadata: Metadata = { title: "Liderança · Lidera+" }
 
@@ -36,6 +38,8 @@ export default async function LiderancaDetalhePage({
   const role = session?.profile.role as UserRole
   const isOwnRecord = role === "lideranca" && session?.profile.leader_id === id
   const canEdit = can(role, "update", "leaders") || isOwnRecord
+  const canDelete = can(role, "delete", "leaders")
+  const hasLinkedRecords = (supporterCount ?? 0) > 0 || (demandCount ?? 0) > 0
 
   return (
     <div className="space-y-6">
@@ -53,6 +57,16 @@ export default async function LiderancaDetalhePage({
               className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
               Editar
             </Link>
+          )}
+          {canDelete && (
+            <DeleteButton
+              action={deleteLeaderAction.bind(null, id)}
+              confirmMessage={
+                hasLinkedRecords
+                  ? `${leader.name} tem ${supporterCount ?? 0} apoiador(es) e ${demandCount ?? 0} demanda(s) vinculados — a exclusão vai ser recusada até esses vínculos serem removidos ou transferidos. Tentar mesmo assim?`
+                  : `Tem certeza que deseja excluir ${leader.name}? Essa ação não pode ser desfeita.`
+              }
+            />
           )}
         </div>
       </div>

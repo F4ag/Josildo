@@ -118,6 +118,26 @@ export async function updateSupporter(supabase: DB, id: string, input: Partial<S
   return data
 }
 
+/**
+ * Exclui o apoiador. Reservado a admin_geral (RLS: policy sp_admin_geral_all
+ * é a única que cobre "for all", incluindo delete — ver rls_policies.sql).
+ * Sem ON DELETE CASCADE em supporter_id nas tabelas dependentes (demands,
+ * attendances, agenda_events) de propósito — não apagar em cascata
+ * histórico de demanda/atendimento. Erro de foreign key vira mensagem
+ * legível (mesmo tratamento de services/leaders.ts).
+ */
+export async function deleteSupporter(supabase: DB, id: string) {
+  const { error } = await supabase.from("supporters").delete().eq("id", id)
+  if (error) {
+    if (error.code === "23503") {
+      throw new Error(
+        "Não é possível excluir: esse apoiador ainda tem demandas, atendimentos ou outros registros vinculados. Remova esses vínculos antes de excluir.",
+      )
+    }
+    throw new Error(`Falha ao excluir apoiador: ${error.message}`)
+  }
+}
+
 export async function listDistinctSupporterNeighborhoods(supabase: DB) {
   const { data, error } = await supabase
     .from("supporters")
