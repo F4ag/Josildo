@@ -15,6 +15,7 @@ export async function markGreeted(supporterId: string, leaderId: string | null) 
     type: "aniversario",
     description: "Aniversariante cumprimentado.",
     createdBy: session.id,
+    organizationId: session.profile.organization_id,
   })
 
   revalidatePath("/aniversariantes")
