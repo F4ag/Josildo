@@ -7,9 +7,11 @@ import { NAV_ITEMS } from "./nav-items"
 import { canAccessRoute } from "@/lib/permissions"
 import type { UserRole } from "@/types/domain"
 
-export function Sidebar({ role }: { role: UserRole }) {
+export function Sidebar({ role, isPlatformAdmin = false }: { role: UserRole; isPlatformAdmin?: boolean }) {
   const pathname = usePathname()
-  const items = NAV_ITEMS.filter((item) => canAccessRoute(role, item.href))
+  const items = NAV_ITEMS.filter(
+    (item) => canAccessRoute(role, item.href) && (!item.platformAdminOnly || isPlatformAdmin),
+  )
 
   return (
     <aside className="no-print hidden w-64 shrink-0 flex-col border-r border-black/5 bg-primary text-primary-foreground md:flex">

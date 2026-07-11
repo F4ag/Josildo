@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { NextResponse, type NextRequest } from "next/server"
 import type { Database } from "@/types/database.types"
 import { canAccessRoute } from "@/lib/permissions"
+import { resolveCookieDomain } from "@/lib/supabase/cookie-domain"
 import type { UserRole } from "@/types/domain"
 
 const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/redefinir-senha", "/auth/confirm"]
@@ -71,8 +72,13 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value)
           }
           response = NextResponse.next({ request })
+          // Domain=.lideramais.app.br faz o cookie de sessão valer tanto na
+          // raiz quanto em qualquer subdomínio de cliente — sem isso, trocar
+          // de host (ver redirect de tenant mais abaixo) derruba a sessão.
+          // Ver comentário completo em lib/supabase/cookie-domain.ts.
+          const cookieDomain = resolveCookieDomain(request.headers.get("host"))
           for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, cookieDomain ? { ...options, domain: cookieDomain } : options)
           }
         },
       },
@@ -101,7 +107,7 @@ export async function updateSession(request: NextRequest) {
   if (user && !isPublicPath) {
     const { data: profile } = await supabase
       .from("users_profiles")
-      .select("role, status")
+      .select("role, status, is_platform_admin")
       .eq("id", user.id)
       .single()
 
@@ -111,6 +117,13 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (!canAccessRoute(profile.role as UserRole, pathname)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+
+    // /clientes é o painel cross-tenant de provisionamento (só Agência F4,
+    // is_platform_admin) — não é sobre role, então fica fora de
+    // canAccessRoute/ADMIN_GERAL_ONLY_ROUTE_PREFIXES (ver lib/permissions.ts).
+    if (pathname.startsWith("/clientes") && !profile.is_platform_admin) {
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }
 

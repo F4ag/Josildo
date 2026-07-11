@@ -6,13 +6,16 @@
 import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard, Users, UserPlus, HeartHandshake, ClipboardList,
-  Stethoscope, Map, Cake, CalendarDays, FileBarChart, MessageCircle, Settings,
+  Stethoscope, Map, Cake, CalendarDays, FileBarChart, MessageCircle, Settings, Building2,
 } from "lucide-react"
 
 export type NavItem = {
   href: string
   label: string
   icon: LucideIcon
+  /** Só renderizado quando isPlatformAdmin (ver sidebar.tsx) — item
+   * cross-tenant, não é sobre permissão de role (canAccessRoute). */
+  platformAdminOnly?: boolean
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -28,4 +31,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/relatorios", label: "Relatórios", icon: FileBarChart },
   { href: "/mensagens", label: "Mensagens", icon: MessageCircle },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
+  { href: "/clientes", label: "Clientes", icon: Building2, platformAdminOnly: true },
 ]

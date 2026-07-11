@@ -24,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell
       role={session.profile.role as UserRole}
       fullName={session.profile.full_name}
+      isPlatformAdmin={session.profile.is_platform_admin}
       unreadNotifications={unreadCount}
       notifications={notifications.map((n) => ({
         id: n.id,

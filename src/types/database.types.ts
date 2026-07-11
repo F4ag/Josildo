@@ -3,8 +3,8 @@
 // (vqrnjiwansfobxaeswnu) via generate_typescript_types.
 // NÃO editar à mão. Para regenerar após uma migration:
 //   npx supabase gen types typescript --project-id vqrnjiwansfobxaeswnu > src/types/database.types.ts
-// Última regeneração: migração multi-tenant (organizations + organization_id
-// em toda tabela) — ver docs/07-migracao-multi-tenant.md.
+// Última regeneração: coluna is_platform_admin em users_profiles (acesso
+// cross-tenant pra provisionar organizações novas) — ver docs/07-migracao-multi-tenant.md.
 // ============================================================================
 export type Json =
   | string
@@ -947,6 +947,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          is_platform_admin: boolean
           leader_id: string | null
           organization_id: string
           phone: string | null
@@ -959,6 +960,7 @@ export type Database = {
           email?: string | null
           full_name: string
           id: string
+          is_platform_admin?: boolean
           leader_id?: string | null
           organization_id: string
           phone?: string | null
@@ -971,6 +973,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          is_platform_admin?: boolean
           leader_id?: string | null
           organization_id?: string
           phone?: string | null

@@ -50,6 +50,9 @@ create table users_profiles (
   role text not null check (role in ('admin_geral', 'admin_equipe', 'lideranca')),
   status text not null default 'ativo' check (status in ('ativo', 'inativo')),
   leader_id uuid, -- preenchido quando role = 'lideranca' (FK adicionada após criar leaders)
+  -- Acesso cross-tenant (provisionar organizações novas) — só contas da
+  -- Agência F4, nunca clientes. Ver docs/07-migracao-multi-tenant.md.
+  is_platform_admin boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

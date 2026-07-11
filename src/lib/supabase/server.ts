@@ -2,10 +2,11 @@
 // Handlers. Lê/escreve cookies de sessão via `next/headers` — por isso não
 // pode ser importado num Client Component.
 
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
+import { resolveCookieDomain } from "@/lib/supabase/cookie-domain"
 
 // O retorno é forçado para SupabaseClient<Database, "public", any> (em vez de
 // deixar o TypeScript inferir sozinho): @supabase/ssr e @supabase/supabase-js
@@ -16,6 +17,10 @@ import type { Database } from "@/types/database.types"
 // usa createClient() — não só quem passa pelos services/*.ts.
 export async function createClient(): Promise<SupabaseClient<Database, "public", any>> {
   const cookieStore = await cookies()
+  // Mesma lógica de lib/supabase/middleware.ts: compartilhar o cookie de
+  // sessão entre raiz e subdomínios de cliente (Domain=.lideramais.app.br).
+  // Ver lib/supabase/cookie-domain.ts.
+  const cookieDomain = resolveCookieDomain((await headers()).get("host"))
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,7 +45,7 @@ export async function createClient(): Promise<SupabaseClient<Database, "public",
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           try {
             for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, cookieDomain ? { ...options, domain: cookieDomain } : options)
             }
           } catch {
             // `setAll` chamado de um Server Component (não de uma Server
