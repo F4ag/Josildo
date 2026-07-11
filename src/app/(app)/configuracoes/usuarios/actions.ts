@@ -80,3 +80,29 @@ export async function toggleUserStatus(userId: string, currentStatus: "ativo" | 
   await setUserStatus(supabase, userId, nextStatus)
   revalidatePath("/configuracoes/usuarios")
 }
+
+/**
+ * Exclui o login do usuário (auth.users + users_profiles, que cai em
+ * cascata via "on delete cascade" — ver supabase/schema.sql). Precisa do
+ * client admin (service role): não existe policy de delete em users_profiles
+ * pra ninguém, de propósito — exclusão de conta só passa por aqui, nunca
+ * direto pelo client do usuário logado.
+ * Retorna string de erro (em vez de lançar) pra dar pra mostrar na tela sem
+ * precisar de um formulário/useFormState só pra isso.
+ */
+export async function deleteUserAction(userId: string): Promise<{ error: string | null }> {
+  const session = await assertAdminGeral()
+
+  if (userId === session.id) {
+    return { error: "Você não pode excluir a própria conta." }
+  }
+
+  const admin = createAdminClient()
+  const { error } = await admin.auth.admin.deleteUser(userId)
+  if (error) {
+    return { error: `Não foi possível excluir este usuário: ${error.message}.` }
+  }
+
+  revalidatePath("/configuracoes/usuarios")
+  return { error: null }
+}

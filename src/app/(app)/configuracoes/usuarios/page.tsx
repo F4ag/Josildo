@@ -1,10 +1,12 @@
 import Link from "next/link"
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
+import { getSessionUser } from "@/lib/auth"
 import { listUserProfiles } from "@/services/users"
 import { USER_ROLE_LABELS, type UserRole } from "@/types/domain"
 import { Badge } from "@/components/ui/badge"
 import { StatusToggleButton } from "./status-toggle-button"
+import { DeleteUserButton } from "./delete-user-button"
 
 export const metadata: Metadata = { title: "Usuários · Lidera+" }
 
@@ -12,7 +14,7 @@ export const metadata: Metadata = { title: "Usuários · Lidera+" }
 // (ADMIN_GERAL_ONLY_ROUTE_PREFIXES em src/lib/permissions.ts).
 export default async function UsuariosPage() {
   const supabase = await createClient()
-  const users = await listUserProfiles(supabase)
+  const [users, session] = await Promise.all([listUserProfiles(supabase), getSessionUser()])
 
   return (
     <div className="space-y-6">
@@ -55,8 +57,13 @@ export default async function UsuariosPage() {
                     {user.status === "ativo" ? "Ativo" : "Inativo"}
                   </Badge>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <StatusToggleButton userId={user.id} status={user.status as "ativo" | "inativo"} />
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-3">
+                    <StatusToggleButton userId={user.id} status={user.status as "ativo" | "inativo"} />
+                    {user.id !== session?.id && (
+                      <DeleteUserButton userId={user.id} userName={user.full_name} />
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
