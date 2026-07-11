@@ -63,6 +63,17 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      // Mesmo motivo do "cache: no-store" em lib/supabase/server.ts: sem
+      // isso, o fetch global do Next.js pode reaproveitar a resposta de uma
+      // requisição anterior (de outro usuário/organização) pra essa mesma
+      // URL do PostgREST — o cache por padrão não leva o header
+      // Authorization em conta. No middleware isso é ainda mais crítico:
+      // é exatamente a consulta que decide se o usuário fica no
+      // subdomínio certo.
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, cache: "no-store" }),
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll()
