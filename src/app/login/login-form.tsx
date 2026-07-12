@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
@@ -25,6 +26,17 @@ export function LoginForm() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirect")
   const contaInativa = searchParams.get("erro") === "conta_inativa"
+
+  // Navegação de página inteira (não router.push) de propósito: o
+  // middleware pode precisar trocar de subdomínio (organização com domínio
+  // próprio), e isso só funciona numa navegação real do navegador — ver
+  // comentário em actions.ts sobre o motivo de a Server Action não usar
+  // mais redirect() diretamente.
+  useEffect(() => {
+    if (state.success && state.redirectTo) {
+      window.location.href = state.redirectTo
+    }
+  }, [state])
 
   return (
     <form action={formAction} className="space-y-4">

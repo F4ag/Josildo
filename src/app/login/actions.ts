@@ -1,10 +1,9 @@
 "use server"
 
-import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { loginSchema, forgotPasswordSchema } from "@/lib/validations/auth"
 
-export type ActionState = { error: string | null; success?: boolean }
+export type ActionState = { error: string | null; success?: boolean; redirectTo?: string }
 
 export async function login(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = loginSchema.safeParse({
@@ -24,8 +23,16 @@ export async function login(_prevState: ActionState, formData: FormData): Promis
     return { error: "E-mail ou senha incorretos." }
   }
 
+  // NÃO usar redirect() do next/navigation aqui: essa Server Action é chamada
+  // via fetch() pelo runtime de Server Actions do React (useFormState), e o
+  // navegador bloqueia por CORS um redirect que troca de domínio dentro de um
+  // fetch (ex.: lideramais.app.br -> flux45.lideramais.app.br, feito pelo
+  // middleware pra usuários de organização com subdomínio próprio). Por isso
+  // devolvemos o destino e deixamos o componente cliente (login-form.tsx)
+  // fazer uma navegação de página inteira (window.location.href), que segue
+  // redirect entre domínios sem problema.
   const redirectTo = (formData.get("redirect") as string | null) || "/dashboard"
-  redirect(redirectTo)
+  return { error: null, success: true, redirectTo }
 }
 
 export async function requestPasswordReset(
