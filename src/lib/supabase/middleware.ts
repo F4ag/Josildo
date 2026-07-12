@@ -1,3 +1,4 @@
+// Alteração de teste (deploy) — sem efeito funcional.
 // Helper usado pelo middleware.ts da raiz para renovar o token de sessão do
 // Supabase a cada request e decidir redirecionamentos por autenticação/perfil
 // e, desde a migração multi-tenant (docs/07-migracao-multi-tenant.md), por
