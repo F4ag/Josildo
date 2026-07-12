@@ -1,5 +1,4 @@
-// Alteração de teste (deploy) — sem efeito funcional.
-// Helper usado pelo middleware.ts da raiz para renovar o token de sessão do
+// Helper usado pelo middleware.ts (dentro de src/) para renovar o token de sessão do
 // Supabase a cada request e decidir redirecionamentos por autenticação/perfil
 // e, desde a migração multi-tenant (docs/07-migracao-multi-tenant.md), por
 // organização/subdomínio. Separado do middleware.ts principal para manter a
@@ -54,7 +53,6 @@ function resolveTenantSlug(host: string | null): string {
 }
 
 export async function updateSession(request: NextRequest) {
-  console.log("[mw] start", request.nextUrl.pathname, request.headers.get("host"))
   let response = NextResponse.next({ request })
 
   // Cast igual ao de lib/supabase/server.ts: @supabase/ssr e
@@ -106,7 +104,6 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
-  console.log("[mw] user", user?.id ?? null, pathname, "isPublicPath", isPublicPath)
 
   if (!user && !isPublicPath) {
     const loginUrl = new URL("/login", request.url)
@@ -157,28 +154,12 @@ export async function updateSession(request: NextRequest) {
       .select("slug")
       .maybeSingle()
 
-    // DEBUG TEMPORÁRIO — remover depois de descobrir por que o redirect de
-    // tenant não está disparando em produção. Ver aba Network > requisição
-    // do documento > Response Headers, e/ou aba Logs do projeto no Vercel.
-    console.log("[mw] tenant-check", JSON.stringify({
-      host: request.headers.get("host"),
-      tenantSlug,
-      myOrgSlug: myOrg?.slug ?? null,
-      myOrgError: myOrgError?.message ?? null,
-    }))
-    response.headers.set("x-debug-host", request.headers.get("host") ?? "null")
-    response.headers.set("x-debug-tenant-slug", tenantSlug)
-    response.headers.set("x-debug-myorg-slug", myOrg?.slug ?? "null")
-    response.headers.set("x-debug-myorg-error", myOrgError?.message ?? "none")
-
     if (myOrg && myOrg.slug !== tenantSlug) {
       const correctHost =
         myOrg.slug === DEFAULT_ORG_SLUG ? ROOT_DOMAIN : `${myOrg.slug}.${ROOT_DOMAIN}`
       const redirectUrl = new URL(request.url)
       redirectUrl.hostname = correctHost
-      const redirectResponse = NextResponse.redirect(redirectUrl)
-      redirectResponse.headers.set("x-debug-redirect", "yes")
-      return redirectResponse
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
