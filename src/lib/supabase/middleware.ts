@@ -54,6 +54,7 @@ function resolveTenantSlug(host: string | null): string {
 }
 
 export async function updateSession(request: NextRequest) {
+  console.log("[mw] start", request.nextUrl.pathname, request.headers.get("host"))
   let response = NextResponse.next({ request })
 
   // Cast igual ao de lib/supabase/server.ts: @supabase/ssr e
@@ -105,6 +106,7 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+  console.log("[mw] user", user?.id ?? null, pathname, "isPublicPath", isPublicPath)
 
   if (!user && !isPublicPath) {
     const loginUrl = new URL("/login", request.url)
@@ -157,7 +159,13 @@ export async function updateSession(request: NextRequest) {
 
     // DEBUG TEMPORÁRIO — remover depois de descobrir por que o redirect de
     // tenant não está disparando em produção. Ver aba Network > requisição
-    // do documento > Response Headers.
+    // do documento > Response Headers, e/ou aba Logs do projeto no Vercel.
+    console.log("[mw] tenant-check", JSON.stringify({
+      host: request.headers.get("host"),
+      tenantSlug,
+      myOrgSlug: myOrg?.slug ?? null,
+      myOrgError: myOrgError?.message ?? null,
+    }))
     response.headers.set("x-debug-host", request.headers.get("host") ?? "null")
     response.headers.set("x-debug-tenant-slug", tenantSlug)
     response.headers.set("x-debug-myorg-slug", myOrg?.slug ?? "null")
