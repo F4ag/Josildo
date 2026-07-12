@@ -149,14 +149,27 @@ export async function updateSession(request: NextRequest) {
     // logado com a marca/URL de outro cliente na tela.
     // ------------------------------------------------------------------
     const tenantSlug = resolveTenantSlug(request.headers.get("host"))
-    const { data: myOrg } = await supabase.from("organizations").select("slug").maybeSingle()
+    const { data: myOrg, error: myOrgError } = await supabase
+      .from("organizations")
+      .select("slug")
+      .maybeSingle()
+
+    // DEBUG TEMPORÁRIO — remover depois de descobrir por que o redirect de
+    // tenant não está disparando em produção. Ver aba Network > requisição
+    // do documento > Response Headers.
+    response.headers.set("x-debug-host", request.headers.get("host") ?? "null")
+    response.headers.set("x-debug-tenant-slug", tenantSlug)
+    response.headers.set("x-debug-myorg-slug", myOrg?.slug ?? "null")
+    response.headers.set("x-debug-myorg-error", myOrgError?.message ?? "none")
 
     if (myOrg && myOrg.slug !== tenantSlug) {
       const correctHost =
         myOrg.slug === DEFAULT_ORG_SLUG ? ROOT_DOMAIN : `${myOrg.slug}.${ROOT_DOMAIN}`
       const redirectUrl = new URL(request.url)
       redirectUrl.hostname = correctHost
-      return NextResponse.redirect(redirectUrl)
+      const redirectResponse = NextResponse.redirect(redirectUrl)
+      redirectResponse.headers.set("x-debug-redirect", "yes")
+      return redirectResponse
     }
   }
 
