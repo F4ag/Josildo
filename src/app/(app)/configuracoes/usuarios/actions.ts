@@ -49,6 +49,10 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
   // organization_id vem sempre do admin_geral que está convidando — o
   // convidado nunca pode entrar em outra organização (multi-tenant, ver
   // docs/07-migracao-multi-tenant.md). Não é um campo do formulário.
+  // leader_id agora também é aceito pra admin_equipe (opcional): vincular
+  // deixa esse usuário aparecer no Mapa Territorial e no Relatório de
+  // Lideranças, que hoje só listam a tabela leaders (ver liderancas/novo).
+  const canLinkLeader = role === "lideranca" || role === "admin_equipe"
   const { error: profileError } = await admin.from("users_profiles").insert({
     id: invited.user.id,
     organization_id: session.profile.organization_id,
@@ -56,7 +60,7 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
     email,
     phone: phone || null,
     role,
-    leader_id: role === "lideranca" ? leader_id || null : null,
+    leader_id: canLinkLeader ? leader_id || null : null,
   })
 
   if (profileError) {
@@ -65,8 +69,16 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
     return { error: `Não foi possível salvar o perfil: ${profileError.message}.` }
   }
 
-  if (role === "lideranca" && leader_id) {
-    await admin.from("leaders").update({ user_id: invited.user.id }).eq("id", leader_id)
+  if (canLinkLeader && leader_id) {
+    // Pra admin_equipe, o registro de liderança vinculado passa a "pertencer"
+    // a este usuário (created_by) — a RLS de Admin de Equipe só mostra o que
+    // ele mesmo cadastrou (migration admin_equipe_scoped_to_own_records), e
+    // sem isso o próprio dono do pin não conseguiria vê-lo no Mapa/Relatório.
+    // Pra lideranca isso não é necessário: a visibilidade dela usa leader_id,
+    // não created_by (ver ld_lideranca_select_self).
+    const leaderUpdate: { user_id: string; created_by?: string } = { user_id: invited.user.id }
+    if (role === "admin_equipe") leaderUpdate.created_by = invited.user.id
+    await admin.from("leaders").update(leaderUpdate).eq("id", leader_id)
   }
 
   revalidatePath("/configuracoes/usuarios")

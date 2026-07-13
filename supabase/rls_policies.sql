@@ -136,15 +136,19 @@ create policy ld_admin_geral_all on leaders
   for all using (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id())
   with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
 
+-- Admin de Equipe só vê/edita as lideranças que ele mesmo cadastrou
+-- (created_by = auth.uid()) — Admin Geral continua vendo tudo da organização
+-- (policy _all acima). Vale pra toda a plataforma, não só pra este cliente
+-- (migration admin_equipe_scoped_to_own_records).
 create policy ld_admin_equipe_select on leaders
-  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy ld_admin_equipe_insert on leaders
-  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy ld_admin_equipe_update on leaders
-  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id())
-  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid())
+  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
   -- Exclusão de liderança é ação sensível: reservada a admin_geral (só a policy _all cobre delete).
 
 create policy ld_lideranca_select_self on leaders
@@ -187,15 +191,16 @@ create policy sp_admin_geral_all on supporters
   for all using (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id())
   with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
 
+-- Isolamento por cadastro próprio (ver nota em ld_admin_equipe_select acima).
 create policy sp_admin_equipe_select on supporters
-  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy sp_admin_equipe_insert on supporters
-  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy sp_admin_equipe_update on supporters
-  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id())
-  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid())
+  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy sp_lideranca_select_own_network on supporters
   for select using (private.current_user_role() = 'lideranca' and is_own_supporter(leader_id) and organization_id = private.current_user_org_id());
@@ -216,15 +221,16 @@ create policy dm_admin_geral_all on demands
   for all using (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id())
   with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
 
+-- Isolamento por cadastro próprio (ver nota em ld_admin_equipe_select).
 create policy dm_admin_equipe_select on demands
-  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy dm_admin_equipe_insert on demands
-  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy dm_admin_equipe_update on demands
-  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id())
-  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid())
+  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
   -- admin_equipe pode atualizar status (Módulo 4.2) mas não excluir — delete só admin_geral.
 
 create policy dm_lideranca_select_own on demands
@@ -249,9 +255,24 @@ create policy dm_lideranca_insert_own on demands
 -- ============================================================================
 alter table demand_updates enable row level security;
 
-create policy du_admin_all on demand_updates
-  for all using (private.current_user_role() in ('admin_geral','admin_equipe') and organization_id = private.current_user_org_id())
-  with check (private.current_user_role() in ('admin_geral','admin_equipe') and organization_id = private.current_user_org_id());
+create policy du_admin_geral_all on demand_updates
+  for all using (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id())
+  with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
+
+-- Herda a visibilidade da demanda relacionada (RLS de demands já filtra
+-- Admin de Equipe por created_by = auth.uid()) — mesma técnica de
+-- du_lideranca_select abaixo, em vez de checar updated_by diretamente.
+create policy du_admin_equipe_own on demand_updates
+  for all using (
+    private.current_user_role() = 'admin_equipe'
+    and organization_id = private.current_user_org_id()
+    and demand_id in (select id from demands)
+  )
+  with check (
+    private.current_user_role() = 'admin_equipe'
+    and organization_id = private.current_user_org_id()
+    and demand_id in (select id from demands)
+  );
 
 create policy du_lideranca_select on demand_updates
   for select using (
@@ -276,15 +297,16 @@ create policy at_admin_geral_all on attendances
   for all using (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id())
   with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
 
+-- Isolamento por cadastro próprio (ver nota em ld_admin_equipe_select).
 create policy at_admin_equipe_select on attendances
-  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy at_admin_equipe_insert on attendances
-  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy at_admin_equipe_update on attendances
-  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id())
-  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid())
+  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy at_lideranca_select_authorized on attendances
   for select using (
@@ -299,9 +321,14 @@ create policy at_lideranca_select_authorized on attendances
 -- ============================================================================
 alter table interactions enable row level security;
 
-create policy it_admin_all on interactions
-  for all using (private.current_user_role() in ('admin_geral','admin_equipe') and organization_id = private.current_user_org_id())
-  with check (private.current_user_role() in ('admin_geral','admin_equipe') and organization_id = private.current_user_org_id());
+create policy it_admin_geral_all on interactions
+  for all using (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id())
+  with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
+
+-- Isolamento por cadastro próprio (ver nota em ld_admin_equipe_select).
+create policy it_admin_equipe_own on interactions
+  for all using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid())
+  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy it_lideranca_select_own on interactions
   for select using (
@@ -423,15 +450,16 @@ create policy ag_admin_geral_all on agenda_events
   for all using (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id())
   with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
 
+-- Isolamento por cadastro próprio (ver nota em ld_admin_equipe_select).
 create policy ag_admin_equipe_select on agenda_events
-  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for select using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy ag_admin_equipe_insert on agenda_events
-  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for insert with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy ag_admin_equipe_update on agenda_events
-  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id())
-  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id());
+  for update using (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid())
+  with check (private.current_user_role() = 'admin_equipe' and organization_id = private.current_user_org_id() and created_by = auth.uid());
 
 create policy ag_lideranca_select_own on agenda_events
   for select using (

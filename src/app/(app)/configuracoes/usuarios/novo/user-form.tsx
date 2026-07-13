@@ -80,25 +80,34 @@ export function UserForm({ leadersWithoutAccount }: { leadersWithoutAccount: Lea
         </select>
       </div>
 
-      {role === "lideranca" && (
+      {(role === "lideranca" || role === "admin_equipe") && (
         <div>
           <label htmlFor="leader_id" className="mb-1 block text-sm font-medium">
-            Qual liderança este usuário representa?
+            {role === "lideranca"
+              ? "Qual liderança este usuário representa?"
+              : "Vincular a um cadastro de liderança (opcional)"}
           </label>
           <select
             id="leader_id" name="leader_id"
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
           >
-            <option value="">Selecione...</option>
+            <option value="">{role === "lideranca" ? "Selecione..." : "Não vincular"}</option>
             {leadersWithoutAccount.map((leader) => (
               <option key={leader.id} value={leader.id}>
                 {leader.name} {leader.neighborhood ? `— ${leader.neighborhood}` : ""}
               </option>
             ))}
           </select>
-          {leadersWithoutAccount.length === 0 && (
+          {role === "lideranca" && leadersWithoutAccount.length === 0 && (
             <p className="mt-1 text-xs text-foreground/50">
               Nenhuma liderança sem login vinculado. Cadastre a liderança primeiro em /liderancas.
+            </p>
+          )}
+          {role === "admin_equipe" && (
+            <p className="mt-1 text-xs text-foreground/50">
+              Só faz efeito se já existir um cadastro de liderança (com endereço) pra essa pessoa
+              em /liderancas — vincular faz esse usuário aparecer no Mapa Territorial e no
+              Relatório de Lideranças.
             </p>
           )}
         </div>
