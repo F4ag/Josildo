@@ -87,6 +87,20 @@ export async function createLeaderAction(
     influence_level: parsed.data.influence_level || null,
   }
 
+  // Hierarquia: quando quem cadastra é a própria liderança, a nova linha
+  // vira "filha" dela automaticamente (parent_leader_id) — o formulário nem
+  // expõe esse campo, e a RLS (ld_lideranca_insert_subordinate) recusaria
+  // qualquer outro valor mesmo que alguém tentasse forjar a requisição.
+  // Também zera os campos administrativos: uma liderança não decide o
+  // próprio nível de influência/status de quem ela recruta (mesma barreira
+  // já aplicada em updateLeaderAction pra edição do próprio cadastro).
+  if (role === "lideranca") {
+    input.parent_leader_id = session.profile.leader_id
+    input.influence_level = null
+    input.status = "ativa"
+    input.can_view_attendances = false
+  }
+
   const leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
   revalidatePath("/liderancas")
   revalidatePath("/mapa")
@@ -102,7 +116,10 @@ export async function updateLeaderAction(
   const role = session.profile.role as UserRole
 
   const isOwnRecord = role === "lideranca" && session.profile.leader_id === leaderId
-  if (!can(role, "update", "leaders") && !isOwnRecord) {
+  // Liderança só edita o próprio cadastro — nunca o de uma sub-liderança
+  // (ver mesma nota em liderancas/[id]/page.tsx e [id]/editar/page.tsx).
+  const canEdit = role === "lideranca" ? isOwnRecord : can(role, "update", "leaders")
+  if (!canEdit) {
     return { error: "Você não tem permissão para editar esta liderança." }
   }
 

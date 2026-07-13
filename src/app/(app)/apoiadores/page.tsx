@@ -3,7 +3,9 @@ import type { Metadata } from "next"
 import { UserPlus, MessageCircle, Mail, TrendingUp } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { listSupporters, listDistinctSupporterNeighborhoods, getSupporterStats } from "@/services/supporters"
+import {
+  listSupporters, listDistinctSupporterNeighborhoods, listDistinctSupporterCities, getSupporterStats,
+} from "@/services/supporters"
 import { SUPPORTER_ORIGINS, SUPPORTER_ORIGIN_LABELS, type SupporterOrigin, type UserRole } from "@/types/domain"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { WhatsAppButton } from "@/components/whatsapp-button"
@@ -11,7 +13,7 @@ import { can } from "@/lib/permissions"
 
 export const metadata: Metadata = { title: "Apoiadores · Lidera+" }
 
-type SearchParams = { bairro?: string; origem?: SupporterOrigin; busca?: string }
+type SearchParams = { bairro?: string; cidade?: string; origem?: SupporterOrigin; busca?: string }
 
 export default async function ApoiadoresPage({
   searchParams,
@@ -23,14 +25,16 @@ export default async function ApoiadoresPage({
   const supabase = await createClient()
   const role = session?.profile.role as UserRole
 
-  const [supporters, neighborhoods, stats] = await Promise.all([
+  const [supporters, neighborhoods, cities, stats] = await Promise.all([
     listSupporters(supabase, {
       neighborhood: params.bairro,
+      city: params.cidade,
       origin: params.origem,
       search: params.busca,
       leaderId: role === "lideranca" ? session?.profile.leader_id ?? undefined : undefined,
     }),
     listDistinctSupporterNeighborhoods(supabase),
+    listDistinctSupporterCities(supabase),
     getSupporterStats(supabase),
   ])
 
@@ -65,6 +69,10 @@ export default async function ApoiadoresPage({
           <option value="">Todos os bairros</option>
           {neighborhoods.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
+        <select name="cidade" defaultValue={params.cidade ?? ""} className="rounded-md border border-black/10 px-3 py-2 text-sm">
+          <option value="">Todas as cidades</option>
+          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
         <select name="origem" defaultValue={params.origem ?? ""} className="rounded-md border border-black/10 px-3 py-2 text-sm">
           <option value="">Toda origem</option>
           {SUPPORTER_ORIGINS.map((o) => <option key={o} value={o}>{SUPPORTER_ORIGIN_LABELS[o]}</option>)}
@@ -80,6 +88,7 @@ export default async function ApoiadoresPage({
             <tr>
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Bairro</th>
+              <th className="px-4 py-3">Cidade</th>
               <th className="px-4 py-3">Liderança</th>
               <th className="px-4 py-3">Origem</th>
               <th className="px-4 py-3" />
@@ -94,6 +103,7 @@ export default async function ApoiadoresPage({
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-foreground/70">{s.neighborhood ?? "—"}</td>
+                <td className="px-4 py-3 text-foreground/70">{s.city ?? "—"}</td>
                 <td className="px-4 py-3 text-foreground/70">{s.leaders?.name ?? "—"}</td>
                 <td className="px-4 py-3 text-foreground/70">
                   {s.origin ? SUPPORTER_ORIGIN_LABELS[s.origin as SupporterOrigin] : "—"}
@@ -105,7 +115,7 @@ export default async function ApoiadoresPage({
             ))}
             {supporters.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-foreground/50">
+                <td colSpan={6} className="px-4 py-8 text-center text-foreground/50">
                   Nenhum apoiador encontrado com esses filtros.
                 </td>
               </tr>

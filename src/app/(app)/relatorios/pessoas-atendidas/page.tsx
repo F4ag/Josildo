@@ -34,6 +34,7 @@ export default async function RelatorioPessoasAtendidasPage() {
             <tr>
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Bairro</th>
+              <th className="px-4 py-3">Cidade</th>
               <th className="px-4 py-3">Liderança</th>
               <th className="px-4 py-3 text-center">Demandas</th>
               <th className="px-4 py-3 text-center">Resolvidas</th>
@@ -50,6 +51,7 @@ export default async function RelatorioPessoasAtendidasPage() {
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
+                <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
                 <td className="px-4 py-3 text-foreground/70">{row.leaderName ?? "—"}</td>
                 <td className="px-4 py-3 text-center">{row.demandCount}</td>
                 <td className="px-4 py-3 text-center">{row.demandResolvedCount}</td>
@@ -58,7 +60,7 @@ export default async function RelatorioPessoasAtendidasPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground/50">Ninguém com demanda ou atendimento registrado ainda.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-foreground/50">Ninguém com demanda ou atendimento registrado ainda.</td></tr>
             )}
           </tbody>
         </table>

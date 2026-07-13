@@ -34,6 +34,7 @@ export default async function RelatorioLiderancasPage() {
           <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
             <tr>
               <th className="px-4 py-3">Bairro</th>
+              <th className="px-4 py-3">Cidade</th>
               <th className="px-4 py-3">Liderança</th>
               <th className="px-4 py-3">WhatsApp</th>
               <th className="px-4 py-3 text-center">Apoiadores</th>
@@ -48,6 +49,7 @@ export default async function RelatorioLiderancasPage() {
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-black/5">
                 <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
+                <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
                 <td className="px-4 py-3 font-medium">{row.name}</td>
                 <td className="px-4 py-3 text-foreground/70">{row.phone ?? "—"}</td>
                 <td className="px-4 py-3 text-center">{row.supporterCount}</td>
@@ -63,7 +65,7 @@ export default async function RelatorioLiderancasPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-foreground/50">Nenhuma liderança cadastrada.</td></tr>
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-foreground/50">Nenhuma liderança cadastrada.</td></tr>
             )}
           </tbody>
         </table>

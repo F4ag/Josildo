@@ -11,6 +11,7 @@ type DB = SupabaseClient<Database, "public", any>
 
 export type LeaderFilters = {
   neighborhood?: string
+  city?: string
   leaderType?: LeaderType
   status?: LeaderStatus
   influenceLevel?: InfluenceLevel
@@ -26,6 +27,7 @@ export async function listLeaders(supabase: DB, filters: LeaderFilters = {}) {
 
   if (filters.onlyLeaderId) query = query.eq("id", filters.onlyLeaderId)
   if (filters.neighborhood) query = query.eq("neighborhood", filters.neighborhood)
+  if (filters.city) query = query.eq("city", filters.city)
   if (filters.leaderType) query = query.eq("leader_type", filters.leaderType)
   if (filters.status) query = query.eq("status", filters.status)
   if (filters.influenceLevel) query = query.eq("influence_level", filters.influenceLevel)
@@ -135,4 +137,14 @@ export async function listDistinctLeaderNeighborhoods(supabase: DB) {
     .not("neighborhood", "is", null)
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
   return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
+}
+
+/** Distinct de cidades cadastradas em leaders — usado no filtro da listagem. */
+export async function listDistinctLeaderCities(supabase: DB) {
+  const { data, error } = await supabase
+    .from("leaders")
+    .select("city")
+    .not("city", "is", null)
+  if (error) throw new Error(`Falha ao listar cidades: ${error.message}`)
+  return Array.from(new Set(data.map((row) => row.city).filter(Boolean))) as string[]
 }

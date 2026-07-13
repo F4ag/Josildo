@@ -30,14 +30,23 @@ export default async function LiderancaDetalhePage({
   // para não vazar se o registro existe ou não.
   if (!leader) notFound()
 
-  const [{ count: supporterCount }, { count: demandCount }] = await Promise.all([
+  const [{ count: supporterCount }, { count: demandCount }, { data: subordinates }, parentLeader] = await Promise.all([
     supabase.from("supporters").select("id", { count: "exact", head: true }).eq("leader_id", id),
     supabase.from("demands").select("id", { count: "exact", head: true }).eq("leader_id", id),
+    supabase.from("leaders").select("id, name, status").eq("parent_leader_id", id).order("name", { ascending: true }),
+    leader.parent_leader_id ? getLeaderById(supabase, leader.parent_leader_id) : Promise.resolve(null),
   ])
 
   const role = session?.profile.role as UserRole
   const isOwnRecord = role === "lideranca" && session?.profile.leader_id === id
-  const canEdit = can(role, "update", "leaders") || isOwnRecord
+  // Liderança só edita o próprio cadastro (a RLS ld_lideranca_update_self só
+  // cobre isso) — mesmo que ela agora veja sub-lideranças que cadastrou
+  // (ld_lideranca_select_subordinates), não existe policy de update pra
+  // elas. Por isso não usar can(role, "update", "leaders") sozinho aqui: o
+  // valor "true" na matriz pra lideranca é só o teto de UX, condicionado a
+  // isOwnRecord — sem isso o botão Editar apareceria numa página que o
+  // submit real (RLS) recusaria.
+  const canEdit = role === "lideranca" ? isOwnRecord : can(role, "update", "leaders")
   const canDelete = can(role, "delete", "leaders")
   const hasLinkedRecords = (supporterCount ?? 0) > 0 || (demandCount ?? 0) > 0
 
@@ -94,12 +103,35 @@ export default async function LiderancaDetalhePage({
         <Info label="E-mail" value={leader.email} />
         <Info label="Data de nascimento" value={leader.birth_date} />
         <Info label="Pode ver atendimentos da rede?" value={leader.can_view_attendances ? "Sim" : "Não"} />
+        {parentLeader && (
+          <Info label="Cadastrada por" value={parentLeader.name} />
+        )}
         {leader.notes && (
           <div className="sm:col-span-2">
             <Info label="Observações" value={leader.notes} />
           </div>
         )}
       </div>
+
+      {subordinates && subordinates.length > 0 && (
+        <div className="rounded-lg border border-black/5 bg-white p-6">
+          <p className="mb-3 text-sm font-medium text-foreground">
+            Lideranças cadastradas por {leader.name} ({subordinates.length})
+          </p>
+          <ul className="space-y-2">
+            {subordinates.map((sub) => (
+              <li key={sub.id}>
+                <Link href={`/liderancas/${sub.id}`} className="flex items-center justify-between gap-2 rounded-md border border-black/5 px-3 py-2 text-sm hover:border-primary/30">
+                  <span className="font-medium text-foreground">{sub.name}</span>
+                  <Badge tone={LEADER_STATUS_COLOR[sub.status as LeaderStatus]}>
+                    {LEADER_STATUS_LABELS[sub.status as LeaderStatus]}
+                  </Badge>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <WhatsAppButton phone={leader.phone} message={`Olá, ${leader.name}!`} />
 

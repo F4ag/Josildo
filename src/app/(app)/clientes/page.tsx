@@ -73,6 +73,12 @@ export default async function ClientesPage() {
                   <p className="mt-1 text-sm text-foreground/60">
                     Admin Geral: {org.admin_email ?? "—"}
                   </p>
+                  <Link
+                    href={`/clientes/${org.id}/editar`}
+                    className="mt-3 inline-block rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+                  >
+                    Editar
+                  </Link>
                 </div>
               )
             })}
@@ -87,6 +93,7 @@ export default async function ClientesPage() {
                   <th className="px-4 py-3">Subdomínio</th>
                   <th className="px-4 py-3">Admin Geral</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -110,6 +117,14 @@ export default async function ClientesPage() {
                         <Badge tone={org.status === "ativa" ? "verde" : "vermelho"}>
                           {org.status === "ativa" ? "Ativa" : org.status}
                         </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/clientes/${org.id}/editar`}
+                          className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+                        >
+                          Editar
+                        </Link>
                       </td>
                     </tr>
                   )

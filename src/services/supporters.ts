@@ -9,6 +9,7 @@ type DB = SupabaseClient<Database, "public", any>
 
 export type SupporterFilters = {
   neighborhood?: string
+  city?: string
   leaderId?: string
   origin?: SupporterOrigin
   /** Aniversariantes de um mês específico (1-12) — usado no Módulo 9. */
@@ -26,6 +27,7 @@ export async function listSupporters(supabase: DB, filters: SupporterFilters = {
   let query = supabase.from("supporters").select("*, leaders(name)").order("name", { ascending: true })
 
   if (filters.neighborhood) query = query.eq("neighborhood", filters.neighborhood)
+  if (filters.city) query = query.eq("city", filters.city)
   if (filters.leaderId) query = query.eq("leader_id", filters.leaderId)
   if (filters.origin) query = query.eq("origin", filters.origin)
   if (filters.search) query = query.ilike("name", `%${filters.search}%`)
@@ -145,6 +147,15 @@ export async function listDistinctSupporterNeighborhoods(supabase: DB) {
     .not("neighborhood", "is", null)
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
   return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
+}
+
+export async function listDistinctSupporterCities(supabase: DB) {
+  const { data, error } = await supabase
+    .from("supporters")
+    .select("city")
+    .not("city", "is", null)
+  if (error) throw new Error(`Falha ao listar cidades: ${error.message}`)
+  return Array.from(new Set(data.map((row) => row.city).filter(Boolean))) as string[]
 }
 
 export type SupporterStats = {

@@ -6,7 +6,7 @@
 // (react-leaflet) fica em territory-map.tsx.
 
 import dynamic from "next/dynamic"
-import type { MapLeaderPin, MapDemandPin, MapSupporterPin } from "@/services/map"
+import type { MapLeaderPin, MapSupporterPin } from "@/services/map"
 
 const TerritoryMap = dynamic(
   () => import("./territory-map").then((mod) => mod.TerritoryMap),
@@ -21,9 +21,9 @@ const TerritoryMap = dynamic(
 )
 
 export function TerritoryMapLoader({
-  leaders, demands, supporters,
+  leaders, supporters,
 }: {
-  leaders: MapLeaderPin[]; demands: MapDemandPin[]; supporters: MapSupporterPin[]
+  leaders: MapLeaderPin[]; supporters: MapSupporterPin[]
 }) {
-  return <TerritoryMap leaders={leaders} demands={demands} supporters={supporters} />
+  return <TerritoryMap leaders={leaders} supporters={supporters} />
 }

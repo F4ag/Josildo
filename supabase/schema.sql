@@ -84,6 +84,12 @@ create table leaders (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id),
   user_id uuid references users_profiles(id), -- se a liderança tem login
+  -- Hierarquia: quem cadastrou/indicou esta liderança (uma liderança com
+  -- login pode cadastrar outras "abaixo" dela). Null = topo da hierarquia
+  -- (cadastrada por admin_geral/admin_equipe). on delete set null pra não
+  -- apagar em cascata se a liderança-mãe for excluída — ver migration
+  -- leaders_parent_hierarchy.
+  parent_leader_id uuid references leaders(id) on delete set null,
   name text not null,
   nickname text,
   phone text,

@@ -3,7 +3,9 @@ import type { Metadata } from "next"
 import { Users, UserCheck, AlertTriangle, UserX } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { listLeaders, listDistinctLeaderNeighborhoods, getLeaderStatusCounts } from "@/services/leaders"
+import {
+  listLeaders, listDistinctLeaderNeighborhoods, listDistinctLeaderCities, getLeaderStatusCounts,
+} from "@/services/leaders"
 import {
   LEADER_TYPES, LEADER_TYPE_LABELS, INFLUENCE_LEVELS, INFLUENCE_LEVEL_LABELS,
   LEADER_STATUSES, LEADER_STATUS_LABELS, LEADER_STATUS_COLOR,
@@ -18,6 +20,7 @@ export const metadata: Metadata = { title: "Lideranças · Lidera+" }
 
 type SearchParams = {
   bairro?: string
+  cidade?: string
   tipo?: LeaderType
   status?: LeaderStatus
   influencia?: InfluenceLevel
@@ -33,15 +36,17 @@ export default async function LiderancasPage({
   const session = await getSessionUser()
   const supabase = await createClient()
 
-  const [leaders, neighborhoods, statusCounts] = await Promise.all([
+  const [leaders, neighborhoods, cities, statusCounts] = await Promise.all([
     listLeaders(supabase, {
       neighborhood: params.bairro,
+      city: params.cidade,
       leaderType: params.tipo,
       status: params.status,
       influenceLevel: params.influencia,
       search: params.busca,
     }),
     listDistinctLeaderNeighborhoods(supabase),
+    listDistinctLeaderCities(supabase),
     getLeaderStatusCounts(supabase),
   ])
 
@@ -78,6 +83,11 @@ export default async function LiderancasPage({
           <option value="">Todos os bairros</option>
           {neighborhoods.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
+        <select name="cidade" defaultValue={params.cidade ?? ""}
+          className="rounded-md border border-black/10 px-3 py-2 text-sm">
+          <option value="">Todas as cidades</option>
+          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
         <select name="tipo" defaultValue={params.tipo ?? ""}
           className="rounded-md border border-black/10 px-3 py-2 text-sm">
           <option value="">Todos os tipos</option>
@@ -110,7 +120,10 @@ export default async function LiderancasPage({
                   {LEADER_STATUS_LABELS[leader.status as LeaderStatus]}
                 </Badge>
               </div>
-              <p className="text-sm text-foreground/60">{leader.neighborhood ?? "Sem bairro"}</p>
+              <p className="text-sm text-foreground/60">
+                {leader.neighborhood ?? "Sem bairro"}
+                {leader.city ? ` · ${leader.city}` : ""}
+              </p>
               {leader.leader_type && (
                 <p className="text-xs text-foreground/50">{LEADER_TYPE_LABELS[leader.leader_type as LeaderType]}</p>
               )}

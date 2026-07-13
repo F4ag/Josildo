@@ -30,10 +30,19 @@ type LeaderFormProps = {
   defaultValues?: Partial<Leader>
   /** Liderança editando o próprio cadastro: esconde campos administrativos. */
   isOwnRecord?: boolean
+  /** Liderança cadastrando uma NOVA liderança (sua "filha" na hierarquia):
+   * mesma restrição visual de isOwnRecord — quem decide influência/status/
+   * permissão de ver atendimentos é sempre Admin Geral/Equipe, nunca quem
+   * recrutou. A Server Action zera esses campos de qualquer forma (ver
+   * liderancas/actions.ts), isto aqui é só pra não mostrar campo que a
+   * escrita vai ignorar. */
+  hideAdminFields?: boolean
   cancelHref: string
 }
 
-export function LeaderForm({ action, defaultValues, isOwnRecord = false, cancelHref }: LeaderFormProps) {
+export function LeaderForm({
+  action, defaultValues, isOwnRecord = false, hideAdminFields = false, cancelHref,
+}: LeaderFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const d = defaultValues
 
@@ -153,7 +162,7 @@ export function LeaderForm({ action, defaultValues, isOwnRecord = false, cancelH
           </select>
         </div>
 
-        {!isOwnRecord && (
+        {!isOwnRecord && !hideAdminFields && (
           <>
             <div>
               <label htmlFor="influence_level" className="mb-1 block text-sm font-medium">Nível de influência</label>

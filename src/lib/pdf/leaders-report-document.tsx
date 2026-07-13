@@ -6,13 +6,14 @@ import type { LeaderReportRow } from "@/services/reports"
 // Larguras de coluna do relatório 11.1 (Bairro, Nome, WhatsApp, Apoiadores,
 // Demandas solicitadas, Demandas resolvidas, Atendimentos, Última interação, Status)
 const cols = StyleSheet.create({
-  bairro: { width: "12%" },
-  nome: { width: "20%" },
-  whatsapp: { width: "13%" },
-  apoiadores: { width: "9%", textAlign: "center" },
-  demandas: { width: "11%", textAlign: "center" },
-  resolvidas: { width: "11%", textAlign: "center" },
-  atendimentos: { width: "10%", textAlign: "center" },
+  bairro: { width: "10%" },
+  cidade: { width: "10%" },
+  nome: { width: "17%" },
+  whatsapp: { width: "12%" },
+  apoiadores: { width: "8%", textAlign: "center" },
+  demandas: { width: "10%", textAlign: "center" },
+  resolvidas: { width: "10%", textAlign: "center" },
+  atendimentos: { width: "9%", textAlign: "center" },
   interacao: { width: "9%" },
   status: { width: "5%" },
 })
@@ -29,6 +30,7 @@ export function LeadersReportDocument({ rows, generatedAt }: { rows: LeaderRepor
         <View style={reportStyles.table}>
           <View style={reportStyles.rowHeader} fixed>
             <Text style={[reportStyles.cellHeader, cols.bairro]}>Bairro</Text>
+            <Text style={[reportStyles.cellHeader, cols.cidade]}>Cidade</Text>
             <Text style={[reportStyles.cellHeader, cols.nome]}>Liderança</Text>
             <Text style={[reportStyles.cellHeader, cols.whatsapp]}>WhatsApp</Text>
             <Text style={[reportStyles.cellHeader, cols.apoiadores]}>Apoiadores</Text>
@@ -42,6 +44,7 @@ export function LeadersReportDocument({ rows, generatedAt }: { rows: LeaderRepor
           {rows.map((row, i) => (
             <View key={row.id} style={i % 2 === 1 ? [reportStyles.row, reportStyles.rowAlt] : reportStyles.row} wrap={false}>
               <Text style={cols.bairro}>{row.neighborhood ?? "—"}</Text>
+              <Text style={cols.cidade}>{row.city ?? "—"}</Text>
               <Text style={cols.nome}>{row.name}</Text>
               <Text style={cols.whatsapp}>{row.phone ?? "—"}</Text>
               <Text style={cols.apoiadores}>{row.supporterCount}</Text>

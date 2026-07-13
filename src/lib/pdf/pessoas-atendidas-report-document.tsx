@@ -3,11 +3,12 @@ import { reportStyles, formatDate } from "./shared-styles"
 import type { PessoaAtendidaReportRow } from "@/services/reports"
 
 const cols = StyleSheet.create({
-  nome: { width: "26%" },
-  bairro: { width: "16%" },
-  lideranca: { width: "22%" },
-  demandas: { width: "9%", textAlign: "center" },
-  demandasResolvidas: { width: "9%", textAlign: "center" },
+  nome: { width: "22%" },
+  bairro: { width: "13%" },
+  cidade: { width: "13%" },
+  lideranca: { width: "18%" },
+  demandas: { width: "8%", textAlign: "center" },
+  demandasResolvidas: { width: "8%", textAlign: "center" },
   atendimentos: { width: "9%", textAlign: "center" },
   atendimentosConcluidos: { width: "9%", textAlign: "center" },
 })
@@ -30,6 +31,7 @@ export function PessoasAtendidasReportDocument({
           <View style={reportStyles.rowHeader} fixed>
             <Text style={[reportStyles.cellHeader, cols.nome]}>Nome</Text>
             <Text style={[reportStyles.cellHeader, cols.bairro]}>Bairro</Text>
+            <Text style={[reportStyles.cellHeader, cols.cidade]}>Cidade</Text>
             <Text style={[reportStyles.cellHeader, cols.lideranca]}>Liderança</Text>
             <Text style={[reportStyles.cellHeader, cols.demandas]}>Demandas</Text>
             <Text style={[reportStyles.cellHeader, cols.demandasResolvidas]}>Resolvidas</Text>
@@ -41,6 +43,7 @@ export function PessoasAtendidasReportDocument({
             <View key={row.id} style={i % 2 === 1 ? [reportStyles.row, reportStyles.rowAlt] : reportStyles.row} wrap={false}>
               <Text style={cols.nome}>{row.name}</Text>
               <Text style={cols.bairro}>{row.neighborhood ?? "—"}</Text>
+              <Text style={cols.cidade}>{row.city ?? "—"}</Text>
               <Text style={cols.lideranca}>{row.leaderName ?? "—"}</Text>
               <Text style={cols.demandas}>{row.demandCount}</Text>
               <Text style={cols.demandasResolvidas}>{row.demandResolvedCount}</Text>

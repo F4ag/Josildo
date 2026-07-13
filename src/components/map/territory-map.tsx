@@ -11,9 +11,9 @@ import Link from "next/link"
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
-import { LEADER_STATUS_COLOR, LEADER_STATUS_LABELS, DEMAND_STATUS_COLOR, DEMAND_STATUS_LABELS } from "@/types/domain"
+import { LEADER_STATUS_COLOR, LEADER_STATUS_LABELS } from "@/types/domain"
 import { STATUS_COLOR_HEX, SUPPORTER_PIN_COLOR } from "@/lib/map-colors"
-import type { MapLeaderPin, MapDemandPin, MapSupporterPin } from "@/services/map"
+import type { MapLeaderPin, MapSupporterPin } from "@/services/map"
 
 // Centro/zoom usados só quando não há nenhum pin para calcular bounds (ex.:
 // projeto recém-criado, sem lat/lng cadastrado ainda). Cada campanha deve
@@ -228,18 +228,16 @@ function SupporterMarkers({ supporters }: { supporters: MapSupporterPin[] }) {
 
 type TerritoryMapProps = {
   leaders: MapLeaderPin[]
-  demands: MapDemandPin[]
   supporters: MapSupporterPin[]
 }
 
-export function TerritoryMap({ leaders, demands, supporters }: TerritoryMapProps) {
+export function TerritoryMap({ leaders, supporters }: TerritoryMapProps) {
   const allPoints = useMemo<[number, number][]>(
     () => [
       ...leaders.map((l): [number, number] => [l.latitude, l.longitude]),
-      ...demands.map((d): [number, number] => [d.latitude, d.longitude]),
       ...supporters.map((s): [number, number] => [s.latitude, s.longitude]),
     ],
-    [leaders, demands, supporters],
+    [leaders, supporters],
   )
 
   return (
@@ -269,27 +267,6 @@ export function TerritoryMap({ leaders, demands, supporters }: TerritoryMapProps
                 {leader.neighborhood ? ` · ${leader.neighborhood}` : ""}
               </p>
               <Link href={`/liderancas/${leader.id}`} className="text-primary hover:underline">
-                Abrir cadastro
-              </Link>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-
-      {demands.map((demand) => (
-        <Marker
-          key={`demand-${demand.id}`}
-          position={[demand.latitude, demand.longitude]}
-          icon={createDotIcon(STATUS_COLOR_HEX[DEMAND_STATUS_COLOR[demand.status]])}
-        >
-          <Popup>
-            <div className="space-y-1 text-sm">
-              <p className="font-medium">{demand.title}</p>
-              <p className="text-foreground/60">
-                Demanda · {DEMAND_STATUS_LABELS[demand.status]}
-                {demand.neighborhood ? ` · ${demand.neighborhood}` : ""}
-              </p>
-              <Link href={`/demandas/${demand.id}`} className="text-primary hover:underline">
                 Abrir cadastro
               </Link>
             </div>

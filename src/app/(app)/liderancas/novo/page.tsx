@@ -10,14 +10,24 @@ export const metadata: Metadata = { title: "Nova liderança · Lidera+" }
 
 export default async function NovaLiderancaPage() {
   const session = await getSessionUser()
-  if (!session || !can(session.profile.role as UserRole, "create", "leaders")) {
+  const role = session?.profile.role as UserRole
+  if (!session || !can(role, "create", "leaders")) {
     redirect("/liderancas")
   }
 
+  const isLideranca = role === "lideranca"
+
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-foreground">Nova liderança</h1>
-      <LeaderForm action={createLeaderAction} cancelHref="/liderancas" />
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Nova liderança</h1>
+        {isLideranca && (
+          <p className="text-sm text-foreground/60">
+            Essa liderança entra na sua rede — você vai poder acompanhá-la aqui em Lideranças.
+          </p>
+        )}
+      </div>
+      <LeaderForm action={createLeaderAction} cancelHref="/liderancas" hideAdminFields={isLideranca} />
     </div>
   )
 }

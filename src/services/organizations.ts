@@ -70,3 +70,22 @@ export async function createOrganizationRow(admin: AdminDB, name: string, slug: 
   if (error) throw new Error(`Falha ao criar organização: ${error.message}`)
   return data
 }
+
+export async function getOrganizationById(admin: AdminDB, id: string) {
+  const { data, error } = await admin.from("organizations").select("*").eq("id", id).maybeSingle()
+  if (error) throw new Error(`Falha ao buscar organização: ${error.message}`)
+  return data
+}
+
+export type OrganizationUpdateInput = { name: string; slug: string; status: string }
+
+export async function updateOrganizationRow(admin: AdminDB, id: string, input: OrganizationUpdateInput) {
+  const { data, error } = await admin
+    .from("organizations")
+    .update(input)
+    .eq("id", id)
+    .select()
+    .single()
+  if (error) throw new Error(`Falha ao atualizar organização: ${error.message}`)
+  return data
+}

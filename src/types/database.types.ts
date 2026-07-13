@@ -3,8 +3,9 @@
 // (vqrnjiwansfobxaeswnu) via generate_typescript_types.
 // NÃO editar à mão. Para regenerar após uma migration:
 //   npx supabase gen types typescript --project-id vqrnjiwansfobxaeswnu > src/types/database.types.ts
-// Última regeneração: coluna is_platform_admin em users_profiles (acesso
-// cross-tenant pra provisionar organizações novas) — ver docs/07-migracao-multi-tenant.md.
+// Última regeneração: coluna parent_leader_id em leaders (hierarquia de
+// lideranças cadastrando outras lideranças) — ver migration
+// leaders_parent_hierarchy.
 // ============================================================================
 export type Json =
   | string
@@ -15,6 +16,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -547,6 +550,7 @@ export type Database = {
           nickname: string | null
           notes: string | null
           organization_id: string
+          parent_leader_id: string | null
           phone: string | null
           photo_url: string | null
           state: string | null
@@ -574,6 +578,7 @@ export type Database = {
           nickname?: string | null
           notes?: string | null
           organization_id: string
+          parent_leader_id?: string | null
           phone?: string | null
           photo_url?: string | null
           state?: string | null
@@ -601,6 +606,7 @@ export type Database = {
           nickname?: string | null
           notes?: string | null
           organization_id?: string
+          parent_leader_id?: string | null
           phone?: string | null
           photo_url?: string | null
           state?: string | null
@@ -629,6 +635,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leaders_parent_leader_id_fkey"
+            columns: ["parent_leader_id"]
+            isOneToOne: false
+            referencedRelation: "leaders"
             referencedColumns: ["id"]
           },
           {

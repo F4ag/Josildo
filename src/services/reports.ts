@@ -18,6 +18,7 @@ type DB = SupabaseClient<Database, "public", any>
 export type LeaderReportRow = {
   id: string
   neighborhood: string | null
+  city: string | null
   name: string
   phone: string | null
   status: string
@@ -31,7 +32,7 @@ export type LeaderReportRow = {
 export async function getLeadersByNeighborhoodReport(supabase: DB): Promise<LeaderReportRow[]> {
   const [{ data: leaders, error: leadersError }, { data: supporters }, { data: demands }, { data: attendances }, { data: interactions }] =
     await Promise.all([
-      supabase.from("leaders").select("id, name, phone, neighborhood, status").order("neighborhood", { ascending: true }),
+      supabase.from("leaders").select("id, name, phone, neighborhood, city, status").order("neighborhood", { ascending: true }),
       supabase.from("supporters").select("leader_id").not("leader_id", "is", null),
       supabase.from("demands").select("leader_id, status").not("leader_id", "is", null),
       supabase.from("attendances").select("leader_id").not("leader_id", "is", null),
@@ -49,6 +50,7 @@ export async function getLeadersByNeighborhoodReport(supabase: DB): Promise<Lead
   return leaders.map((leader) => ({
     id: leader.id,
     neighborhood: leader.neighborhood,
+    city: leader.city,
     name: leader.name,
     phone: leader.phone,
     status: leader.status,
@@ -67,6 +69,7 @@ export type PessoaAtendidaReportRow = {
   id: string
   name: string
   neighborhood: string | null
+  city: string | null
   leaderName: string | null
   demandCount: number
   demandResolvedCount: number
@@ -90,6 +93,7 @@ export async function getPessoasAtendidasReport(supabase: DB): Promise<PessoaAte
     id: p.id,
     name: p.name,
     neighborhood: p.neighborhood,
+    city: p.city,
     leaderName: p.leaders?.name ?? null,
     demandCount: demandCounts.get(p.id) ?? 0,
     demandResolvedCount: demandResolvedCounts.get(p.id) ?? 0,

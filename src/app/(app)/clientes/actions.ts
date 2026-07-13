@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
-  isSlugTaken, isEmailTaken, createOrganizationRow,
+  isSlugTaken, isEmailTaken, createOrganizationRow, getOrganizationById, updateOrganizationRow,
 } from "@/services/organizations"
-import { createOrganizationSchema } from "@/lib/validations/organization"
+import { createOrganizationSchema, updateOrganizationSchema } from "@/lib/validations/organization"
 
 export type CreateClientActionState = {
   error: string | null
@@ -83,4 +83,41 @@ export async function createClientAction(
 
   revalidatePath("/clientes")
   return { error: null, success: true, slug: org.slug }
+}
+
+export type UpdateClientActionState = { error: string | null; success?: boolean }
+
+export async function updateClientAction(
+  organizationId: string,
+  _prevState: UpdateClientActionState,
+  formData: FormData,
+): Promise<UpdateClientActionState> {
+  await assertPlatformAdmin()
+
+  const parsed = updateOrganizationSchema.safeParse({
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    status: formData.get("status"),
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
+  }
+
+  const { name, slug, status } = parsed.data
+  const admin = createAdminClient()
+
+  const current = await getOrganizationById(admin, organizationId)
+  if (!current) {
+    return { error: "Cliente não encontrado." }
+  }
+
+  if (slug !== current.slug && (await isSlugTaken(admin, slug))) {
+    return { error: `O subdomínio "${slug}" já está em uso por outro cliente.` }
+  }
+
+  await updateOrganizationRow(admin, organizationId, { name, slug, status })
+
+  revalidatePath("/clientes")
+  return { error: null, success: true }
 }

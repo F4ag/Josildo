@@ -24,7 +24,11 @@ export default async function EditarLiderancaPage({
 
   const role = session?.profile.role as UserRole
   const isOwnRecord = role === "lideranca" && session?.profile.leader_id === id
-  if (!can(role, "update", "leaders") && !isOwnRecord) {
+  // Liderança só edita o próprio cadastro, nunca o de uma sub-liderança que
+  // ela cadastrou (RLS ld_lideranca_update_self não cobre isso) — ver nota
+  // igual em liderancas/[id]/page.tsx.
+  const canEdit = role === "lideranca" ? isOwnRecord : can(role, "update", "leaders")
+  if (!canEdit) {
     redirect(`/liderancas/${id}`)
   }
 

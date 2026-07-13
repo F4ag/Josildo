@@ -60,8 +60,12 @@ const ADMIN_EQUIPE: ResourceMatrix = {
 
 // lideranca: só a própria rede (o "read: true" aqui é o teto — a RLS ainda
 // filtra por leader_id; ver is_own_supporter() em rls_policies.sql).
+// leaders.create: true desde a hierarquia de lideranças (migration
+// leaders_parent_hierarchy) — a liderança pode cadastrar outras lideranças
+// "abaixo" dela (parent_leader_id = a própria), nunca soltas; RLS
+// (ld_lideranca_insert_subordinate) barra qualquer outro valor.
 const LIDERANCA: ResourceMatrix = {
-  leaders: { create: false, read: true, update: true /* só o próprio cadastro */, delete: false },
+  leaders: { create: true, read: true, update: true /* só o próprio cadastro */, delete: false },
   supporters: { create: true, read: true, update: true, delete: false },
   demands: { create: true, read: true, update: false, delete: false, update_status: false },
   attendances: { create: false, read: true /* só se can_view_attendances */, update: false, delete: false },

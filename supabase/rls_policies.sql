@@ -156,6 +156,28 @@ create policy ld_lideranca_update_self on leaders
   -- App deve restringir quais campos a liderança pode alterar no próprio cadastro
   -- (ex.: não pode mudar influence_level ou status para "estrategica").
 
+-- Hierarquia (migration leaders_parent_hierarchy): liderança pode cadastrar
+-- outra liderança "abaixo" dela (parent_leader_id = seu próprio leader_id)
+-- e ver as que ela mesma cadastrou — nunca lideranças soltas nem de outra
+-- rede. App zera influence_level/status/can_view_attendances nesse cadastro
+-- (ver liderancas/actions.ts) — RLS não impede a liderança de mandar esses
+-- valores, é defesa em profundidade, não a barreira principal.
+create policy ld_lideranca_insert_subordinate on leaders
+  for insert
+  with check (
+    private.current_user_role() = 'lideranca'
+    and organization_id = private.current_user_org_id()
+    and parent_leader_id = private.current_user_leader_id()
+  );
+
+create policy ld_lideranca_select_subordinates on leaders
+  for select
+  using (
+    private.current_user_role() = 'lideranca'
+    and organization_id = private.current_user_org_id()
+    and parent_leader_id = private.current_user_leader_id()
+  );
+
 -- ============================================================================
 -- supporters
 -- ============================================================================
