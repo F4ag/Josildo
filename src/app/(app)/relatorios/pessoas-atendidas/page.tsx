@@ -28,43 +28,65 @@ export default async function RelatorioPessoasAtendidasPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Bairro</th>
-              <th className="px-4 py-3">Cidade</th>
-              <th className="px-4 py-3">Liderança</th>
-              <th className="px-4 py-3 text-center">Demandas</th>
-              <th className="px-4 py-3 text-center">Resolvidas</th>
-              <th className="px-4 py-3 text-center">Atendimentos</th>
-              <th className="px-4 py-3 text-center">Concluídos</th>
-            </tr>
-          </thead>
-          <tbody>
+      {rows.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Ninguém com demanda ou atendimento registrado ainda.
+        </div>
+      ) : (
+        <>
+          <div className="no-print grid gap-3 sm:hidden">
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-black/5">
-                <td className="px-4 py-3">
-                  <Link href={`/pessoas-atendidas/${row.id}`} className="font-medium text-foreground hover:text-primary">
-                    {row.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{row.leaderName ?? "—"}</td>
-                <td className="px-4 py-3 text-center">{row.demandCount}</td>
-                <td className="px-4 py-3 text-center">{row.demandResolvedCount}</td>
-                <td className="px-4 py-3 text-center">{row.attendanceCount}</td>
-                <td className="px-4 py-3 text-center">{row.attendanceConcludedCount}</td>
-              </tr>
+              <Link key={row.id} href={`/pessoas-atendidas/${row.id}`} className="block rounded-lg border border-black/5 bg-white p-4 hover:border-primary/30">
+                <p className="font-medium text-foreground">{row.name}</p>
+                <p className="text-sm text-foreground/60">
+                  {row.neighborhood ?? "Sem bairro"}{row.city ? ` · ${row.city}` : ""} · {row.leaderName ?? "—"}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/70">
+                  <span>Demandas: {row.demandCount}</span>
+                  <span>Resolvidas: {row.demandResolvedCount}</span>
+                  <span>Atendimentos: {row.attendanceCount}</span>
+                  <span>Concluídos: {row.attendanceConcludedCount}</span>
+                </div>
+              </Link>
             ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-foreground/50">Ninguém com demanda ou atendimento registrado ainda.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Bairro</th>
+                  <th className="px-4 py-3">Cidade</th>
+                  <th className="px-4 py-3">Liderança</th>
+                  <th className="px-4 py-3 text-center">Demandas</th>
+                  <th className="px-4 py-3 text-center">Resolvidas</th>
+                  <th className="px-4 py-3 text-center">Atendimentos</th>
+                  <th className="px-4 py-3 text-center">Concluídos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} className="border-t border-black/5">
+                    <td className="px-4 py-3">
+                      <Link href={`/pessoas-atendidas/${row.id}`} className="font-medium text-foreground hover:text-primary">
+                        {row.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">{row.leaderName ?? "—"}</td>
+                    <td className="px-4 py-3 text-center">{row.demandCount}</td>
+                    <td className="px-4 py-3 text-center">{row.demandResolvedCount}</td>
+                    <td className="px-4 py-3 text-center">{row.attendanceCount}</td>
+                    <td className="px-4 py-3 text-center">{row.attendanceConcludedCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

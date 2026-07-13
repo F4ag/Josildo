@@ -92,43 +92,65 @@ export default async function DemandasPage({
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Título</th>
-              <th className="px-4 py-3">Bairro</th>
-              <th className="px-4 py-3">Liderança / Pessoa</th>
-              <th className="px-4 py-3">Prioridade</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {demands.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Nenhuma demanda encontrada.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:hidden">
             {demands.map((d) => (
-              <tr key={d.id} className="border-t border-black/5">
-                <td className="px-4 py-3">
-                  <Link href={`/demandas/${d.id}`} className="font-medium text-foreground hover:text-primary">
-                    {d.title}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-foreground/70">{d.neighborhood ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">
-                  {d.leaders?.name ?? d.supporters?.name ?? "—"}
-                </td>
-                <td className="px-4 py-3 text-foreground/70">{PRIORITY_LABELS[d.priority as Priority]}</td>
-                <td className="px-4 py-3">
+              <Link key={d.id} href={`/demandas/${d.id}`} className="block rounded-lg border border-black/5 bg-white p-4 hover:border-primary/30">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium text-foreground">{d.title}</p>
                   <Badge tone={DEMAND_STATUS_COLOR[d.status as DemandStatus]}>
                     {DEMAND_STATUS_LABELS[d.status as DemandStatus]}
                   </Badge>
-                </td>
-              </tr>
+                </div>
+                <p className="text-sm text-foreground/60">
+                  {d.neighborhood ?? "Sem bairro"} · {d.leaders?.name ?? d.supporters?.name ?? "—"}
+                </p>
+                <p className="text-xs text-foreground/50">Prioridade: {PRIORITY_LABELS[d.priority as Priority]}</p>
+              </Link>
             ))}
-            {demands.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-foreground/50">Nenhuma demanda encontrada.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Título</th>
+                  <th className="px-4 py-3">Bairro</th>
+                  <th className="px-4 py-3">Liderança / Pessoa</th>
+                  <th className="px-4 py-3">Prioridade</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {demands.map((d) => (
+                  <tr key={d.id} className="border-t border-black/5">
+                    <td className="px-4 py-3">
+                      <Link href={`/demandas/${d.id}`} className="font-medium text-foreground hover:text-primary">
+                        {d.title}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">{d.neighborhood ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {d.leaders?.name ?? d.supporters?.name ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">{PRIORITY_LABELS[d.priority as Priority]}</td>
+                    <td className="px-4 py-3">
+                      <Badge tone={DEMAND_STATUS_COLOR[d.status as DemandStatus]}>
+                        {DEMAND_STATUS_LABELS[d.status as DemandStatus]}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -74,40 +74,62 @@ export default async function AtendimentosPage({
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Pessoa</th>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Liderança</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {attendances.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Nenhum atendimento encontrado.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:hidden">
             {attendances.map((a) => (
-              <tr key={a.id} className="border-t border-black/5">
-                <td className="px-4 py-3">
-                  <Link href={`/atendimentos/${a.id}`} className="font-medium text-foreground hover:text-primary">
-                    {a.supporters?.name ?? "—"}
-                  </Link>
-                  <p className="text-xs text-foreground/50">{a.title}</p>
-                </td>
-                <td className="px-4 py-3 text-foreground/70">{ATTENDANCE_TYPE_LABELS[a.attendance_type as AttendanceType]}</td>
-                <td className="px-4 py-3 text-foreground/70">{a.leaders?.name ?? "—"}</td>
-                <td className="px-4 py-3">
+              <Link key={a.id} href={`/atendimentos/${a.id}`} className="block rounded-lg border border-black/5 bg-white p-4 hover:border-primary/30">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium text-foreground">{a.supporters?.name ?? "—"}</p>
                   <Badge tone={STATUS_TONE[a.status as AttendanceStatus]}>
                     {ATTENDANCE_STATUS_LABELS[a.status as AttendanceStatus]}
                   </Badge>
-                </td>
-              </tr>
+                </div>
+                <p className="text-xs text-foreground/50">{a.title}</p>
+                <p className="mt-1 text-sm text-foreground/60">
+                  {ATTENDANCE_TYPE_LABELS[a.attendance_type as AttendanceType]} · {a.leaders?.name ?? "—"}
+                </p>
+              </Link>
             ))}
-            {attendances.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-foreground/50">Nenhum atendimento encontrado.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Pessoa</th>
+                  <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">Liderança</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attendances.map((a) => (
+                  <tr key={a.id} className="border-t border-black/5">
+                    <td className="px-4 py-3">
+                      <Link href={`/atendimentos/${a.id}`} className="font-medium text-foreground hover:text-primary">
+                        {a.supporters?.name ?? "—"}
+                      </Link>
+                      <p className="text-xs text-foreground/50">{a.title}</p>
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">{ATTENDANCE_TYPE_LABELS[a.attendance_type as AttendanceType]}</td>
+                    <td className="px-4 py-3 text-foreground/70">{a.leaders?.name ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <Badge tone={STATUS_TONE[a.status as AttendanceStatus]}>
+                        {ATTENDANCE_STATUS_LABELS[a.status as AttendanceStatus]}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

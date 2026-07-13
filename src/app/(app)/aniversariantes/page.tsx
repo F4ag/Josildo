@@ -90,47 +90,78 @@ export default async function AniversariantesPage({
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Data</th>
-              <th className="px-4 py-3">Bairro</th>
-              <th className="px-4 py-3">Liderança</th>
-              <th className="px-4 py-3" />
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
+      {birthdays.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Ninguém faz aniversário nesse período.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:hidden">
             {birthdays.map((b) => (
-              <tr key={b.id} className="border-t border-black/5">
-                <td className="px-4 py-3 font-medium">{b.name}</td>
-                <td className="px-4 py-3 text-foreground/70">
-                  {new Date(`${b.birthDate}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                  {b.daysUntil === 0 && <span className="ml-2 text-xs text-secondary">hoje</span>}
-                </td>
-                <td className="px-4 py-3 text-foreground/70">{b.neighborhood ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{b.leaderName ?? "—"}</td>
-                <td className="px-4 py-3">
+              <div key={b.id} className="rounded-lg border border-black/5 bg-white p-4">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="font-medium text-foreground">{b.name}</p>
+                  <p className="text-sm text-foreground/70">
+                    {new Date(`${b.birthDate}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                    {b.daysUntil === 0 && <span className="ml-2 text-xs text-secondary">hoje</span>}
+                  </p>
+                </div>
+                <p className="text-sm text-foreground/60">
+                  {b.neighborhood ?? "Sem bairro"} · {b.leaderName ?? "—"}
+                </p>
+                <div className="mt-3 flex items-center gap-2">
                   <WhatsAppButton
                     phone={b.phone}
                     message={renderTemplate(messageBody, { nome: b.name })}
                     label="Parabenizar"
                     consentWhatsapp={b.consentWhatsapp}
                   />
-                </td>
-                <td className="px-4 py-3">
                   <GreetButton supporterId={b.id} leaderId={b.leaderId} alreadyGreeted={b.alreadyGreetedToday} />
-                </td>
-              </tr>
+                </div>
+              </div>
             ))}
-            {birthdays.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-foreground/50">Ninguém faz aniversário nesse período.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Data</th>
+                  <th className="px-4 py-3">Bairro</th>
+                  <th className="px-4 py-3">Liderança</th>
+                  <th className="px-4 py-3" />
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {birthdays.map((b) => (
+                  <tr key={b.id} className="border-t border-black/5">
+                    <td className="px-4 py-3 font-medium">{b.name}</td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {new Date(`${b.birthDate}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                      {b.daysUntil === 0 && <span className="ml-2 text-xs text-secondary">hoje</span>}
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">{b.neighborhood ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">{b.leaderName ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <WhatsAppButton
+                        phone={b.phone}
+                        message={renderTemplate(messageBody, { nome: b.name })}
+                        label="Parabenizar"
+                        consentWhatsapp={b.consentWhatsapp}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <GreetButton supporterId={b.id} leaderId={b.leaderId} alreadyGreeted={b.alreadyGreetedToday} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

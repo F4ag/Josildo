@@ -82,47 +82,68 @@ export default async function ApoiadoresPage({
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Bairro</th>
-              <th className="px-4 py-3">Cidade</th>
-              <th className="px-4 py-3">Liderança</th>
-              <th className="px-4 py-3">Origem</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
+      {supporters.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Nenhum apoiador encontrado com esses filtros.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:hidden">
             {supporters.map((s) => (
-              <tr key={s.id} className="border-t border-black/5">
-                <td className="px-4 py-3">
-                  <Link href={`/apoiadores/${s.id}`} className="font-medium text-foreground hover:text-primary">
-                    {s.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-foreground/70">{s.neighborhood ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{s.city ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{s.leaders?.name ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">
-                  {s.origin ? SUPPORTER_ORIGIN_LABELS[s.origin as SupporterOrigin] : "—"}
-                </td>
-                <td className="px-4 py-3 text-right">
+              <div key={s.id} className="rounded-lg border border-black/5 bg-white p-4">
+                <Link href={`/apoiadores/${s.id}`} className="font-medium text-foreground hover:text-primary">
+                  {s.name}
+                </Link>
+                <p className="mt-1 text-sm text-foreground/60">
+                  {s.neighborhood ?? "Sem bairro"}{s.city ? ` · ${s.city}` : ""}
+                </p>
+                <p className="text-sm text-foreground/60">
+                  Liderança: {s.leaders?.name ?? "—"}
+                  {s.origin ? ` · ${SUPPORTER_ORIGIN_LABELS[s.origin as SupporterOrigin]}` : ""}
+                </p>
+                <div className="mt-3">
                   <WhatsAppButton phone={s.phone} message={`Olá, ${s.name}!`} consentWhatsapp={s.consent_whatsapp} />
-                </td>
-              </tr>
+                </div>
+              </div>
             ))}
-            {supporters.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-foreground/50">
-                  Nenhum apoiador encontrado com esses filtros.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Bairro</th>
+                  <th className="px-4 py-3">Cidade</th>
+                  <th className="px-4 py-3">Liderança</th>
+                  <th className="px-4 py-3">Origem</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {supporters.map((s) => (
+                  <tr key={s.id} className="border-t border-black/5">
+                    <td className="px-4 py-3">
+                      <Link href={`/apoiadores/${s.id}`} className="font-medium text-foreground hover:text-primary">
+                        {s.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">{s.neighborhood ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">{s.city ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">{s.leaders?.name ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {s.origin ? SUPPORTER_ORIGIN_LABELS[s.origin as SupporterOrigin] : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <WhatsAppButton phone={s.phone} message={`Olá, ${s.name}!`} consentWhatsapp={s.consent_whatsapp} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -74,46 +74,71 @@ export default async function AgendaPage({
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Compromisso</th>
-              <th className="px-4 py-3">Data</th>
-              <th className="px-4 py-3">Local / Bairro</th>
-              <th className="px-4 py-3">Liderança / Pessoa</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {events.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Nenhum compromisso encontrado.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:hidden">
             {events.map((e) => (
-              <tr key={e.id} className="border-t border-black/5">
-                <td className="px-4 py-3">
-                  <Link href={`/agenda/${e.id}`} className="font-medium text-foreground hover:text-primary">
-                    {e.title}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-foreground/70">
-                  {new Date(`${e.event_date}T00:00:00`).toLocaleDateString("pt-BR")}
-                  {e.event_time && ` · ${e.event_time.slice(0, 5)}`}
-                </td>
-                <td className="px-4 py-3 text-foreground/70">{e.location ?? e.neighborhood ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">
-                  {e.leaders?.name ?? e.supporters?.name ?? "—"}
-                </td>
-                <td className="px-4 py-3">
+              <Link key={e.id} href={`/agenda/${e.id}`} className="block rounded-lg border border-black/5 bg-white p-4 hover:border-primary/30">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium text-foreground">{e.title}</p>
                   <Badge tone={AGENDA_STATUS_COLOR[e.status as AgendaStatus]}>
                     {AGENDA_STATUS_LABELS[e.status as AgendaStatus]}
                   </Badge>
-                </td>
-              </tr>
+                </div>
+                <p className="text-sm text-foreground/60">
+                  {new Date(`${e.event_date}T00:00:00`).toLocaleDateString("pt-BR")}
+                  {e.event_time && ` · ${e.event_time.slice(0, 5)}`}
+                </p>
+                <p className="text-sm text-foreground/60">
+                  {e.location ?? e.neighborhood ?? "—"} · {e.leaders?.name ?? e.supporters?.name ?? "—"}
+                </p>
+              </Link>
             ))}
-            {events.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-foreground/50">Nenhum compromisso encontrado.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Compromisso</th>
+                  <th className="px-4 py-3">Data</th>
+                  <th className="px-4 py-3">Local / Bairro</th>
+                  <th className="px-4 py-3">Liderança / Pessoa</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((e) => (
+                  <tr key={e.id} className="border-t border-black/5">
+                    <td className="px-4 py-3">
+                      <Link href={`/agenda/${e.id}`} className="font-medium text-foreground hover:text-primary">
+                        {e.title}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {new Date(`${e.event_date}T00:00:00`).toLocaleDateString("pt-BR")}
+                      {e.event_time && ` · ${e.event_time.slice(0, 5)}`}
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">{e.location ?? e.neighborhood ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {e.leaders?.name ?? e.supporters?.name ?? "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge tone={AGENDA_STATUS_COLOR[e.status as AgendaStatus]}>
+                        {AGENDA_STATUS_LABELS[e.status as AgendaStatus]}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }

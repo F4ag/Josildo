@@ -29,47 +29,78 @@ export default async function RelatorioLiderancasPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Bairro</th>
-              <th className="px-4 py-3">Cidade</th>
-              <th className="px-4 py-3">Liderança</th>
-              <th className="px-4 py-3">WhatsApp</th>
-              <th className="px-4 py-3 text-center">Apoiadores</th>
-              <th className="px-4 py-3 text-center">Demandas</th>
-              <th className="px-4 py-3 text-center">Resolvidas</th>
-              <th className="px-4 py-3 text-center">Atendimentos</th>
-              <th className="px-4 py-3">Última interação</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {rows.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Nenhuma liderança cadastrada.
+        </div>
+      ) : (
+        <>
+          <div className="no-print grid gap-3 sm:hidden">
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-black/5">
-                <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
-                <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
-                <td className="px-4 py-3 font-medium">{row.name}</td>
-                <td className="px-4 py-3 text-foreground/70">{row.phone ?? "—"}</td>
-                <td className="px-4 py-3 text-center">{row.supporterCount}</td>
-                <td className="px-4 py-3 text-center">{row.demandCount}</td>
-                <td className="px-4 py-3 text-center">{row.demandResolvedCount}</td>
-                <td className="px-4 py-3 text-center">{row.attendanceCount}</td>
-                <td className="px-4 py-3 text-foreground/70">
-                  {row.lastInteractionAt ? new Date(row.lastInteractionAt).toLocaleDateString("pt-BR") : "—"}
-                </td>
-                <td className="px-4 py-3 text-foreground/70">
-                  {LEADER_STATUS_LABELS[row.status as LeaderStatus] ?? row.status}
-                </td>
-              </tr>
+              <div key={row.id} className="rounded-lg border border-black/5 bg-white p-4">
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <p className="font-medium text-foreground">{row.name}</p>
+                  <span className="text-xs text-foreground/60">
+                    {LEADER_STATUS_LABELS[row.status as LeaderStatus] ?? row.status}
+                  </span>
+                </div>
+                <p className="text-sm text-foreground/60">
+                  {row.neighborhood ?? "Sem bairro"}{row.city ? ` · ${row.city}` : ""}
+                  {row.phone ? ` · ${row.phone}` : ""}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/70">
+                  <span>Apoiadores: {row.supporterCount}</span>
+                  <span>Demandas: {row.demandCount}</span>
+                  <span>Resolvidas: {row.demandResolvedCount}</span>
+                  <span>Atendimentos: {row.attendanceCount}</span>
+                </div>
+                <p className="mt-2 text-xs text-foreground/50">
+                  Última interação: {row.lastInteractionAt ? new Date(row.lastInteractionAt).toLocaleDateString("pt-BR") : "—"}
+                </p>
+              </div>
             ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={10} className="px-4 py-8 text-center text-foreground/50">Nenhuma liderança cadastrada.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Bairro</th>
+                  <th className="px-4 py-3">Cidade</th>
+                  <th className="px-4 py-3">Liderança</th>
+                  <th className="px-4 py-3">WhatsApp</th>
+                  <th className="px-4 py-3 text-center">Apoiadores</th>
+                  <th className="px-4 py-3 text-center">Demandas</th>
+                  <th className="px-4 py-3 text-center">Resolvidas</th>
+                  <th className="px-4 py-3 text-center">Atendimentos</th>
+                  <th className="px-4 py-3">Última interação</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} className="border-t border-black/5">
+                    <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
+                    <td className="px-4 py-3 font-medium">{row.name}</td>
+                    <td className="px-4 py-3 text-foreground/70">{row.phone ?? "—"}</td>
+                    <td className="px-4 py-3 text-center">{row.supporterCount}</td>
+                    <td className="px-4 py-3 text-center">{row.demandCount}</td>
+                    <td className="px-4 py-3 text-center">{row.demandResolvedCount}</td>
+                    <td className="px-4 py-3 text-center">{row.attendanceCount}</td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {row.lastInteractionAt ? new Date(row.lastInteractionAt).toLocaleDateString("pt-BR") : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {LEADER_STATUS_LABELS[row.status as LeaderStatus] ?? row.status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }
