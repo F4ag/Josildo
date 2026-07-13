@@ -42,51 +42,83 @@ export default async function ClientesPage() {
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-black/5 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
-            <tr>
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Subdomínio</th>
-              <th className="px-4 py-3">Admin Geral</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {organizations.length === 0 ? (
+        <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+          Nenhum cliente cadastrado ainda.
+        </div>
+      ) : (
+        <>
+          {/* Celular: cards empilhados — a tabela abaixo (sm:) não cabe numa
+              tela estreita sem cortar coluna, então aqui é um layout à parte
+              em vez de só permitir rolagem horizontal da tabela. */}
+          <div className="grid gap-3 sm:hidden">
             {organizations.map((org) => {
               const host = org.slug === DEFAULT_ORG_SLUG ? rootDomain : `${org.slug}.${rootDomain}`
               return (
-                <tr key={org.id} className="border-t border-black/5">
-                  <td className="px-4 py-3 font-medium">{org.name}</td>
-                  <td className="px-4 py-3 text-foreground/70">
-                    <a
-                      href={`https://${host}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-secondary hover:underline"
-                    >
-                      {host}
-                    </a>
-                  </td>
-                  <td className="px-4 py-3 text-foreground/70">{org.admin_email ?? "—"}</td>
-                  <td className="px-4 py-3">
+                <div key={org.id} className="rounded-lg border border-black/5 bg-white p-4">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <p className="font-medium text-foreground">{org.name}</p>
                     <Badge tone={org.status === "ativa" ? "verde" : "vermelho"}>
                       {org.status === "ativa" ? "Ativa" : org.status}
                     </Badge>
-                  </td>
-                </tr>
+                  </div>
+                  <a
+                    href={`https://${host}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-sm text-secondary hover:underline"
+                  >
+                    {host}
+                  </a>
+                  <p className="mt-1 text-sm text-foreground/60">
+                    Admin Geral: {org.admin_email ?? "—"}
+                  </p>
+                </div>
               )
             })}
-            {organizations.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-foreground/50">
-                  Nenhum cliente cadastrado ainda.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* sm e acima: tabela normal */}
+          <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Subdomínio</th>
+                  <th className="px-4 py-3">Admin Geral</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {organizations.map((org) => {
+                  const host = org.slug === DEFAULT_ORG_SLUG ? rootDomain : `${org.slug}.${rootDomain}`
+                  return (
+                    <tr key={org.id} className="border-t border-black/5">
+                      <td className="px-4 py-3 font-medium">{org.name}</td>
+                      <td className="px-4 py-3 text-foreground/70">
+                        <a
+                          href={`https://${host}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-secondary hover:underline"
+                        >
+                          {host}
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 text-foreground/70">{org.admin_email ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <Badge tone={org.status === "ativa" ? "verde" : "vermelho"}>
+                          {org.status === "ativa" ? "Ativa" : org.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }
