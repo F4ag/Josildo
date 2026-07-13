@@ -36,9 +36,9 @@ export default async function ApoiadorDetalhePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <h1 className="text-xl font-semibold text-foreground">{supporter.name}</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h1 className="min-w-0 break-words text-xl font-semibold text-foreground">{supporter.name}</h1>
+        <div className="flex flex-wrap items-center gap-2">
           {canEdit && (
             <Link href={`/apoiadores/${id}/editar`}
               className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">

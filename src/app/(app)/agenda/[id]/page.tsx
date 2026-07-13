@@ -32,9 +32,9 @@ export default async function CompromissoDetalhePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">{event.title}</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="break-words text-xl font-semibold text-foreground">{event.title}</h1>
           <p className="text-sm text-foreground/60">
             {new Date(`${event.event_date}T00:00:00`).toLocaleDateString("pt-BR")}
             {event.event_time && ` às ${event.event_time.slice(0, 5)}`}

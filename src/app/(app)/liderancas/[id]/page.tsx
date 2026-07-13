@@ -52,12 +52,12 @@ export default async function LiderancaDetalhePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">{leader.name}</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-foreground break-words">{leader.name}</h1>
           {leader.nickname && <p className="text-sm text-foreground/60">&quot;{leader.nickname}&quot;</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge tone={LEADER_STATUS_COLOR[leader.status as LeaderStatus]}>
             {LEADER_STATUS_LABELS[leader.status as LeaderStatus]}
           </Badge>

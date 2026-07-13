@@ -3,14 +3,25 @@ import type { Metadata } from "next"
 import { Download } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getLeadersByNeighborhoodReport } from "@/services/reports"
+import { listDistinctLeaderCities } from "@/services/leaders"
 import { LEADER_STATUS_LABELS, type LeaderStatus } from "@/types/domain"
 import { PrintButton } from "@/components/print-button"
 
 export const metadata: Metadata = { title: "Lideranças por bairro · Lidera+" }
 
-export default async function RelatorioLiderancasPage() {
+type SearchParams = { cidade?: string }
+
+export default async function RelatorioLiderancasPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
-  const rows = await getLeadersByNeighborhoodReport(supabase)
+  const [rows, cities] = await Promise.all([
+    getLeadersByNeighborhoodReport(supabase, { city: params.cidade }),
+    listDistinctLeaderCities(supabase),
+  ])
 
   return (
     <div className="space-y-6">
@@ -20,7 +31,7 @@ export default async function RelatorioLiderancasPage() {
           <p className="text-sm text-foreground/60">{rows.length} lideranças.</p>
         </div>
         <div className="no-print flex items-center gap-2">
-          <Link href="/relatorios/liderancas/pdf"
+          <Link href={`/relatorios/liderancas/pdf${params.cidade ? `?cidade=${encodeURIComponent(params.cidade)}` : ""}`}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
             <Download className="h-4 w-4" aria-hidden />
             Baixar PDF
@@ -28,6 +39,17 @@ export default async function RelatorioLiderancasPage() {
           <PrintButton />
         </div>
       </div>
+
+      <form className="no-print flex flex-wrap gap-3 rounded-lg border border-black/5 bg-white p-4">
+        <select name="cidade" defaultValue={params.cidade ?? ""}
+          className="rounded-md border border-black/10 px-3 py-2 text-sm">
+          <option value="">Todas as cidades</option>
+          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <button type="submit" className="rounded-md bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
+          Filtrar
+        </button>
+      </form>
 
       {rows.length === 0 ? (
         <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">

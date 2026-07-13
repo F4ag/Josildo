@@ -30,9 +30,9 @@ export default async function PessoaAtendidaDetalhePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">{supporter.name}</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="break-words text-xl font-semibold text-foreground">{supporter.name}</h1>
           <p className="text-sm text-foreground/60">
             {supporter.neighborhood ?? "Sem bairro"}
             {supporter.leaders ? ` · Rede de ${supporter.leaders.name}` : ""}

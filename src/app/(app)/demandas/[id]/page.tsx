@@ -34,14 +34,14 @@ export default async function DemandaDetalhePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">{demand.title}</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="break-words text-xl font-semibold text-foreground">{demand.title}</h1>
           {demand.demand_type && (
             <p className="text-sm text-foreground/60">{DEMAND_TYPE_LABELS[demand.demand_type as DemandType]}</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge tone={DEMAND_STATUS_COLOR[demand.status as DemandStatus]}>
             {DEMAND_STATUS_LABELS[demand.status as DemandStatus]}
           </Badge>

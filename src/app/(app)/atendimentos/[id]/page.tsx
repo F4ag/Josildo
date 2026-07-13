@@ -28,12 +28,12 @@ export default async function AtendimentoDetalhePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">{attendance.title}</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="break-words text-xl font-semibold text-foreground">{attendance.title}</h1>
           <p className="text-sm text-foreground/60">{ATTENDANCE_TYPE_LABELS[attendance.attendance_type as AttendanceType]}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge tone="azul">{ATTENDANCE_STATUS_LABELS[attendance.status as AttendanceStatus]}</Badge>
           <Badge tone="cinza">{PRIORITY_LABELS[attendance.priority as Priority]}</Badge>
         </div>

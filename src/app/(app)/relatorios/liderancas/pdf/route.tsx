@@ -2,7 +2,7 @@
 export const runtime = "nodejs"
 
 import { renderToBuffer } from "@react-pdf/renderer"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getLeadersByNeighborhoodReport } from "@/services/reports"
@@ -10,7 +10,7 @@ import { can } from "@/lib/permissions"
 import type { UserRole } from "@/types/domain"
 import { LeadersReportDocument } from "@/lib/pdf/leaders-report-document"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getSessionUser()
   // O middleware já bloqueia /relatorios para quem não é admin_geral/admin_equipe;
   // esta é a defesa em profundidade de sempre.
@@ -18,8 +18,10 @@ export async function GET() {
     return NextResponse.json({ error: "Sem permissão para gerar relatórios." }, { status: 403 })
   }
 
+  const city = request.nextUrl.searchParams.get("cidade") ?? undefined
+
   const supabase = await createClient()
-  const rows = await getLeadersByNeighborhoodReport(supabase)
+  const rows = await getLeadersByNeighborhoodReport(supabase, { city })
   const buffer = await renderToBuffer(<LeadersReportDocument rows={rows} generatedAt={new Date()} />)
 
   // NextResponse espera BodyInit (Uint8Array, Blob, string, etc.) — o Buffer

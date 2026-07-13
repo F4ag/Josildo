@@ -29,10 +29,16 @@ export type LeaderReportRow = {
   lastInteractionAt: string | null
 }
 
-export async function getLeadersByNeighborhoodReport(supabase: DB): Promise<LeaderReportRow[]> {
+export async function getLeadersByNeighborhoodReport(
+  supabase: DB,
+  filters?: { city?: string },
+): Promise<LeaderReportRow[]> {
+  let leadersQuery = supabase.from("leaders").select("id, name, phone, neighborhood, city, status").order("neighborhood", { ascending: true })
+  if (filters?.city) leadersQuery = leadersQuery.eq("city", filters.city)
+
   const [{ data: leaders, error: leadersError }, { data: supporters }, { data: demands }, { data: attendances }, { data: interactions }] =
     await Promise.all([
-      supabase.from("leaders").select("id, name, phone, neighborhood, city, status").order("neighborhood", { ascending: true }),
+      leadersQuery,
       supabase.from("supporters").select("leader_id").not("leader_id", "is", null),
       supabase.from("demands").select("leader_id, status").not("leader_id", "is", null),
       supabase.from("attendances").select("leader_id").not("leader_id", "is", null),
