@@ -56,16 +56,18 @@ const SUPPORTER_ICON = L.divIcon({
   popupAnchor: [0, -5],
 })
 
-/** Ícone redondo com o número de apoiadores agrupados naquele ponto da tela
- * (ver useSupporterClusters abaixo). Cresce um pouco conforme o número fica
+/** Ícone redondo com o número de cadastros agrupados naquele ponto da tela
+ * (ver usePointClusters abaixo). Cresce um pouco conforme o número fica
  * maior, pra não virar um "1" minúsculo dentro de um círculo grande quando
- * o grupo é de 30+ pessoas. */
-function createClusterIcon(count: number) {
+ * o grupo é de 30+ pessoas. Cor configurável — roxo pra apoiadores, azul-
+ * marinho pra lideranças, só pra diferenciar visualmente os dois tipos de
+ * "balão de agrupamento" no mesmo mapa. */
+function createClusterIcon(count: number, hexColor: string) {
   const size = count < 10 ? 26 : count < 100 ? 32 : 38
   const fontSize = count < 100 ? 12 : 10
   return L.divIcon({
     className: "",
-    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:9999px;background:${SUPPORTER_PIN_COLOR};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.45);color:white;font-weight:700;font-size:${fontSize}px;font-family:inherit;line-height:1;">${count}</span>`,
+    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:9999px;background:${hexColor};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.45);color:white;font-weight:700;font-size:${fontSize}px;font-family:inherit;line-height:1;">${count}</span>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
     popupAnchor: [0, -size / 2],
@@ -91,12 +93,14 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null
 }
 
-type SupporterCluster = {
+type PointCluster<T> = {
   key: string
   latitude: number
   longitude: number
-  items: MapSupporterPin[]
+  items: T[]
 }
+
+type Clusterable = { id: string; latitude: number; longitude: number }
 
 // Raio de agrupamento em PIXELS da tela, não em graus/metros de coordenada.
 // Tentativa anterior (fix27) espalhava pins em ~35m fixos — funciona quando
@@ -108,31 +112,33 @@ type SupporterCluster = {
 // coordenadas são IDÊNTICAS, não só próximas).
 //
 // Por isso o agrupamento aqui é recalculado a cada zoom/arrasto do Leaflet
-// (useMapEvents abaixo), convertendo cada apoiador pra posição em pixel na
-// tela (map.latLngToContainerPoint) e juntando quem está a menos de
+// (useMapEvents abaixo), convertendo cada item pra posição em pixel na tela
+// (map.latLngToContainerPoint) e juntando quem está a menos de
 // CLUSTER_PIXEL_RADIUS px de distância num "balão" só, com o número de
-// pessoas ali dentro. Clicar no balão mostra a lista com link pro cadastro
+// cadastros ali dentro. Clicar no balão mostra a lista com link pro cadastro
 // de cada um — não tem "zoom pra separar" porque, sendo o mesmo ponto
-// geográfico, não existe zoom que realmente os afaste.
+// geográfico, não existe zoom que realmente os afaste. Usado tanto pra
+// apoiadores quanto pra lideranças (fix: 2+ lideranças no mesmo endereço só
+// mostravam a primeira, escondendo a outra sem nenhum aviso).
 const CLUSTER_PIXEL_RADIUS = 28
 
-function useSupporterClusters(supporters: MapSupporterPin[]): SupporterCluster[] {
+function usePointClusters<T extends Clusterable>(items: T[]): PointCluster<T>[] {
   const map = useMap()
-  const [clusters, setClusters] = useState<SupporterCluster[]>([])
+  const [clusters, setClusters] = useState<PointCluster<T>[]>([])
 
   const recompute = useCallback(() => {
-    if (supporters.length === 0) {
+    if (items.length === 0) {
       setClusters([])
       return
     }
 
-    const projected = supporters.map((s) => ({
-      supporter: s,
-      point: map.latLngToContainerPoint([s.latitude, s.longitude]),
+    const projected = items.map((item) => ({
+      item,
+      point: map.latLngToContainerPoint([item.latitude, item.longitude]),
     }))
 
     const used = new Array(projected.length).fill(false)
-    const result: SupporterCluster[] = []
+    const result: PointCluster<T>[] = []
 
     for (let i = 0; i < projected.length; i++) {
       if (used[i]) continue
@@ -149,18 +155,18 @@ function useSupporterClusters(supporters: MapSupporterPin[]): SupporterCluster[]
         }
       }
 
-      const avgLat = group.reduce((sum, g) => sum + g.supporter.latitude, 0) / group.length
-      const avgLng = group.reduce((sum, g) => sum + g.supporter.longitude, 0) / group.length
+      const avgLat = group.reduce((sum, g) => sum + g.item.latitude, 0) / group.length
+      const avgLng = group.reduce((sum, g) => sum + g.item.longitude, 0) / group.length
       result.push({
-        key: group.map((g) => g.supporter.id).join("-"),
+        key: group.map((g) => g.item.id).join("-"),
         latitude: avgLat,
         longitude: avgLng,
-        items: group.map((g) => g.supporter),
+        items: group.map((g) => g.item),
       })
     }
 
     setClusters(result)
-  }, [map, supporters])
+  }, [map, items])
 
   useEffect(() => {
     recompute()
@@ -175,7 +181,7 @@ function useSupporterClusters(supporters: MapSupporterPin[]): SupporterCluster[]
 }
 
 function SupporterMarkers({ supporters }: { supporters: MapSupporterPin[] }) {
-  const clusters = useSupporterClusters(supporters)
+  const clusters = usePointClusters(supporters)
 
   return (
     <>
@@ -202,7 +208,7 @@ function SupporterMarkers({ supporters }: { supporters: MapSupporterPin[] }) {
           <Marker
             key={cluster.key}
             position={[cluster.latitude, cluster.longitude]}
-            icon={createClusterIcon(cluster.items.length)}
+            icon={createClusterIcon(cluster.items.length, SUPPORTER_PIN_COLOR)}
           >
             <Popup>
               <div className="space-y-1 text-sm">
@@ -214,6 +220,70 @@ function SupporterMarkers({ supporters }: { supporters: MapSupporterPin[] }) {
                         {s.name}
                       </Link>
                       {s.neighborhood ? <span className="text-foreground/60"> · {s.neighborhood}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Popup>
+          </Marker>
+        ),
+      )}
+    </>
+  )
+}
+
+// Mesmo agrupamento por pixel usado nos apoiadores, agora pras lideranças:
+// duas ou mais lideranças com o mesmo endereço (comum quando o cadastro usa
+// geocodificação por bairro, ver lib/geocoding.ts) antes ficavam uma em cima
+// da outra e o popup só mostrava a de cima, escondendo a(s) outra(s) sem
+// nenhum aviso. Agora, se o "balão" tem mais de uma liderança, mostra
+// "N lideranças neste local" com a lista de todas.
+const LEADER_CLUSTER_COLOR = STATUS_COLOR_HEX.azul
+
+function LeaderMarkers({ leaders }: { leaders: MapLeaderPin[] }) {
+  const clusters = usePointClusters(leaders)
+
+  return (
+    <>
+      {clusters.map((cluster) =>
+        cluster.items.length === 1 ? (
+          <Marker
+            key={cluster.key}
+            position={[cluster.latitude, cluster.longitude]}
+            icon={createDotIcon(STATUS_COLOR_HEX[LEADER_STATUS_COLOR[cluster.items[0]!.status]])}
+          >
+            <Popup>
+              <div className="space-y-1 text-sm">
+                <p className="font-medium">{cluster.items[0]!.name}</p>
+                <p className="text-foreground/60">
+                  Liderança · {LEADER_STATUS_LABELS[cluster.items[0]!.status]}
+                  {cluster.items[0]!.neighborhood ? ` · ${cluster.items[0]!.neighborhood}` : ""}
+                </p>
+                <Link href={`/liderancas/${cluster.items[0]!.id}`} className="text-primary hover:underline">
+                  Abrir cadastro
+                </Link>
+              </div>
+            </Popup>
+          </Marker>
+        ) : (
+          <Marker
+            key={cluster.key}
+            position={[cluster.latitude, cluster.longitude]}
+            icon={createClusterIcon(cluster.items.length, LEADER_CLUSTER_COLOR)}
+          >
+            <Popup>
+              <div className="space-y-1 text-sm">
+                <p className="font-medium">{cluster.items.length} lideranças neste local</p>
+                <ul className="space-y-1">
+                  {cluster.items.map((l) => (
+                    <li key={l.id}>
+                      <Link href={`/liderancas/${l.id}`} className="text-primary hover:underline">
+                        {l.name}
+                      </Link>
+                      <span className="text-foreground/60">
+                        {" "}· {LEADER_STATUS_LABELS[l.status]}
+                        {l.neighborhood ? ` · ${l.neighborhood}` : ""}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -253,27 +323,7 @@ export function TerritoryMap({ leaders, supporters }: TerritoryMapProps) {
       />
       <FitBounds points={allPoints} />
 
-      {leaders.map((leader) => (
-        <Marker
-          key={`leader-${leader.id}`}
-          position={[leader.latitude, leader.longitude]}
-          icon={createDotIcon(STATUS_COLOR_HEX[LEADER_STATUS_COLOR[leader.status]])}
-        >
-          <Popup>
-            <div className="space-y-1 text-sm">
-              <p className="font-medium">{leader.name}</p>
-              <p className="text-foreground/60">
-                Liderança · {LEADER_STATUS_LABELS[leader.status]}
-                {leader.neighborhood ? ` · ${leader.neighborhood}` : ""}
-              </p>
-              <Link href={`/liderancas/${leader.id}`} className="text-primary hover:underline">
-                Abrir cadastro
-              </Link>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-
+      <LeaderMarkers leaders={leaders} />
       <SupporterMarkers supporters={supporters} />
     </MapContainer>
   )

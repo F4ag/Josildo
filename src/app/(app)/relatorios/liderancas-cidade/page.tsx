@@ -2,15 +2,20 @@ import Link from "next/link"
 import type { Metadata } from "next"
 import { Download } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
-import { getPessoasAtendidasReport } from "@/services/reports"
-import { listDistinctSupporterCities } from "@/services/supporters"
+import { getLeadersByNeighborhoodReport } from "@/services/reports"
+import { listDistinctLeaderCities } from "@/services/leaders"
+import { LEADER_STATUS_LABELS, type LeaderStatus } from "@/types/domain"
 import { PrintButton } from "@/components/print-button"
 
-export const metadata: Metadata = { title: "Pessoas atendidas · Lidera+" }
+export const metadata: Metadata = { title: "Lideranças por cidade · Lidera+" }
 
 type SearchParams = { cidade?: string }
 
-export default async function RelatorioPessoasAtendidasPage({
+// Mesmo relatório de liderancas/page.tsx (mesmos dados, mesma agregação em
+// services/reports.ts), só que ordenado/organizado por cidade em vez de
+// bairro — pedido explícito da Agência F4 como um relatório separado (com
+// PDF próprio), não só um filtro dentro do "por bairro".
+export default async function RelatorioLiderancasPorCidadePage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>
@@ -18,19 +23,19 @@ export default async function RelatorioPessoasAtendidasPage({
   const params = await searchParams
   const supabase = await createClient()
   const [rows, cities] = await Promise.all([
-    getPessoasAtendidasReport(supabase, { city: params.cidade }),
-    listDistinctSupporterCities(supabase),
+    getLeadersByNeighborhoodReport(supabase, { city: params.cidade, sortBy: "city" }),
+    listDistinctLeaderCities(supabase),
   ])
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Pessoas atendidas</h1>
-          <p className="text-sm text-foreground/60">{rows.length} pessoas.</p>
+          <h1 className="text-xl font-semibold text-foreground">Lideranças por cidade</h1>
+          <p className="text-sm text-foreground/60">{rows.length} lideranças.</p>
         </div>
         <div className="no-print flex items-center gap-2">
-          <Link href={`/relatorios/pessoas-atendidas/pdf${params.cidade ? `?cidade=${encodeURIComponent(params.cidade)}` : ""}`}
+          <Link href={`/relatorios/liderancas-cidade/pdf${params.cidade ? `?cidade=${encodeURIComponent(params.cidade)}` : ""}`}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
             <Download className="h-4 w-4" aria-hidden />
             Baixar PDF
@@ -52,24 +57,33 @@ export default async function RelatorioPessoasAtendidasPage({
 
       {rows.length === 0 ? (
         <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
-          Ninguém com demanda ou atendimento registrado ainda.
+          Nenhuma liderança cadastrada.
         </div>
       ) : (
         <>
           <div className="no-print grid gap-3 sm:hidden">
             {rows.map((row) => (
-              <Link key={row.id} href={`/pessoas-atendidas/${row.id}`} className="block rounded-lg border border-black/5 bg-white p-4 hover:border-primary/30">
-                <p className="font-medium text-foreground">{row.name}</p>
+              <div key={row.id} className="rounded-lg border border-black/5 bg-white p-4">
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <p className="font-medium text-foreground">{row.name}</p>
+                  <span className="text-xs text-foreground/60">
+                    {LEADER_STATUS_LABELS[row.status as LeaderStatus] ?? row.status}
+                  </span>
+                </div>
                 <p className="text-sm text-foreground/60">
-                  {row.neighborhood ?? "Sem bairro"}{row.city ? ` · ${row.city}` : ""} · {row.leaderName ?? "—"}
+                  {row.city ?? "Sem cidade"}{row.neighborhood ? ` · ${row.neighborhood}` : ""}
+                  {row.phone ? ` · ${row.phone}` : ""}
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/70">
+                  <span>Apoiadores: {row.supporterCount}</span>
                   <span>Demandas: {row.demandCount}</span>
                   <span>Resolvidas: {row.demandResolvedCount}</span>
                   <span>Atendimentos: {row.attendanceCount}</span>
-                  <span>Concluídos: {row.attendanceConcludedCount}</span>
                 </div>
-              </Link>
+                <p className="mt-2 text-xs text-foreground/50">
+                  Última interação: {row.lastInteractionAt ? new Date(row.lastInteractionAt).toLocaleDateString("pt-BR") : "—"}
+                </p>
+              </div>
             ))}
           </div>
 
@@ -77,31 +91,35 @@ export default async function RelatorioPessoasAtendidasPage({
             <table className="w-full text-left text-sm">
               <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
                 <tr>
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Bairro</th>
                   <th className="px-4 py-3">Cidade</th>
+                  <th className="px-4 py-3">Bairro</th>
                   <th className="px-4 py-3">Liderança</th>
+                  <th className="px-4 py-3">WhatsApp</th>
+                  <th className="px-4 py-3 text-center">Apoiadores</th>
                   <th className="px-4 py-3 text-center">Demandas</th>
                   <th className="px-4 py-3 text-center">Resolvidas</th>
                   <th className="px-4 py-3 text-center">Atendimentos</th>
-                  <th className="px-4 py-3 text-center">Concluídos</th>
+                  <th className="px-4 py-3">Última interação</th>
+                  <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="border-t border-black/5">
-                    <td className="px-4 py-3">
-                      <Link href={`/pessoas-atendidas/${row.id}`} className="font-medium text-foreground hover:text-primary">
-                        {row.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
                     <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
-                    <td className="px-4 py-3 text-foreground/70">{row.leaderName ?? "—"}</td>
+                    <td className="px-4 py-3 text-foreground/70">{row.neighborhood ?? "—"}</td>
+                    <td className="px-4 py-3 font-medium">{row.name}</td>
+                    <td className="px-4 py-3 text-foreground/70">{row.phone ?? "—"}</td>
+                    <td className="px-4 py-3 text-center">{row.supporterCount}</td>
                     <td className="px-4 py-3 text-center">{row.demandCount}</td>
                     <td className="px-4 py-3 text-center">{row.demandResolvedCount}</td>
                     <td className="px-4 py-3 text-center">{row.attendanceCount}</td>
-                    <td className="px-4 py-3 text-center">{row.attendanceConcludedCount}</td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {row.lastInteractionAt ? new Date(row.lastInteractionAt).toLocaleDateString("pt-BR") : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-foreground/70">
+                      {LEADER_STATUS_LABELS[row.status as LeaderStatus] ?? row.status}
+                    </td>
                   </tr>
                 ))}
               </tbody>

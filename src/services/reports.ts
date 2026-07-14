@@ -31,9 +31,9 @@ export type LeaderReportRow = {
 
 export async function getLeadersByNeighborhoodReport(
   supabase: DB,
-  filters?: { city?: string },
+  filters?: { city?: string; sortBy?: "neighborhood" | "city" },
 ): Promise<LeaderReportRow[]> {
-  let leadersQuery = supabase.from("leaders").select("id, name, phone, neighborhood, city, status").order("neighborhood", { ascending: true })
+  let leadersQuery = supabase.from("leaders").select("id, name, phone, neighborhood, city, status").order(filters?.sortBy ?? "neighborhood", { ascending: true })
   if (filters?.city) leadersQuery = leadersQuery.eq("city", filters.city)
 
   const [{ data: leaders, error: leadersError }, { data: supporters }, { data: demands }, { data: attendances }, { data: interactions }] =
@@ -83,9 +83,12 @@ export type PessoaAtendidaReportRow = {
   attendanceConcludedCount: number
 }
 
-export async function getPessoasAtendidasReport(supabase: DB): Promise<PessoaAtendidaReportRow[]> {
+export async function getPessoasAtendidasReport(
+  supabase: DB,
+  filters?: { city?: string },
+): Promise<PessoaAtendidaReportRow[]> {
   const [pessoas, { data: demands }, { data: attendances }] = await Promise.all([
-    listPessoasAtendidas(supabase),
+    listPessoasAtendidas(supabase, filters),
     supabase.from("demands").select("supporter_id, status").not("supporter_id", "is", null),
     supabase.from("attendances").select("supporter_id, status"),
   ])

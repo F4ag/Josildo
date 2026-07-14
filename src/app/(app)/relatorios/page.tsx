@@ -1,6 +1,6 @@
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Users, HeartHandshake, type LucideIcon } from "lucide-react"
+import { Users, MapPin, HeartHandshake, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
 
 export const metadata: Metadata = { title: "Relatórios · Lidera+" }
@@ -18,9 +18,16 @@ const REPORTS: { href: string; title: string; description: string; icon: LucideI
     color: "primary",
   },
   {
+    href: "/relatorios/liderancas-cidade",
+    title: "Lideranças por cidade",
+    description: "Mesmos dados do relatório por bairro, organizados e ordenados por cidade.",
+    icon: MapPin,
+    color: "accent",
+  },
+  {
     href: "/relatorios/pessoas-atendidas",
     title: "Pessoas atendidas",
-    description: "Todo apoiador com demanda ou atendimento registrado, com totais e status.",
+    description: "Todo apoiador com demanda ou atendimento registrado, com totais e status — filtrável por bairro e cidade.",
     icon: HeartHandshake,
     color: "supporter",
   },
@@ -29,6 +36,7 @@ const REPORTS: { href: string; title: string; description: string; icon: LucideI
 const BADGE_CLASSES: Record<string, string> = {
   primary: "bg-primary/10 text-primary",
   supporter: "bg-supporter/10 text-supporter",
+  accent: "bg-accent/10 text-accent",
 }
 
 // Só os 2 relatórios do MVP (Módulo 11.1 e 11.5). Crescimento, ranking e

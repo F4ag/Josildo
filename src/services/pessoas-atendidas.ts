@@ -15,7 +15,7 @@ export type SupporterWithLeader = Supporter & {
   leaders: { id: string; name: string; phone?: string | null } | null
 }
 
-export async function listPessoasAtendidas(supabase: DB) {
+export async function listPessoasAtendidas(supabase: DB, filters?: { city?: string }) {
   const [{ data: demandRows, error: demandError }, { data: attendanceRows, error: attendanceError }] =
     await Promise.all([
       supabase.from("demands").select("supporter_id").not("supporter_id", "is", null),
@@ -31,11 +31,14 @@ export async function listPessoasAtendidas(supabase: DB) {
 
   if (supporterIds.length === 0) return []
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("supporters")
     .select("*, leaders(name)")
     .in("id", supporterIds)
     .order("name", { ascending: true })
+  if (filters?.city) query = query.eq("city", filters.city)
+
+  const { data, error } = await query
   if (error) throw new Error(`Falha ao listar pessoas atendidas: ${error.message}`)
   return data as unknown as SupporterWithLeader[]
 }

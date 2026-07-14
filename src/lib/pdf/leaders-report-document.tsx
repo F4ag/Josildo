@@ -18,19 +18,39 @@ const cols = StyleSheet.create({
   status: { width: "5%" },
 })
 
-export function LeadersReportDocument({ rows, generatedAt }: { rows: LeaderReportRow[]; generatedAt: Date }) {
+type LeadersReportDocumentProps = {
+  rows: LeaderReportRow[]
+  generatedAt: Date
+  /** "bairro" (padrão, Módulo 11.1) ou "cidade" (mesma listagem, ordenada e
+   * organizada por cidade) — só troca o título e a ordem das duas primeiras
+   * colunas, os dados são os mesmos. */
+  groupBy?: "bairro" | "cidade"
+}
+
+export function LeadersReportDocument({ rows, generatedAt, groupBy = "bairro" }: LeadersReportDocumentProps) {
+  const title = groupBy === "cidade" ? "Lideranças por cidade" : "Lideranças por bairro"
+
   return (
-    <Document title="Lidera+ — Lideranças por bairro">
+    <Document title={`Lidera+ — ${title}`}>
       <Page size="A4" orientation="landscape" style={reportStyles.page}>
         <View style={reportStyles.header}>
-          <Text style={reportStyles.title}>Lideranças por bairro</Text>
+          <Text style={reportStyles.title}>{title}</Text>
           <Text style={reportStyles.subtitle}>Lidera+ · Gerado em {formatDate(generatedAt)}</Text>
         </View>
 
         <View style={reportStyles.table}>
           <View style={reportStyles.rowHeader} fixed>
-            <Text style={[reportStyles.cellHeader, cols.bairro]}>Bairro</Text>
-            <Text style={[reportStyles.cellHeader, cols.cidade]}>Cidade</Text>
+            {groupBy === "cidade" ? (
+              <>
+                <Text style={[reportStyles.cellHeader, cols.cidade]}>Cidade</Text>
+                <Text style={[reportStyles.cellHeader, cols.bairro]}>Bairro</Text>
+              </>
+            ) : (
+              <>
+                <Text style={[reportStyles.cellHeader, cols.bairro]}>Bairro</Text>
+                <Text style={[reportStyles.cellHeader, cols.cidade]}>Cidade</Text>
+              </>
+            )}
             <Text style={[reportStyles.cellHeader, cols.nome]}>Liderança</Text>
             <Text style={[reportStyles.cellHeader, cols.whatsapp]}>WhatsApp</Text>
             <Text style={[reportStyles.cellHeader, cols.apoiadores]}>Apoiadores</Text>
@@ -43,8 +63,17 @@ export function LeadersReportDocument({ rows, generatedAt }: { rows: LeaderRepor
 
           {rows.map((row, i) => (
             <View key={row.id} style={i % 2 === 1 ? [reportStyles.row, reportStyles.rowAlt] : reportStyles.row} wrap={false}>
-              <Text style={cols.bairro}>{row.neighborhood ?? "—"}</Text>
-              <Text style={cols.cidade}>{row.city ?? "—"}</Text>
+              {groupBy === "cidade" ? (
+                <>
+                  <Text style={cols.cidade}>{row.city ?? "—"}</Text>
+                  <Text style={cols.bairro}>{row.neighborhood ?? "—"}</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={cols.bairro}>{row.neighborhood ?? "—"}</Text>
+                  <Text style={cols.cidade}>{row.city ?? "—"}</Text>
+                </>
+              )}
               <Text style={cols.nome}>{row.name}</Text>
               <Text style={cols.whatsapp}>{row.phone ?? "—"}</Text>
               <Text style={cols.apoiadores}>{row.supporterCount}</Text>
