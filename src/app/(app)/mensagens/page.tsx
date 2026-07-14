@@ -73,13 +73,7 @@ export default async function MensagensPage({
             {templates.map((t) => (
               <div key={t.id} className="rounded-lg border border-black/5 bg-white p-4">
                 <div className="mb-1 flex items-start justify-between gap-2">
-                  {canManage ? (
-                    <Link href={`/mensagens/${t.id}`} className="font-medium text-foreground hover:text-primary">
-                      {t.name}
-                    </Link>
-                  ) : (
-                    <span className="font-medium text-foreground">{t.name}</span>
-                  )}
+                  <span className="font-medium text-foreground">{t.name}</span>
                   <Badge tone={t.status === "ativo" ? "verde" : "cinza"}>
                     {t.status === "ativo" ? "Ativo" : "Inativo"}
                   </Badge>
@@ -87,7 +81,11 @@ export default async function MensagensPage({
                 <p className="text-xs text-foreground/50">{MESSAGE_TEMPLATE_TYPE_LABELS[t.type as MessageTemplateType]}</p>
                 <p className="mt-1 truncate text-sm text-foreground/70">{t.body}</p>
                 {canManage && (
-                  <div className="mt-3">
+                  <div className="mt-3 flex items-center gap-2">
+                    <Link href={`/mensagens/${t.id}`}
+                      className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
+                      Editar
+                    </Link>
                     <StatusToggleButton templateId={t.id} status={t.status as "ativo" | "inativo"} />
                   </div>
                 )}
@@ -110,13 +108,7 @@ export default async function MensagensPage({
                 {templates.map((t) => (
                   <tr key={t.id} className="border-t border-black/5">
                     <td className="px-4 py-3">
-                      {canManage ? (
-                        <Link href={`/mensagens/${t.id}`} className="font-medium text-foreground hover:text-primary">
-                          {t.name}
-                        </Link>
-                      ) : (
-                        <span className="font-medium text-foreground">{t.name}</span>
-                      )}
+                      <span className="font-medium text-foreground">{t.name}</span>
                     </td>
                     <td className="px-4 py-3 text-foreground/70">
                       {MESSAGE_TEMPLATE_TYPE_LABELS[t.type as MessageTemplateType]}
@@ -129,9 +121,15 @@ export default async function MensagensPage({
                         {t.status === "ativo" ? "Ativo" : "Inativo"}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3">
                       {canManage && (
-                        <StatusToggleButton templateId={t.id} status={t.status as "ativo" | "inativo"} />
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/mensagens/${t.id}`}
+                            className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
+                            Editar
+                          </Link>
+                          <StatusToggleButton templateId={t.id} status={t.status as "ativo" | "inativo"} />
+                        </div>
                       )}
                     </td>
                   </tr>

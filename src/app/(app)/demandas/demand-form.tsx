@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import Link from "next/link"
 import { DEMAND_TYPES, DEMAND_TYPE_LABELS, PRIORITIES, PRIORITY_LABELS } from "@/types/domain"
@@ -22,12 +22,41 @@ function SubmitButton() {
 
 type DemandFormProps = {
   leaders?: { id: string; name: string }[]
-  supporters?: { id: string; name: string }[]
+  supporters?: { id: string; name: string; leader_id: string | null }[]
   lockedToOwnNetwork?: boolean
 }
 
 export function DemandForm({ leaders, supporters, lockedToOwnNetwork = false }: DemandFormProps) {
   const [state, formAction] = useFormState(createDemandAction, initialState)
+
+  // Cascata Liderança → Pessoa relacionada: sem liderança escolhida, mostra
+  // todos os apoiadores (comportamento de sempre); ao escolher uma
+  // liderança solicitante, o dropdown de apoiador estreita para só quem tem
+  // leader_id igual à liderança escolhida — evita vincular a demanda a um
+  // apoiador de outra rede. Quando lockedToOwnNetwork (perfil "lideranca"),
+  // a lista de apoiadores já vem pré-filtrada pelo servidor (própria rede),
+  // então esse estado nem entra em jogo (não há select de liderança pra
+  // disparar a mudança).
+  const [selectedLeaderId, setSelectedLeaderId] = useState("")
+  const [selectedSupporterId, setSelectedSupporterId] = useState("")
+
+  const visibleSupporters = useMemo(() => {
+    if (!supporters) return []
+    if (!selectedLeaderId) return supporters
+    return supporters.filter((s) => s.leader_id === selectedLeaderId)
+  }, [supporters, selectedLeaderId])
+
+  function handleLeaderChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const nextLeaderId = event.target.value
+    setSelectedLeaderId(nextLeaderId)
+    // Se o apoiador selecionado não pertence mais à liderança escolhida,
+    // limpa a seleção pra não submeter uma combinação que já não aparece
+    // nas opções visíveis.
+    if (nextLeaderId && selectedSupporterId) {
+      const stillVisible = supporters?.some((s) => s.id === selectedSupporterId && s.leader_id === nextLeaderId)
+      if (!stillVisible) setSelectedSupporterId("")
+    }
+  }
 
   // Demandas não têm campo de cidade/estado (a tabela não guarda isso),
   // então o autopreenchimento por CEP aqui só afeta rua e bairro — ver
@@ -77,7 +106,7 @@ export function DemandForm({ leaders, supporters, lockedToOwnNetwork = false }: 
         {!lockedToOwnNetwork && leaders && (
           <div>
             <label htmlFor="leader_id" className="mb-1 block text-sm font-medium">Liderança solicitante</label>
-            <select id="leader_id" name="leader_id"
+            <select id="leader_id" name="leader_id" value={selectedLeaderId} onChange={handleLeaderChange}
               className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none">
               <option value="">Nenhuma</option>
               {leaders.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -88,11 +117,17 @@ export function DemandForm({ leaders, supporters, lockedToOwnNetwork = false }: 
         {supporters && (
           <div>
             <label htmlFor="supporter_id" className="mb-1 block text-sm font-medium">Pessoa relacionada</label>
-            <select id="supporter_id" name="supporter_id"
+            <select id="supporter_id" name="supporter_id" value={selectedSupporterId}
+              onChange={(e) => setSelectedSupporterId(e.target.value)}
               className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none">
               <option value="">Nenhuma (demanda coletiva/territorial)</option>
-              {supporters.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {visibleSupporters.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
+            {!lockedToOwnNetwork && selectedLeaderId && (
+              <p className="mt-1 text-xs text-foreground/50">
+                Mostrando só os apoiadores vinculados à liderança escolhida acima.
+              </p>
+            )}
           </div>
         )}
 

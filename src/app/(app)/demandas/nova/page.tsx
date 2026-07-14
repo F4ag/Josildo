@@ -32,7 +32,7 @@ export default async function NovaDemandaPage() {
       <h1 className="text-xl font-semibold text-foreground">Nova demanda</h1>
       <DemandForm
         leaders={leaders.map((l) => ({ id: l.id, name: l.name }))}
-        supporters={supporters.map((s) => ({ id: s.id, name: s.name }))}
+        supporters={supporters.map((s) => ({ id: s.id, name: s.name, leader_id: s.leader_id }))}
         lockedToOwnNetwork={isLideranca}
       />
     </div>

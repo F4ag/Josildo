@@ -3,12 +3,12 @@ import type { Metadata } from "next"
 import { Download } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getPessoasAtendidasReport } from "@/services/reports"
-import { listDistinctSupporterCities } from "@/services/supporters"
+import { listDistinctSupporterCities, listDistinctSupporterNeighborhoods } from "@/services/supporters"
 import { PrintButton } from "@/components/print-button"
 
 export const metadata: Metadata = { title: "Pessoas atendidas · Lidera+" }
 
-type SearchParams = { cidade?: string }
+type SearchParams = { cidade?: string; bairro?: string }
 
 export default async function RelatorioPessoasAtendidasPage({
   searchParams,
@@ -17,10 +17,16 @@ export default async function RelatorioPessoasAtendidasPage({
 }) {
   const params = await searchParams
   const supabase = await createClient()
-  const [rows, cities] = await Promise.all([
-    getPessoasAtendidasReport(supabase, { city: params.cidade }),
+  const [rows, cities, neighborhoods] = await Promise.all([
+    getPessoasAtendidasReport(supabase, { city: params.cidade, neighborhood: params.bairro }),
     listDistinctSupporterCities(supabase),
+    listDistinctSupporterNeighborhoods(supabase, { city: params.cidade }),
   ])
+
+  const pdfParams = new URLSearchParams()
+  if (params.cidade) pdfParams.set("cidade", params.cidade)
+  if (params.bairro) pdfParams.set("bairro", params.bairro)
+  const pdfQuery = pdfParams.toString()
 
   return (
     <div className="space-y-6">
@@ -30,7 +36,7 @@ export default async function RelatorioPessoasAtendidasPage({
           <p className="text-sm text-foreground/60">{rows.length} pessoas.</p>
         </div>
         <div className="no-print flex items-center gap-2">
-          <Link href={`/relatorios/pessoas-atendidas/pdf${params.cidade ? `?cidade=${encodeURIComponent(params.cidade)}` : ""}`}
+          <Link href={`/relatorios/pessoas-atendidas/pdf${pdfQuery ? `?${pdfQuery}` : ""}`}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
             <Download className="h-4 w-4" aria-hidden />
             Baixar PDF
@@ -44,6 +50,11 @@ export default async function RelatorioPessoasAtendidasPage({
           className="rounded-md border border-black/10 px-3 py-2 text-sm">
           <option value="">Todas as cidades</option>
           {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select name="bairro" defaultValue={params.bairro ?? ""}
+          className="rounded-md border border-black/10 px-3 py-2 text-sm">
+          <option value="">Todos os bairros</option>
+          {neighborhoods.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
         <button type="submit" className="rounded-md bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
           Filtrar

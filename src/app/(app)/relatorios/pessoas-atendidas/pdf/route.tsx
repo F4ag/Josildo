@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
   }
 
   const city = request.nextUrl.searchParams.get("cidade") ?? undefined
+  const neighborhood = request.nextUrl.searchParams.get("bairro") ?? undefined
 
   const supabase = await createClient()
-  const rows = await getPessoasAtendidasReport(supabase, { city })
+  const rows = await getPessoasAtendidasReport(supabase, { city, neighborhood })
   const buffer = await renderToBuffer(<PessoasAtendidasReportDocument rows={rows} generatedAt={new Date()} />)
 
   return new NextResponse(new Uint8Array(buffer), {

@@ -88,7 +88,7 @@ export type PessoaAtendidaReportRow = {
 
 export async function getPessoasAtendidasReport(
   supabase: DB,
-  filters?: { city?: string },
+  filters?: { city?: string; neighborhood?: string },
 ): Promise<PessoaAtendidaReportRow[]> {
   const [pessoas, { data: demands }, { data: attendances }] = await Promise.all([
     listPessoasAtendidas(supabase, filters),
