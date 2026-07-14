@@ -107,20 +107,46 @@ export async function listBirthdaysToday(supabase: DB): Promise<BirthdayToday[]>
     .map((s) => ({ id: s.id, name: s.name, phone: s.phone, neighborhood: null, consentWhatsapp: s.consent_whatsapp }))
 }
 
-export type NeighborhoodCount = { neighborhood: string; count: number }
+export type CategoryCount = { label: string; count: number }
 
-export async function getSupportersByNeighborhood(supabase: DB, limit = 10): Promise<NeighborhoodCount[]> {
-  const { data, error } = await supabase.from("supporters").select("neighborhood").not("neighborhood", "is", null)
-  if (error) throw new Error(`Falha ao agrupar apoiadores por bairro: ${error.message}`)
+/** Agrupamento genérico de contagem por coluna (cidade ou bairro), usado
+ * pelos 4 gráficos exploratórios do Dashboard (lideranças/apoiadores ×
+ * cidade/bairro). Mesma lógica de sempre (agrega em memória em vez de
+ * depender de agregação no PostgREST), só generalizada pra não repetir a
+ * mesma função 4 vezes com nomes de coluna diferentes. */
+async function getCountsByColumn(
+  supabase: DB,
+  table: "leaders" | "supporters",
+  column: "city" | "neighborhood",
+  limit: number,
+): Promise<CategoryCount[]> {
+  const { data, error } = await supabase.from(table).select(column).not(column, "is", null)
+  if (error) throw new Error(`Falha ao agrupar ${table} por ${column}: ${error.message}`)
 
   const counts = new Map<string, number>()
-  for (const row of data) {
-    const key = row.neighborhood as string
+  for (const row of data as unknown as Record<string, string>[]) {
+    const key = row[column]
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }
 
   return Array.from(counts.entries())
-    .map(([neighborhood, count]) => ({ neighborhood, count }))
+    .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit)
+}
+
+export async function getLeadersByCity(supabase: DB, limit = 10): Promise<CategoryCount[]> {
+  return getCountsByColumn(supabase, "leaders", "city", limit)
+}
+
+export async function getLeadersByNeighborhood(supabase: DB, limit = 10): Promise<CategoryCount[]> {
+  return getCountsByColumn(supabase, "leaders", "neighborhood", limit)
+}
+
+export async function getSupportersByCity(supabase: DB, limit = 10): Promise<CategoryCount[]> {
+  return getCountsByColumn(supabase, "supporters", "city", limit)
+}
+
+export async function getSupportersByNeighborhood(supabase: DB, limit = 10): Promise<CategoryCount[]> {
+  return getCountsByColumn(supabase, "supporters", "neighborhood", limit)
 }

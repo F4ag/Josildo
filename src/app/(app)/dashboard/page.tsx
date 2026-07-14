@@ -4,10 +4,11 @@ import { Users, UserPlus, HeartHandshake, ClipboardCheck, Stethoscope } from "lu
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import {
-  getDashboardSummary, listOverdueDemands, listBirthdaysToday, getSupportersByNeighborhood,
+  getDashboardSummary, listOverdueDemands, listBirthdaysToday,
+  getLeadersByCity, getLeadersByNeighborhood, getSupportersByCity, getSupportersByNeighborhood,
 } from "@/services/dashboard"
 import { StatCard } from "@/components/dashboard/stat-card"
-import { SupportersByNeighborhoodChart } from "@/components/dashboard/supporters-by-neighborhood-chart"
+import { CategoryBarChart } from "@/components/dashboard/supporters-by-neighborhood-chart"
 import { WhatsAppButton } from "@/components/whatsapp-button"
 
 export const metadata: Metadata = { title: "Dashboard · Lidera+" }
@@ -18,10 +19,16 @@ export default async function DashboardPage() {
   const session = await getSessionUser()
   const supabase = await createClient()
 
-  const [summary, overdueDemands, birthdaysToday, supportersByNeighborhood] = await Promise.all([
+  const [
+    summary, overdueDemands, birthdaysToday,
+    leadersByCity, leadersByNeighborhood, supportersByCity, supportersByNeighborhood,
+  ] = await Promise.all([
     getDashboardSummary(supabase),
     listOverdueDemands(supabase),
     listBirthdaysToday(supabase),
+    getLeadersByCity(supabase),
+    getLeadersByNeighborhood(supabase),
+    getSupportersByCity(supabase),
     getSupportersByNeighborhood(supabase),
   ])
 
@@ -98,9 +105,38 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-black/5 bg-white p-4">
-        <p className="mb-3 text-sm font-medium text-foreground">Apoiadores por bairro</p>
-        <SupportersByNeighborhoodChart data={supportersByNeighborhood} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-black/5 bg-white p-4">
+          <p className="mb-3 text-sm font-medium text-foreground">Lideranças por cidade</p>
+          <CategoryBarChart
+            data={leadersByCity} color="#0B2545" unitLabel="liderança(s)"
+            emptyMessage="Sem lideranças com cidade cadastrada ainda."
+          />
+        </div>
+
+        <div className="rounded-lg border border-black/5 bg-white p-4">
+          <p className="mb-3 text-sm font-medium text-foreground">Lideranças por bairro</p>
+          <CategoryBarChart
+            data={leadersByNeighborhood} color="#D4A017" unitLabel="liderança(s)"
+            emptyMessage="Sem lideranças com bairro cadastrado ainda."
+          />
+        </div>
+
+        <div className="rounded-lg border border-black/5 bg-white p-4">
+          <p className="mb-3 text-sm font-medium text-foreground">Apoiadores por cidade</p>
+          <CategoryBarChart
+            data={supportersByCity} color="#7C3AED" unitLabel="apoiador(es)"
+            emptyMessage="Sem apoiadores com cidade cadastrada ainda."
+          />
+        </div>
+
+        <div className="rounded-lg border border-black/5 bg-white p-4">
+          <p className="mb-3 text-sm font-medium text-foreground">Apoiadores por bairro</p>
+          <CategoryBarChart
+            data={supportersByNeighborhood} color="#1E7A46" unitLabel="apoiador(es)"
+            emptyMessage="Sem apoiadores com bairro cadastrado ainda."
+          />
+        </div>
       </div>
     </div>
   )

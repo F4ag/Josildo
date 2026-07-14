@@ -2,18 +2,77 @@
 // actions de Lideranças e Demandas (Módulo 8, Mapa Territorial) sempre que
 // quem preenche o formulário não digitou as coordenadas manualmente.
 //
-// Usa o Nominatim (serviço de busca do OpenStreetMap, gratuito, mesmo
-// provedor dos tiles do mapa em components/map/territory-map.tsx) — não
-// precisa de chave de API nem de cadastro. Em troca, a política de uso
-// exige no máximo 1 requisição por segundo e um identificador do app no
-// cabeçalho (nunca em "system-to-system" em massa sem cache); como aqui é
-// só 1 chamada por cadastro/edição feito por uma pessoa, está dentro do uso
-// aceitável: https://operations.osmfoundation.org/policies/nominatim/
+// Dois provedores, nessa ordem de preferência por consulta:
+//
+// 1) Google Geocoding API — só entra em jogo se a variável de ambiente
+//    GOOGLE_GEOCODING_API_KEY estiver configurada (Vercel > Settings >
+//    Environment Variables). Pago (a partir de ~10 mil consultas grátis por
+//    mês, depois cobrado por consulta — ver console.cloud.google.com), mas
+//    bem mais preciso em endereço com número no Brasil.
+// 2) Nominatim (OpenStreetMap) — gratuito, sem chave, usado como fallback
+//    automático sempre que o Google não está configurado OU não encontra o
+//    endereço. Mesmo provedor dos tiles do mapa em
+//    components/map/territory-map.tsx. Política de uso exige no máximo 1
+//    requisição por segundo e um identificador do app no cabeçalho (nunca
+//    em "system-to-system" em massa sem cache); como aqui é só 1 chamada
+//    por cadastro/edição feito por uma pessoa, está dentro do uso aceitável:
+//    https://operations.osmfoundation.org/policies/nominatim/
+//
+// Isso significa que o sistema funciona igual (via Nominatim) para
+// qualquer cliente que não configurar a chave do Google — configurar é
+// opcional, por cliente, não uma migração obrigatória.
 //
 // Falha na geocodificação NUNCA deve bloquear o cadastro — se o endereço
-// não for encontrado (rua nova, digitação estranha, etc.), a liderança ou
-// demanda é salva do mesmo jeito, só sem aparecer no mapa até alguém
-// preencher as coordenadas manualmente.
+// não for encontrado em nenhum dos dois provedores (rua nova, digitação
+// estranha, etc.), a liderança ou demanda é salva do mesmo jeito, só sem
+// aparecer no mapa até alguém preencher as coordenadas manualmente.
+
+async function tryGoogleGeocoding(query: string): Promise<{ latitude: number; longitude: number } | null> {
+  const apiKey = process.env.GOOGLE_GEOCODING_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const url = new URL("https://maps.googleapis.com/maps/api/geocode/json")
+    url.searchParams.set("address", query)
+    url.searchParams.set("region", "br")
+    url.searchParams.set("key", apiKey)
+
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) })
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      console.error(
+        `[geocodeAddress] Google Geocoding respondeu HTTP ${response.status} para query "${query}". Corpo: ${body.slice(0, 300)}`,
+      )
+      return null
+    }
+
+    const data = (await response.json()) as {
+      status: string
+      error_message?: string
+      results: { geometry: { location: { lat: number; lng: number } } }[]
+    }
+
+    // Status "ZERO_RESULTS" é esperado (endereço não encontrado) — não é
+    // erro. "REQUEST_DENIED"/"OVER_QUERY_LIMIT" indicam chave inválida ou
+    // faturamento não ativado no Google Cloud; nesses casos caímos pro
+    // Nominatim do mesmo jeito, mas logamos pra facilitar diagnóstico.
+    if (data.status !== "OK" || !data.results[0]) {
+      console.error(
+        `[geocodeAddress] Google Geocoding sem resultado (status "${data.status}"${data.error_message ? `: ${data.error_message}` : ""}) para query "${query}".`,
+      )
+      return null
+    }
+
+    const { lat, lng } = data.results[0].geometry.location
+    console.log(`[geocodeAddress] Google encontrou para query "${query}": ${lat}, ${lng}`)
+    return { latitude: lat, longitude: lng }
+  } catch (err) {
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    console.error(`[geocodeAddress] Falha ao geocodificar (Google) query "${query}": ${message}`)
+    return null
+  }
+}
 
 async function tryNominatim(query: string): Promise<{ latitude: number; longitude: number } | null> {
   try {
@@ -106,7 +165,7 @@ export async function geocodeAddress(parts: {
     .filter((q, i, arr) => q.length > "Brasil".length && arr.indexOf(q) === i)
 
   for (const query of candidates) {
-    const found = await tryNominatim(query)
+    const found = (await tryGoogleGeocoding(query)) ?? (await tryNominatim(query))
     if (found) return found
   }
 
