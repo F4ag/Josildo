@@ -20,10 +20,12 @@ export const createOrganizationSchema = z.object({
 
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>
 
-// Edição só toca dados da própria organização (nome/subdomínio/status) — o
-// responsável (Admin Geral) é gerenciado à parte, em configuracoes/usuarios,
-// pelo próprio cliente. Ver comentário em supabase/schema.sql: status é
-// 'ativa' | 'suspensa' | 'cancelada' (CHECK constraint da tabela).
+// Edição toca todos os campos editáveis da organização (nome/subdomínio/
+// status/plano) — o responsável (Admin Geral) é gerenciado à parte, em
+// configuracoes/usuarios, pelo próprio cliente. Ver comentário em
+// supabase/schema.sql: status é 'ativa' | 'suspensa' | 'cancelada' (CHECK
+// constraint da tabela); "plan" não tem CHECK constraint no banco (texto
+// livre, default 'padrao'), por isso aqui é só "não vazio".
 export const updateOrganizationSchema = z.object({
   name: z.string().min(2, "Informe o nome do cliente/organização."),
   slug: z
@@ -32,6 +34,7 @@ export const updateOrganizationSchema = z.object({
     .max(63, "Subdomínio muito longo.")
     .regex(slugRegex, "Use só letras minúsculas, números e hífen (ex.: nome-do-cliente)."),
   status: z.enum(["ativa", "suspensa", "cancelada"]),
+  plan: z.string().min(1, "Informe o plano."),
 })
 
 export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>

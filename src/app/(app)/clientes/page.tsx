@@ -5,6 +5,8 @@ import { getSessionUser } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { listOrganizationsWithAdmin } from "@/services/organizations"
 import { Badge } from "@/components/ui/badge"
+import { DeleteButton } from "@/components/delete-button"
+import { deleteClientAction } from "./actions"
 
 export const metadata: Metadata = { title: "Clientes · Lidera+" }
 
@@ -73,12 +75,20 @@ export default async function ClientesPage() {
                   <p className="mt-1 text-sm text-foreground/60">
                     Admin Geral: {org.admin_email ?? "—"}
                   </p>
-                  <Link
-                    href={`/clientes/${org.id}/editar`}
-                    className="mt-3 inline-block rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
-                  >
-                    Editar
-                  </Link>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Link
+                      href={`/clientes/${org.id}/editar`}
+                      className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+                    >
+                      Editar
+                    </Link>
+                    {org.slug !== DEFAULT_ORG_SLUG && org.id !== session.profile.organization_id && (
+                      <DeleteButton
+                        action={deleteClientAction.bind(null, org.id)}
+                        confirmMessage={`Excluir "${org.name}" apaga PERMANENTEMENTE todas as lideranças, apoiadores, demandas, atendimentos, agenda, mensagens e logins desse cliente. Essa ação não pode ser desfeita. Confirma?`}
+                      />
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -118,13 +128,21 @@ export default async function ClientesPage() {
                           {org.status === "ativa" ? "Ativa" : org.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/clientes/${org.id}/editar`}
-                          className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
-                        >
-                          Editar
-                        </Link>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/clientes/${org.id}/editar`}
+                            className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5"
+                          >
+                            Editar
+                          </Link>
+                          {org.slug !== DEFAULT_ORG_SLUG && org.id !== session.profile.organization_id && (
+                            <DeleteButton
+                              action={deleteClientAction.bind(null, org.id)}
+                              confirmMessage={`Excluir "${org.name}" apaga PERMANENTEMENTE todas as lideranças, apoiadores, demandas, atendimentos, agenda, mensagens e logins desse cliente. Essa ação não pode ser desfeita. Confirma?`}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

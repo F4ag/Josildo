@@ -3,14 +3,20 @@ import type { Metadata } from "next"
 import { Download } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { getLeadersByNeighborhoodReport } from "@/services/reports"
-import { listDistinctLeaderCities } from "@/services/leaders"
+import { listDistinctLeaderCities, listDistinctLeaderNeighborhoods } from "@/services/leaders"
 import { LEADER_STATUS_LABELS, type LeaderStatus } from "@/types/domain"
 import { PrintButton } from "@/components/print-button"
 
 export const metadata: Metadata = { title: "Lideranças por bairro · Lidera+" }
 
-type SearchParams = { cidade?: string }
+type SearchParams = { cidade?: string; bairro?: string }
 
+// Filtro em cascata: o dropdown de bairro só mostra os bairros da cidade
+// escolhida (listDistinctLeaderNeighborhoods recebe { city } opcional) — por
+// isso é um formulário GET de sempre (recarrega a página a cada escolha) em
+// vez de um <select> dependente via JS: primeiro escolhe a cidade e filtra,
+// aí o bairro já vem só com as opções daquela cidade, escolhe e filtra de
+// novo. Sem JS extra, mesmo padrão zero-client-state do resto do relatório.
 export default async function RelatorioLiderancasPage({
   searchParams,
 }: {
@@ -18,10 +24,16 @@ export default async function RelatorioLiderancasPage({
 }) {
   const params = await searchParams
   const supabase = await createClient()
-  const [rows, cities] = await Promise.all([
-    getLeadersByNeighborhoodReport(supabase, { city: params.cidade }),
+  const [rows, cities, neighborhoods] = await Promise.all([
+    getLeadersByNeighborhoodReport(supabase, { city: params.cidade, neighborhood: params.bairro }),
     listDistinctLeaderCities(supabase),
+    listDistinctLeaderNeighborhoods(supabase, { city: params.cidade }),
   ])
+
+  const pdfParams = new URLSearchParams()
+  if (params.cidade) pdfParams.set("cidade", params.cidade)
+  if (params.bairro) pdfParams.set("bairro", params.bairro)
+  const pdfQuery = pdfParams.toString()
 
   return (
     <div className="space-y-6">
@@ -31,7 +43,7 @@ export default async function RelatorioLiderancasPage({
           <p className="text-sm text-foreground/60">{rows.length} lideranças.</p>
         </div>
         <div className="no-print flex items-center gap-2">
-          <Link href={`/relatorios/liderancas/pdf${params.cidade ? `?cidade=${encodeURIComponent(params.cidade)}` : ""}`}
+          <Link href={`/relatorios/liderancas/pdf${pdfQuery ? `?${pdfQuery}` : ""}`}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
             <Download className="h-4 w-4" aria-hidden />
             Baixar PDF
@@ -45,6 +57,11 @@ export default async function RelatorioLiderancasPage({
           className="rounded-md border border-black/10 px-3 py-2 text-sm">
           <option value="">Todas as cidades</option>
           {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select name="bairro" defaultValue={params.bairro ?? ""}
+          className="rounded-md border border-black/10 px-3 py-2 text-sm">
+          <option value="">Todos os bairros</option>
+          {neighborhoods.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
         <button type="submit" className="rounded-md bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
           Filtrar

@@ -129,12 +129,13 @@ export async function getLeaderStatusCounts(supabase: DB): Promise<LeaderStatusC
   return counts
 }
 
-/** Distinct de bairros cadastrados em leaders — usado no filtro da listagem. */
-export async function listDistinctLeaderNeighborhoods(supabase: DB) {
-  const { data, error } = await supabase
-    .from("leaders")
-    .select("neighborhood")
-    .not("neighborhood", "is", null)
+/** Distinct de bairros cadastrados em leaders — usado no filtro da listagem.
+ * Filtro opcional por cidade, pro dropdown de bairro em cascata (escolhe a
+ * cidade primeiro, o de bairro só mostra os bairros daquela cidade). */
+export async function listDistinctLeaderNeighborhoods(supabase: DB, filters?: { city?: string }) {
+  let query = supabase.from("leaders").select("neighborhood").not("neighborhood", "is", null)
+  if (filters?.city) query = query.eq("city", filters.city)
+  const { data, error } = await query
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
   return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
 }

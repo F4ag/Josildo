@@ -9,6 +9,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 import { listPessoasAtendidas } from "./pessoas-atendidas"
+import { listDistinctLeaderCities, listDistinctLeaderNeighborhoods } from "./leaders"
+import { listDistinctSupporterCities, listDistinctSupporterNeighborhoods } from "./supporters"
 
 type DB = SupabaseClient<Database, "public", any>
 
@@ -31,10 +33,11 @@ export type LeaderReportRow = {
 
 export async function getLeadersByNeighborhoodReport(
   supabase: DB,
-  filters?: { city?: string; sortBy?: "neighborhood" | "city" },
+  filters?: { city?: string; neighborhood?: string; sortBy?: "neighborhood" | "city" },
 ): Promise<LeaderReportRow[]> {
   let leadersQuery = supabase.from("leaders").select("id, name, phone, neighborhood, city, status").order(filters?.sortBy ?? "neighborhood", { ascending: true })
   if (filters?.city) leadersQuery = leadersQuery.eq("city", filters.city)
+  if (filters?.neighborhood) leadersQuery = leadersQuery.eq("neighborhood", filters.neighborhood)
 
   const [{ data: leaders, error: leadersError }, { data: supporters }, { data: demands }, { data: attendances }, { data: interactions }] =
     await Promise.all([
@@ -109,6 +112,93 @@ export async function getPessoasAtendidasReport(
     attendanceCount: attendanceCounts.get(p.id) ?? 0,
     attendanceConcludedCount: attendanceConcludedCounts.get(p.id) ?? 0,
   }))
+}
+
+// ----------------------------------------------------------------------------
+// Relatório geral — Todos os cadastros (lideranças + apoiadores juntos)
+// ----------------------------------------------------------------------------
+export type AllRegistrationRow = {
+  id: string
+  kind: "lideranca" | "apoiador"
+  name: string
+  neighborhood: string | null
+  city: string | null
+  phone: string | null
+  /** Só preenchido pra apoiador: nome da liderança à qual está vinculado. */
+  leaderName: string | null
+}
+
+export async function getAllRegistrationsReport(
+  supabase: DB,
+  filters?: { city?: string; neighborhood?: string },
+): Promise<AllRegistrationRow[]> {
+  let leadersQuery = supabase.from("leaders").select("id, name, phone, neighborhood, city").order("name", { ascending: true })
+  let supportersQuery = supabase.from("supporters").select("id, name, phone, neighborhood, city, leaders(name)").order("name", { ascending: true })
+
+  if (filters?.city) {
+    leadersQuery = leadersQuery.eq("city", filters.city)
+    supportersQuery = supportersQuery.eq("city", filters.city)
+  }
+  if (filters?.neighborhood) {
+    leadersQuery = leadersQuery.eq("neighborhood", filters.neighborhood)
+    supportersQuery = supportersQuery.eq("neighborhood", filters.neighborhood)
+  }
+
+  const [{ data: leaders, error: leadersError }, { data: supporters, error: supportersError }] = await Promise.all([
+    leadersQuery,
+    supportersQuery,
+  ])
+  if (leadersError) throw new Error(`Falha ao gerar relatório geral (lideranças): ${leadersError.message}`)
+  if (supportersError) throw new Error(`Falha ao gerar relatório geral (apoiadores): ${supportersError.message}`)
+
+  const leaderRows: AllRegistrationRow[] = (leaders ?? []).map((l) => ({
+    id: l.id,
+    kind: "lideranca",
+    name: l.name,
+    neighborhood: l.neighborhood,
+    city: l.city,
+    phone: l.phone,
+    leaderName: null,
+  }))
+  const supporterRows: AllRegistrationRow[] = (supporters ?? []).map((s) => {
+    const linked = s.leaders as unknown as { name: string } | null
+    return {
+      id: s.id,
+      kind: "apoiador",
+      name: s.name,
+      neighborhood: s.neighborhood,
+      city: s.city,
+      phone: s.phone,
+      leaderName: linked?.name ?? null,
+    }
+  })
+
+  return [...leaderRows, ...supporterRows].sort((a, b) => {
+    const cityCmp = (a.city ?? "").localeCompare(b.city ?? "")
+    if (cityCmp !== 0) return cityCmp
+    const neighborhoodCmp = (a.neighborhood ?? "").localeCompare(b.neighborhood ?? "")
+    if (neighborhoodCmp !== 0) return neighborhoodCmp
+    return a.name.localeCompare(b.name)
+  })
+}
+
+/** Cidades distintas somando lideranças e apoiadores — pro filtro do relatório geral. */
+export async function listDistinctRegistrationCities(supabase: DB) {
+  const [leaderCities, supporterCities] = await Promise.all([
+    listDistinctLeaderCities(supabase),
+    listDistinctSupporterCities(supabase),
+  ])
+  return Array.from(new Set([...leaderCities, ...supporterCities])).sort((a, b) => a.localeCompare(b))
+}
+
+/** Bairros distintos somando lideranças e apoiadores, com o mesmo filtro em
+ * cascata por cidade dos outros relatórios. */
+export async function listDistinctRegistrationNeighborhoods(supabase: DB, filters?: { city?: string }) {
+  const [leaderNeighborhoods, supporterNeighborhoods] = await Promise.all([
+    listDistinctLeaderNeighborhoods(supabase, filters),
+    listDistinctSupporterNeighborhoods(supabase, filters),
+  ])
+  return Array.from(new Set([...leaderNeighborhoods, ...supporterNeighborhoods])).sort((a, b) => a.localeCompare(b))
 }
 
 // ----------------------------------------------------------------------------

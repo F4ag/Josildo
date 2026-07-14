@@ -29,7 +29,7 @@ function SubmitButton() {
 
 type ClientEditFormProps = {
   action: (prevState: UpdateClientActionState, formData: FormData) => Promise<UpdateClientActionState>
-  defaultValues: { name: string; slug: string; status: string }
+  defaultValues: { name: string; slug: string; status: string; plan: string }
 }
 
 export function ClientEditForm({ action, defaultValues }: ClientEditFormProps) {
@@ -79,6 +79,17 @@ export function ClientEditForm({ action, defaultValues }: ClientEditFormProps) {
         >
           {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+      </div>
+
+      <div>
+        <label htmlFor="plan" className="mb-1 block text-sm font-medium">Plano</label>
+        <input
+          id="plan" name="plan" required defaultValue={defaultValues.plan}
+          className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-foreground/50">
+          Campo livre (ex.: padrao, premium) — não afeta permissões, é só rótulo interno por enquanto.
+        </p>
       </div>
 
       {state.error && (

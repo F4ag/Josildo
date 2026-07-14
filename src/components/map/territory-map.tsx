@@ -180,118 +180,149 @@ function usePointClusters<T extends Clusterable>(items: T[]): PointCluster<T>[] 
   return clusters
 }
 
-function SupporterMarkers({ supporters }: { supporters: MapSupporterPin[] }) {
-  const clusters = usePointClusters(supporters)
+// Ponto genérico do mapa, seja liderança ou apoiador — o "id" é prefixado
+// pelo tipo (leader-/supporter-) porque os dois vêm de tabelas diferentes e
+// poderiam colidir se algum dia os UUIDs se repetissem entre elas.
+type CombinedPoint =
+  | { id: string; latitude: number; longitude: number; kind: "leader"; data: MapLeaderPin }
+  | { id: string; latitude: number; longitude: number; kind: "supporter"; data: MapSupporterPin }
 
-  return (
-    <>
-      {clusters.map((cluster) =>
-        cluster.items.length === 1 ? (
-          <Marker
-            key={cluster.key}
-            position={[cluster.latitude, cluster.longitude]}
-            icon={SUPPORTER_ICON}
-          >
-            <Popup>
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">{cluster.items[0]!.name}</p>
-                <p className="text-foreground/60">
-                  Apoiador{cluster.items[0]!.neighborhood ? ` · ${cluster.items[0]!.neighborhood}` : ""}
-                </p>
-                <Link href={`/apoiadores/${cluster.items[0]!.id}`} className="text-primary hover:underline">
-                  Abrir cadastro
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
-        ) : (
-          <Marker
-            key={cluster.key}
-            position={[cluster.latitude, cluster.longitude]}
-            icon={createClusterIcon(cluster.items.length, SUPPORTER_PIN_COLOR)}
-          >
-            <Popup>
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">{cluster.items.length} apoiadores nesta região</p>
-                <ul className="space-y-1">
-                  {cluster.items.map((s) => (
-                    <li key={s.id}>
-                      <Link href={`/apoiadores/${s.id}`} className="text-primary hover:underline">
-                        {s.name}
-                      </Link>
-                      {s.neighborhood ? <span className="text-foreground/60"> · {s.neighborhood}</span> : null}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Popup>
-          </Marker>
-        ),
-      )}
-    </>
-  )
-}
-
-// Mesmo agrupamento por pixel usado nos apoiadores, agora pras lideranças:
-// duas ou mais lideranças com o mesmo endereço (comum quando o cadastro usa
-// geocodificação por bairro, ver lib/geocoding.ts) antes ficavam uma em cima
-// da outra e o popup só mostrava a de cima, escondendo a(s) outra(s) sem
-// nenhum aviso. Agora, se o "balão" tem mais de uma liderança, mostra
-// "N lideranças neste local" com a lista de todas.
 const LEADER_CLUSTER_COLOR = STATUS_COLOR_HEX.azul
+// Cor neutra pro "balão" quando o agrupamento mistura liderança(s) e
+// apoiador(es) no mesmo ponto — não faz sentido usar a cor de só um dos
+// dois tipos aí.
+const MIXED_CLUSTER_COLOR = "#334155"
 
-function LeaderMarkers({ leaders }: { leaders: MapLeaderPin[] }) {
-  const clusters = usePointClusters(leaders)
+// Antes, lideranças e apoiadores eram agrupados em duas passadas separadas
+// (uma pra cada tipo) — então uma liderança e um apoiador exatamente no
+// mesmo endereço ficavam em cima um do outro sem nenhum aviso, porque cada
+// passada só enxergava os pins do próprio tipo (bug relatado: pino mostrava
+// só "Paulo Rogério · Apoiador", escondendo a liderança embaixo). Agora tudo
+// entra numa lista só e é agrupado junto, então qualquer combinação de
+// liderança(s) + apoiador(es) no mesmo ponto vira um balão único.
+function CombinedMarkers({ leaders, supporters }: { leaders: MapLeaderPin[]; supporters: MapSupporterPin[] }) {
+  const points = useMemo<CombinedPoint[]>(
+    () => [
+      ...leaders.map((l): CombinedPoint => ({
+        id: `leader-${l.id}`, latitude: l.latitude, longitude: l.longitude, kind: "leader", data: l,
+      })),
+      ...supporters.map((s): CombinedPoint => ({
+        id: `supporter-${s.id}`, latitude: s.latitude, longitude: s.longitude, kind: "supporter", data: s,
+      })),
+    ],
+    [leaders, supporters],
+  )
+
+  const clusters = usePointClusters(points)
 
   return (
     <>
-      {clusters.map((cluster) =>
-        cluster.items.length === 1 ? (
+      {clusters.map((cluster) => {
+        if (cluster.items.length === 1) {
+          const point = cluster.items[0]!
+          if (point.kind === "leader") {
+            const leader = point.data
+            return (
+              <Marker
+                key={cluster.key}
+                position={[cluster.latitude, cluster.longitude]}
+                icon={createDotIcon(STATUS_COLOR_HEX[LEADER_STATUS_COLOR[leader.status]])}
+              >
+                <Popup>
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium">{leader.name}</p>
+                    <p className="text-foreground/60">
+                      Liderança · {LEADER_STATUS_LABELS[leader.status]}
+                      {leader.neighborhood ? ` · ${leader.neighborhood}` : ""}
+                    </p>
+                    <Link href={`/liderancas/${leader.id}`} className="text-primary hover:underline">
+                      Abrir cadastro
+                    </Link>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          }
+          const supporter = point.data
+          return (
+            <Marker key={cluster.key} position={[cluster.latitude, cluster.longitude]} icon={SUPPORTER_ICON}>
+              <Popup>
+                <div className="space-y-1 text-sm">
+                  <p className="font-medium">{supporter.name}</p>
+                  <p className="text-foreground/60">
+                    Apoiador{supporter.neighborhood ? ` · ${supporter.neighborhood}` : ""}
+                  </p>
+                  <Link href={`/apoiadores/${supporter.id}`} className="text-primary hover:underline">
+                    Abrir cadastro
+                  </Link>
+                </div>
+              </Popup>
+            </Marker>
+          )
+        }
+
+        const leaderItems = cluster.items.filter(
+          (p): p is Extract<CombinedPoint, { kind: "leader" }> => p.kind === "leader",
+        )
+        const supporterItems = cluster.items.filter(
+          (p): p is Extract<CombinedPoint, { kind: "supporter" }> => p.kind === "supporter",
+        )
+        const isMixed = leaderItems.length > 0 && supporterItems.length > 0
+        const clusterColor = isMixed
+          ? MIXED_CLUSTER_COLOR
+          : leaderItems.length > 0
+            ? LEADER_CLUSTER_COLOR
+            : SUPPORTER_PIN_COLOR
+
+        return (
           <Marker
             key={cluster.key}
             position={[cluster.latitude, cluster.longitude]}
-            icon={createDotIcon(STATUS_COLOR_HEX[LEADER_STATUS_COLOR[cluster.items[0]!.status]])}
+            icon={createClusterIcon(cluster.items.length, clusterColor)}
           >
             <Popup>
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">{cluster.items[0]!.name}</p>
-                <p className="text-foreground/60">
-                  Liderança · {LEADER_STATUS_LABELS[cluster.items[0]!.status]}
-                  {cluster.items[0]!.neighborhood ? ` · ${cluster.items[0]!.neighborhood}` : ""}
-                </p>
-                <Link href={`/liderancas/${cluster.items[0]!.id}`} className="text-primary hover:underline">
-                  Abrir cadastro
-                </Link>
+              <div className="space-y-2 text-sm">
+                <p className="font-medium">{cluster.items.length} cadastros neste local</p>
+
+                {leaderItems.length > 0 && (
+                  <div>
+                    {isMixed && <p className="text-xs font-medium uppercase text-foreground/50">Lideranças</p>}
+                    <ul className="space-y-1">
+                      {leaderItems.map(({ data: l }) => (
+                        <li key={l.id}>
+                          <Link href={`/liderancas/${l.id}`} className="text-primary hover:underline">
+                            {l.name}
+                          </Link>
+                          <span className="text-foreground/60">
+                            {" "}· {LEADER_STATUS_LABELS[l.status]}
+                            {l.neighborhood ? ` · ${l.neighborhood}` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {supporterItems.length > 0 && (
+                  <div>
+                    {isMixed && <p className="text-xs font-medium uppercase text-foreground/50">Apoiadores</p>}
+                    <ul className="space-y-1">
+                      {supporterItems.map(({ data: s }) => (
+                        <li key={s.id}>
+                          <Link href={`/apoiadores/${s.id}`} className="text-primary hover:underline">
+                            {s.name}
+                          </Link>
+                          {s.neighborhood ? <span className="text-foreground/60"> · {s.neighborhood}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </Popup>
           </Marker>
-        ) : (
-          <Marker
-            key={cluster.key}
-            position={[cluster.latitude, cluster.longitude]}
-            icon={createClusterIcon(cluster.items.length, LEADER_CLUSTER_COLOR)}
-          >
-            <Popup>
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">{cluster.items.length} lideranças neste local</p>
-                <ul className="space-y-1">
-                  {cluster.items.map((l) => (
-                    <li key={l.id}>
-                      <Link href={`/liderancas/${l.id}`} className="text-primary hover:underline">
-                        {l.name}
-                      </Link>
-                      <span className="text-foreground/60">
-                        {" "}· {LEADER_STATUS_LABELS[l.status]}
-                        {l.neighborhood ? ` · ${l.neighborhood}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Popup>
-          </Marker>
-        ),
-      )}
+        )
+      })}
     </>
   )
 }
@@ -323,8 +354,7 @@ export function TerritoryMap({ leaders, supporters }: TerritoryMapProps) {
       />
       <FitBounds points={allPoints} />
 
-      <LeaderMarkers leaders={leaders} />
-      <SupporterMarkers supporters={supporters} />
+      <CombinedMarkers leaders={leaders} supporters={supporters} />
     </MapContainer>
   )
 }

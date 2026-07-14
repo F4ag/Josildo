@@ -5,10 +5,10 @@ import { renderToBuffer } from "@react-pdf/renderer"
 import { NextRequest, NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { getLeadersByNeighborhoodReport } from "@/services/reports"
+import { getAllRegistrationsReport } from "@/services/reports"
 import { can } from "@/lib/permissions"
 import type { UserRole } from "@/types/domain"
-import { LeadersReportDocument } from "@/lib/pdf/leaders-report-document"
+import { AllRegistrationsReportDocument } from "@/lib/pdf/all-registrations-report-document"
 
 export async function GET(request: NextRequest) {
   const session = await getSessionUser()
@@ -22,17 +22,13 @@ export async function GET(request: NextRequest) {
   const neighborhood = request.nextUrl.searchParams.get("bairro") ?? undefined
 
   const supabase = await createClient()
-  const rows = await getLeadersByNeighborhoodReport(supabase, { city, neighborhood })
-  const buffer = await renderToBuffer(<LeadersReportDocument rows={rows} generatedAt={new Date()} />)
+  const rows = await getAllRegistrationsReport(supabase, { city, neighborhood })
+  const buffer = await renderToBuffer(<AllRegistrationsReportDocument rows={rows} generatedAt={new Date()} />)
 
-  // NextResponse espera BodyInit (Uint8Array, Blob, string, etc.) — o Buffer
-  // do Node não bate estruturalmente com esse tipo no TypeScript (mesmo
-  // funcionando em runtime, por Buffer estender Uint8Array), então convertê-lo
-  // explicitamente evita o erro de build "não pode ser atribuído a BodyInit".
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="liderancas-por-bairro.pdf"',
+      "Content-Disposition": 'attachment; filename="todos-os-cadastros.pdf"',
     },
   })
 }

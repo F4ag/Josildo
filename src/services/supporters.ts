@@ -140,11 +140,10 @@ export async function deleteSupporter(supabase: DB, id: string) {
   }
 }
 
-export async function listDistinctSupporterNeighborhoods(supabase: DB) {
-  const { data, error } = await supabase
-    .from("supporters")
-    .select("neighborhood")
-    .not("neighborhood", "is", null)
+export async function listDistinctSupporterNeighborhoods(supabase: DB, filters?: { city?: string }) {
+  let query = supabase.from("supporters").select("neighborhood").not("neighborhood", "is", null)
+  if (filters?.city) query = query.eq("city", filters.city)
+  const { data, error } = await query
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
   return Array.from(new Set(data.map((row) => row.neighborhood).filter(Boolean))) as string[]
 }
