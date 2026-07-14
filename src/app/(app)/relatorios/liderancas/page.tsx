@@ -6,6 +6,7 @@ import { getLeadersByNeighborhoodReport } from "@/services/reports"
 import { listDistinctLeaderCities, listDistinctLeaderNeighborhoods } from "@/services/leaders"
 import { LEADER_STATUS_LABELS, type LeaderStatus } from "@/types/domain"
 import { PrintButton } from "@/components/print-button"
+import { PrintLogo } from "@/components/print-logo"
 
 export const metadata: Metadata = { title: "Lideranças por bairro · Lidera+" }
 
@@ -37,6 +38,7 @@ export default async function RelatorioLiderancasPage({
 
   return (
     <div className="space-y-6">
+      <PrintLogo />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Lideranças por bairro</h1>

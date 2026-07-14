@@ -37,11 +37,18 @@ type LeaderFormProps = {
    * liderancas/actions.ts), isto aqui é só pra não mostrar campo que a
    * escrita vai ignorar. */
   hideAdminFields?: boolean
+  /** Só no cadastro (não na edição) e só pra quem pode convidar login
+   * (admin_geral — mesma restrição de configuracoes/usuarios/actions.ts) —
+   * mostra a opção de já criar o acesso e disparar o convite por e-mail
+   * junto com o cadastro, sem precisar do passo separado em Configurações >
+   * Usuários depois. */
+  showInviteLoginOption?: boolean
   cancelHref: string
 }
 
 export function LeaderForm({
-  action, defaultValues, isOwnRecord = false, hideAdminFields = false, cancelHref,
+  action, defaultValues, isOwnRecord = false, hideAdminFields = false,
+  showInviteLoginOption = false, cancelHref,
 }: LeaderFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const d = defaultValues
@@ -94,7 +101,26 @@ export function LeaderForm({
           <label htmlFor="email" className="mb-1 block text-sm font-medium">E-mail</label>
           <input id="email" name="email" type="email" defaultValue={d?.email ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          {showInviteLoginOption && (
+            <p className="mt-1 text-xs text-foreground/50">
+              Necessário se você marcar &quot;criar acesso de login&quot; abaixo — é pra esse e-mail que o convite vai.
+            </p>
+          )}
         </div>
+
+        {showInviteLoginOption && (
+          <div className="sm:col-span-2 flex items-start gap-2 rounded-md border border-black/10 bg-black/[0.02] p-3">
+            <input id="create_login" name="create_login" type="checkbox" className="mt-0.5 h-4 w-4" />
+            <label htmlFor="create_login" className="text-sm">
+              <span className="font-medium text-foreground">Criar acesso de login agora e enviar convite por e-mail</span>
+              <br />
+              <span className="text-xs text-foreground/50">
+                Assim que ela definir a senha, já pode entrar no sistema e cadastrar apoiadores na própria rede —
+                sem precisar de um segundo passo em Configurações &gt; Usuários.
+              </span>
+            </label>
+          </div>
+        )}
 
         <div>
           <label htmlFor="birth_date" className="mb-1 block text-sm font-medium">Data de nascimento</label>
@@ -162,6 +188,16 @@ export function LeaderForm({
           </select>
         </div>
 
+        <div>
+          <label htmlFor="expected_votes" className="mb-1 block text-sm font-medium">Expectativa de votos</label>
+          <input id="expected_votes" name="expected_votes" type="number" min={0} inputMode="numeric"
+            placeholder="Ex.: 500" defaultValue={d?.expected_votes ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+          <p className="mt-1 text-xs text-foreground/50">
+            Quantos votos você acredita que consegue entregar.
+          </p>
+        </div>
+
         {!isOwnRecord && !hideAdminFields && (
           <>
             <div>
@@ -187,6 +223,18 @@ export function LeaderForm({
               <label htmlFor="can_view_attendances" className="text-sm">
                 Pode ver atendimentos da própria rede
               </label>
+            </div>
+
+            <div>
+              <label htmlFor="admin_estimated_votes" className="mb-1 block text-sm font-medium">
+                Expectativa de votos (avaliação do admin)
+              </label>
+              <input id="admin_estimated_votes" name="admin_estimated_votes" type="number" min={0} inputMode="numeric"
+                placeholder="Ex.: 300" defaultValue={d?.admin_estimated_votes ?? undefined}
+                className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+              <p className="mt-1 text-xs text-foreground/50">
+                Só você vê este campo — quantos votos você acredita que ela realmente vai entregar.
+              </p>
             </div>
           </>
         )}

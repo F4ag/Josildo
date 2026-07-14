@@ -533,12 +533,14 @@ export type Database = {
       leaders: {
         Row: {
           address: string | null
+          admin_estimated_votes: number | null
           birth_date: string | null
           can_view_attendances: boolean
           city: string | null
           created_at: string
           created_by: string | null
           email: string | null
+          expected_votes: number | null
           id: string
           influence_level: string | null
           latitude: number | null
@@ -561,12 +563,14 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          admin_estimated_votes?: number | null
           birth_date?: string | null
           can_view_attendances?: boolean
           city?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
+          expected_votes?: number | null
           id?: string
           influence_level?: string | null
           latitude?: number | null
@@ -589,12 +593,14 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          admin_estimated_votes?: number | null
           birth_date?: string | null
           can_view_attendances?: boolean
           city?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
+          expected_votes?: number | null
           id?: string
           influence_level?: string | null
           latitude?: number | null

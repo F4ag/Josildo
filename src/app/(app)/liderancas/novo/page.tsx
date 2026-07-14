@@ -27,7 +27,10 @@ export default async function NovaLiderancaPage() {
           </p>
         )}
       </div>
-      <LeaderForm action={createLeaderAction} cancelHref="/liderancas" hideAdminFields={isLideranca} />
+      <LeaderForm
+        action={createLeaderAction} cancelHref="/liderancas" hideAdminFields={isLideranca}
+        showInviteLoginOption={role === "admin_geral"}
+      />
     </div>
   )
 }

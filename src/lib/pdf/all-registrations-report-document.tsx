@@ -1,5 +1,5 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
-import { reportStyles, formatDate } from "./shared-styles"
+import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer"
+import { reportStyles, formatDate, LOGO_PATH } from "./shared-styles"
 import type { AllRegistrationRow } from "@/services/reports"
 
 // Relatório geral (lideranças + apoiadores juntos): Cidade, Bairro, Tipo,
@@ -28,6 +28,7 @@ export function AllRegistrationsReportDocument({ rows, generatedAt }: AllRegistr
     <Document title="Lidera+ — Todos os cadastros">
       <Page size="A4" orientation="landscape" style={reportStyles.page}>
         <View style={reportStyles.header}>
+          <Image style={reportStyles.logo} src={LOGO_PATH} />
           <Text style={reportStyles.title}>Todos os cadastros</Text>
           <Text style={reportStyles.subtitle}>Lidera+ · Gerado em {formatDate(generatedAt)}</Text>
         </View>

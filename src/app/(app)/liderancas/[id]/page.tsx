@@ -18,10 +18,13 @@ export const metadata: Metadata = { title: "Liderança · Lidera+" }
 
 export default async function LiderancaDetalhePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ convite?: string; promovido?: string; apoiador_mantido?: string }>
 }) {
   const { id } = await params
+  const { convite, promovido, apoiador_mantido: apoiadorMantido } = await searchParams
   const supabase = await createClient()
   const [leader, session] = await Promise.all([getLeaderById(supabase, id), getSessionUser()])
 
@@ -52,6 +55,21 @@ export default async function LiderancaDetalhePage({
 
   return (
     <div className="space-y-6">
+      {convite === "enviado" && (
+        <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4 text-sm text-secondary">
+          Convite de acesso enviado{leader.email ? ` para ${leader.email}` : ""}. Assim que {leader.name} definir a
+          senha, já vai poder entrar no sistema e cadastrar apoiadores na própria rede.
+        </div>
+      )}
+      {promovido === "1" && (
+        <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4 text-sm text-secondary">
+          {leader.name} foi transformado(a) de apoiador(a) em liderança.
+          {apoiadorMantido === "1"
+            ? " Como já tinha demanda(s)/atendimento(s) vinculados, o cadastro de apoiador original foi mantido — os dois cadastros existem em paralelo."
+            : " O cadastro de apoiador original foi removido."}
+          {" "}Complete o cadastro abaixo com tipo de liderança, nível de influência e expectativa de votos.
+        </div>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-foreground break-words">{leader.name}</h1>
@@ -103,6 +121,19 @@ export default async function LiderancaDetalhePage({
         <Info label="E-mail" value={leader.email} />
         <Info label="Data de nascimento" value={leader.birth_date} />
         <Info label="Pode ver atendimentos da rede?" value={leader.can_view_attendances ? "Sim" : "Não"} />
+        <Info label="Expectativa de votos" value={leader.expected_votes != null ? String(leader.expected_votes) : null} />
+        {/* Campo admin-only: nunca mostrar pra role lideranca, nem no próprio
+            cadastro nem no de sub-lideranças que ela cadastrou — é a
+            avaliação real do administrador, não algo que ela deveria ver.
+            Mesma regra de acesso já aplicada em leader-form.tsx/actions.ts,
+            mas ali é sobre edição — aqui é o primeiro campo desta página que
+            também precisa ser escondido na leitura. */}
+        {role !== "lideranca" && (
+          <Info
+            label="Expectativa de votos (avaliação do admin)"
+            value={leader.admin_estimated_votes != null ? String(leader.admin_estimated_votes) : null}
+          />
+        )}
         {parentLeader && (
           <Info label="Cadastrada por" value={parentLeader.name} />
         )}

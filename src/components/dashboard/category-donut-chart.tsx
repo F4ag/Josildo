@@ -4,7 +4,7 @@
 // do redesign: cidade em barra, bairro em rosca, pra dar textura visual
 // variada sem sair da paleta da marca). Mesma CategoryCount dos gráficos de
 // barra, mesma paleta compartilhada (ver CATEGORY_PALETTE).
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import type { CategoryCount } from "@/services/dashboard"
 import { CATEGORY_PALETTE } from "./supporters-by-neighborhood-chart"
 
@@ -29,20 +29,17 @@ export function CategoryDonutChart({ data, unitLabel, emptyMessage }: CategoryDo
   const rest = data.slice(MAX_SLICES)
   const restTotal = rest.reduce((sum, item) => sum + item.count, 0)
   const chartData = restTotal > 0 ? [...visible, { label: "Outros", count: restTotal }] : visible
+  const total = chartData.reduce((sum, item) => sum + item.count, 0)
 
+  // Antes as fatias tinham rótulo "Cidade (20%)" flutuando pra fora do
+  // círculo (label/labelLine do Pie) — em telas estreitas (celular) esse
+  // texto passava da largura do card e ficava cortado ("rtur Lundgren I
+  // (20%)"). Trocado por uma legenda abaixo do gráfico, que quebra linha
+  // normalmente dentro da largura do card em vez de vazar pra fora.
   return (
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height={280}>
       <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-        <Pie
-          data={chartData}
-          dataKey="count"
-          nameKey="label"
-          innerRadius={55}
-          outerRadius={90}
-          paddingAngle={2}
-          label={({ label, percent }) => `${label} (${Math.round(percent * 100)}%)`}
-          labelLine={false}
-        >
+        <Pie data={chartData} dataKey="count" nameKey="label" innerRadius={55} outerRadius={90} paddingAngle={2}>
           {chartData.map((entry, index) => (
             <Cell
               key={entry.label}
@@ -50,6 +47,17 @@ export function CategoryDonutChart({ data, unitLabel, emptyMessage }: CategoryDo
             />
           ))}
         </Pie>
+        <Legend
+          layout="horizontal"
+          verticalAlign="bottom"
+          align="center"
+          wrapperStyle={{ fontSize: 12, lineHeight: 1.6, paddingTop: 8 }}
+          formatter={(value, entry) => {
+            const count = (entry?.payload as unknown as { count?: number } | undefined)?.count ?? 0
+            const percent = total > 0 ? Math.round((count / total) * 100) : 0
+            return `${value} (${percent}%)`
+          }}
+        />
         <Tooltip formatter={(value: number) => [`${value} ${unitLabel}`, ""]} />
       </PieChart>
     </ResponsiveContainer>

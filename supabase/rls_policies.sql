@@ -159,6 +159,11 @@ create policy ld_lideranca_update_self on leaders
   with check (private.current_user_role() = 'lideranca' and id = private.current_user_leader_id() and organization_id = private.current_user_org_id());
   -- App deve restringir quais campos a liderança pode alterar no próprio cadastro
   -- (ex.: não pode mudar influence_level ou status para "estrategica").
+  -- admin_estimated_votes é mais restrito ainda: nem leitura a liderança deve
+  -- ter (é a avaliação real do admin sobre ela). Postgres RLS não faz
+  -- restrição por coluna, só por linha — então mesmo com select liberado por
+  -- esta policy, a aplicação precisa esconder esse campo específico de quem
+  -- é role lideranca (ver liderancas/[id]/page.tsx e leader-form.tsx).
 
 -- Hierarquia (migration leaders_parent_hierarchy): liderança pode cadastrar
 -- outra liderança "abaixo" dela (parent_leader_id = seu próprio leader_id)

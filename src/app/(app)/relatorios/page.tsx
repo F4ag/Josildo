@@ -1,7 +1,9 @@
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Users, MapPin, HeartHandshake, Layers, type LucideIcon } from "lucide-react"
+import { Users, MapPin, HeartHandshake, Layers, BarChart3, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
+import { getSessionUser } from "@/lib/auth"
+import type { UserRole } from "@/types/domain"
 
 export const metadata: Metadata = { title: "Relatórios · Lidera+" }
 
@@ -9,7 +11,11 @@ export const metadata: Metadata = { title: "Relatórios · Lidera+" }
 // texto sólido) — os cards continuam brancos, diferente dos StatCard
 // coloridos usados no Dashboard e nas listagens. Reaproveita os mesmos
 // tokens de marca (ver tailwind.config.ts) pra manter a mesma paleta.
-const REPORTS: { href: string; title: string; description: string; icon: LucideIcon; color: string }[] = [
+// "adminOnly" restringe o card a admin_geral — mais restrito que o resto do
+// módulo (que admin_equipe também acessa, ver ADMIN_ONLY_ROUTE_PREFIXES em
+// lib/permissions.ts), usado só pelo relatório de Expectativa de votos, que
+// cruza admin_estimated_votes (campo admin-only em todo o resto do sistema).
+const REPORTS: { href: string; title: string; description: string; icon: LucideIcon; color: string; adminOnly?: boolean }[] = [
   {
     href: "/relatorios/liderancas",
     title: "Lideranças por bairro",
@@ -38,6 +44,14 @@ const REPORTS: { href: string; title: string; description: string; icon: LucideI
     icon: Layers,
     color: "secondary",
   },
+  {
+    href: "/relatorios/votos",
+    title: "Expectativa de votos",
+    description: "Total geral, por cidade e por bairro — comparando o que cada liderança informa com sua avaliação como Admin Geral.",
+    icon: BarChart3,
+    color: "primary",
+    adminOnly: true,
+  },
 ]
 
 const BADGE_CLASSES: Record<string, string> = {
@@ -50,7 +64,11 @@ const BADGE_CLASSES: Record<string, string> = {
 // Só os 2 relatórios do MVP (Módulo 11.1 e 11.5). Crescimento, ranking e
 // bairros fracos (11.2 a 11.7) entram na v2, quando houver histórico
 // suficiente para os indicadores serem confiáveis.
-export default function RelatoriosPage() {
+export default async function RelatoriosPage() {
+  const session = await getSessionUser()
+  const role = session?.profile.role as UserRole
+  const visibleReports = REPORTS.filter((r) => !r.adminOnly || role === "admin_geral")
+
   return (
     <div className="space-y-6">
       <div>
@@ -59,7 +77,7 @@ export default function RelatoriosPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {REPORTS.map((r) => (
+        {visibleReports.map((r) => (
           <Link key={r.href} href={r.href}
             className="rounded-lg border border-black/5 bg-white p-5 hover:border-primary/30">
             <span className={clsx("flex h-10 w-10 items-center justify-center rounded-full", BADGE_CLASSES[r.color])}>

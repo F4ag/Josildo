@@ -33,6 +33,22 @@ export const leaderSchema = z.object({
   influence_level: z.enum(INFLUENCE_LEVELS).optional().or(z.literal("")),
   status: z.enum(LEADER_STATUSES).default("ativa"),
   can_view_attendances: z.coerce.boolean().default(false),
+  // Mesma lógica de string→number da lat/lng acima: z.coerce.number() em
+  // cima de "" não falha, vira 0 — e 0 votos é um valor real, diferente de
+  // "não preenchido". A conversão pra number|null acontece na action.
+  // expected_votes: a liderança diz quantos votos acha que entrega.
+  // admin_estimated_votes: campo admin-only (ver comment em schema.sql) —
+  // continua fazendo parte do schema pra poder ser lido do FormData quando
+  // quem está no formulário é admin_geral/admin_equipe; a action zera esse
+  // valor sempre que quem está editando é a própria liderança.
+  expected_votes: z.string().optional().refine(
+    (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= 0),
+    "Expectativa de votos inválida.",
+  ),
+  admin_estimated_votes: z.string().optional().refine(
+    (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= 0),
+    "Expectativa de votos (admin) inválida.",
+  ),
   notes: z.string().optional(),
 })
 

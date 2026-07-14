@@ -113,6 +113,14 @@ create table leaders (
   -- Módulo 4.3: liderança só vê atendimentos da própria rede se autorizada pelo Admin Geral
   can_view_attendances boolean not null default false,
   photo_url text,
+  -- Expectativa de votos informada pela própria liderança (ela mesma pode
+  -- ver/editar). admin_estimated_votes é a avaliação real do administrador
+  -- sobre quantos votos ela vai entregar de fato — campo admin-only: RLS no
+  -- Postgres só filtra linha, não coluna, então a restrição de leitura/
+  -- escrita pra role lideranca é feita na aplicação (ver liderancas/
+  -- actions.ts e liderancas/leader-form.tsx, mesmo padrão de influence_level).
+  expected_votes integer,
+  admin_estimated_votes integer,
   notes text,
   created_by uuid references users_profiles(id),
   created_at timestamptz not null default now(),

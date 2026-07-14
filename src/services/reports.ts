@@ -202,6 +202,112 @@ export async function listDistinctRegistrationNeighborhoods(supabase: DB, filter
 }
 
 // ----------------------------------------------------------------------------
+// Expectativa de votos — relatório restrito a admin_geral (não faz parte do
+// grupo de relatórios que admin_equipe também acessa): cruza
+// expected_votes (o que a própria liderança diz que entrega) com
+// admin_estimated_votes, que é um campo admin-only em todo o resto do
+// sistema (ver comentário em liderancas/actions.ts) — faria pouco sentido
+// esse relatório ficar visível pra quem não pode nem ver o campo no
+// cadastro individual.
+// ----------------------------------------------------------------------------
+export type VotesSummary = {
+  totalLeaders: number
+  leadersWithExpectedVotes: number
+  leadersWithAdminEstimate: number
+  totalExpectedVotes: number
+  totalAdminEstimatedVotes: number
+}
+
+export type VotesByGroupRow = {
+  /** Nome da cidade (getVotesByCity) ou do bairro (getVotesByNeighborhood). */
+  label: string
+  /** Só preenchido em getVotesByNeighborhood, pra mostrar a cidade ao lado. */
+  city?: string | null
+  leaderCount: number
+  expectedVotes: number
+  adminEstimatedVotes: number
+}
+
+async function listVoteRows(supabase: DB, filters?: { city?: string }) {
+  let query = supabase.from("leaders").select("city, neighborhood, expected_votes, admin_estimated_votes")
+  if (filters?.city) query = query.eq("city", filters.city)
+  const { data, error } = await query
+  if (error) throw new Error(`Falha ao gerar relatório de votos: ${error.message}`)
+  return data
+}
+
+export async function getVotesSummary(supabase: DB): Promise<VotesSummary> {
+  const rows = await listVoteRows(supabase)
+  let totalExpectedVotes = 0
+  let totalAdminEstimatedVotes = 0
+  let leadersWithExpectedVotes = 0
+  let leadersWithAdminEstimate = 0
+
+  for (const row of rows) {
+    if (row.expected_votes != null) {
+      totalExpectedVotes += row.expected_votes
+      leadersWithExpectedVotes += 1
+    }
+    if (row.admin_estimated_votes != null) {
+      totalAdminEstimatedVotes += row.admin_estimated_votes
+      leadersWithAdminEstimate += 1
+    }
+  }
+
+  return {
+    totalLeaders: rows.length,
+    leadersWithExpectedVotes,
+    leadersWithAdminEstimate,
+    totalExpectedVotes,
+    totalAdminEstimatedVotes,
+  }
+}
+
+/** Soma expected_votes/admin_estimated_votes agrupado por cidade — ordenado
+ * pelo total informado pela liderança (o campo que mais frequentemente vem
+ * preenchido; a avaliação do admin pode ainda não existir pra várias). */
+export async function getVotesByCity(supabase: DB): Promise<VotesByGroupRow[]> {
+  const rows = await listVoteRows(supabase)
+  const groups = new Map<string, VotesByGroupRow>()
+
+  for (const row of rows) {
+    const key = row.city ?? "Sem cidade"
+    const current = groups.get(key) ?? { label: key, leaderCount: 0, expectedVotes: 0, adminEstimatedVotes: 0 }
+    current.leaderCount += 1
+    current.expectedVotes += row.expected_votes ?? 0
+    current.adminEstimatedVotes += row.admin_estimated_votes ?? 0
+    groups.set(key, current)
+  }
+
+  return Array.from(groups.values()).sort((a, b) => b.expectedVotes - a.expectedVotes)
+}
+
+/** Mesma agregação, por bairro — com o mesmo filtro opcional por cidade dos
+ * outros relatórios (cascata cidade→bairro). Chave de agrupamento combina
+ * cidade+bairro pra não misturar bairros de mesmo nome em cidades diferentes. */
+export async function getVotesByNeighborhood(supabase: DB, filters?: { city?: string }): Promise<VotesByGroupRow[]> {
+  const rows = await listVoteRows(supabase, filters)
+  const groups = new Map<string, VotesByGroupRow>()
+
+  for (const row of rows) {
+    const key = `${row.city ?? "Sem cidade"}::${row.neighborhood ?? "Sem bairro"}`
+    const current = groups.get(key) ?? {
+      label: row.neighborhood ?? "Sem bairro",
+      city: row.city,
+      leaderCount: 0,
+      expectedVotes: 0,
+      adminEstimatedVotes: 0,
+    }
+    current.leaderCount += 1
+    current.expectedVotes += row.expected_votes ?? 0
+    current.adminEstimatedVotes += row.admin_estimated_votes ?? 0
+    groups.set(key, current)
+  }
+
+  return Array.from(groups.values()).sort((a, b) => b.expectedVotes - a.expectedVotes)
+}
+
+// ----------------------------------------------------------------------------
 // Helpers de agregação em memória
 // ----------------------------------------------------------------------------
 function countBy<T extends Record<string, unknown>>(rows: T[], key: keyof T): Map<string, number> {

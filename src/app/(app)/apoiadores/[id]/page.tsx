@@ -8,7 +8,7 @@ import { SUPPORTER_ORIGIN_LABELS, type SupporterOrigin, type UserRole } from "@/
 import { WhatsAppButton } from "@/components/whatsapp-button"
 import { DeleteButton } from "@/components/delete-button"
 import { can } from "@/lib/permissions"
-import { deleteSupporterAction } from "../actions"
+import { deleteSupporterAction, promoteSupporterToLeaderAction } from "../actions"
 
 export const metadata: Metadata = { title: "Apoiador · Lidera+" }
 
@@ -32,6 +32,10 @@ export default async function ApoiadorDetalhePage({
   const isOwnNetwork = role === "lideranca" && supporter.leader_id === session?.profile.leader_id
   const canEdit = can(role, "update", "supporters") || isOwnNetwork
   const canDelete = can(role, "delete", "supporters")
+  // Transformar em liderança é ação sensível o bastante (cria cadastro novo
+  // e pode apagar o de apoiador) pra reservar só ao Admin Geral, mesmo
+  // quando admin_equipe já pode editar/cadastrar apoiadores normalmente.
+  const canPromote = role === "admin_geral"
   const isPessoaAtendida = (demandCount ?? 0) > 0 || (attendanceCount ?? 0) > 0
 
   return (
@@ -44,6 +48,18 @@ export default async function ApoiadorDetalhePage({
               className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
               Editar
             </Link>
+          )}
+          {canPromote && (
+            <DeleteButton
+              action={promoteSupporterToLeaderAction.bind(null, id)}
+              label="Transformar em liderança"
+              tone="primary"
+              confirmMessage={
+                isPessoaAtendida
+                  ? `${supporter.name} vira um cadastro de liderança novo. Como já tem ${demandCount ?? 0} demanda(s)/${attendanceCount ?? 0} atendimento(s) vinculados, o cadastro de apoiador original vai ser mantido (não pode ser apagado com histórico vinculado). Continuar?`
+                  : `${supporter.name} vira um cadastro de liderança novo, e o cadastro de apoiador original será removido. Continuar?`
+              }
+            />
           )}
           {canDelete && (
             <DeleteButton

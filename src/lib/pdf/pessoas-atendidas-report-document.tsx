@@ -1,5 +1,5 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
-import { reportStyles, formatDate } from "./shared-styles"
+import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer"
+import { reportStyles, formatDate, LOGO_PATH } from "./shared-styles"
 import type { PessoaAtendidaReportRow } from "@/services/reports"
 
 const cols = StyleSheet.create({
@@ -23,6 +23,7 @@ export function PessoasAtendidasReportDocument({
     <Document title="Lidera+ — Pessoas atendidas">
       <Page size="A4" orientation="landscape" style={reportStyles.page}>
         <View style={reportStyles.header}>
+          <Image style={reportStyles.logo} src={LOGO_PATH} />
           <Text style={reportStyles.title}>Pessoas atendidas</Text>
           <Text style={reportStyles.subtitle}>Lidera+ · Gerado em {formatDate(generatedAt)}</Text>
         </View>

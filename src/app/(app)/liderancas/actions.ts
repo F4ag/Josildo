@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createLeader, updateLeader, deleteLeader, type LeaderInput } from "@/services/leaders"
 import { leaderSchema } from "@/lib/validations/leader"
 import { can } from "@/lib/permissions"
@@ -35,8 +36,15 @@ function parseLeaderForm(formData: FormData) {
     influence_level: formData.get("influence_level") || "",
     status: formData.get("status") || "ativa",
     can_view_attendances: formData.get("can_view_attendances") === "on",
+    expected_votes: formData.get("expected_votes") || "",
+    admin_estimated_votes: formData.get("admin_estimated_votes") || "",
     notes: formData.get("notes") || undefined,
   })
+}
+
+/** "" -> null, "150" -> 150. Mesma regra do parseCoord acima. */
+function parseVotes(value: string | undefined): number | null {
+  return value ? Number(value) : null
 }
 
 /** Só tenta geocodificar quando ninguém preencheu lat/lng à mão — o
@@ -74,7 +82,33 @@ export async function createLeaderAction(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
+  // Criar o acesso de login junto com o cadastro é restrito a admin_geral —
+  // mesma restrição de configuracoes/usuarios/actions.ts (assertAdminGeral),
+  // já que isso usa o client de service_role. O formulário já esconde o
+  // checkbox pra qualquer outro perfil (showInviteLoginOption em
+  // liderancas/novo/page.tsx); isto aqui é a segunda barreira.
+  const wantsLogin = role === "admin_geral" && formData.get("create_login") === "on"
+  if (wantsLogin && !parsed.data.email) {
+    return { error: "Informe o e-mail da liderança para criar o acesso de login." }
+  }
+
   const coords = await resolveCoords(parsed.data)
+
+  // Convite acontece ANTES de criar a linha em leaders: se o e-mail já tiver
+  // conta ou o convite falhar por qualquer motivo, a liderança nunca chega a
+  // ser criada "pela metade" (cadastrada, mas sem explicação de por que o
+  // login não saiu). Ver o mesmo cuidado em configuracoes/usuarios/actions.ts.
+  let invitedUserId: string | null = null
+  if (wantsLogin) {
+    const admin = createAdminClient()
+    const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email!, {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
+    })
+    if (inviteError || !invited.user) {
+      return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
+    }
+    invitedUserId = invited.user.id
+  }
 
   const supabase = await createClient()
   const input: LeaderInput = {
@@ -85,6 +119,9 @@ export async function createLeaderAction(
     longitude: coords.longitude,
     leader_type: parsed.data.leader_type || null,
     influence_level: parsed.data.influence_level || null,
+    expected_votes: parseVotes(parsed.data.expected_votes),
+    admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
+    user_id: invitedUserId,
   }
 
   // Hierarquia: quando quem cadastra é a própria liderança, a nova linha
@@ -94,17 +131,61 @@ export async function createLeaderAction(
   // Também zera os campos administrativos: uma liderança não decide o
   // próprio nível de influência/status de quem ela recruta (mesma barreira
   // já aplicada em updateLeaderAction pra edição do próprio cadastro).
+  // admin_estimated_votes segue a mesma regra — mesmo que o formulário nem
+  // exiba esse campo pra role lideranca, zera aqui também como segunda
+  // barreira (defesa em profundidade, igual ao restante do bloco).
   if (role === "lideranca") {
     input.parent_leader_id = session.profile.leader_id
     input.influence_level = null
     input.status = "ativa"
     input.can_view_attendances = false
+    input.admin_estimated_votes = null
   }
 
-  const leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
+  let leader: Awaited<ReturnType<typeof createLeader>>
+  if (invitedUserId) {
+    // Convite já saiu — se a criação da liderança falhar agora, desfaz o
+    // convite pra não deixar um login sem liderança nem perfil vinculados.
+    try {
+      leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
+    } catch (err) {
+      await createAdminClient().auth.admin.deleteUser(invitedUserId)
+      return { error: err instanceof Error ? err.message : "Falha ao cadastrar liderança." }
+    }
+  } else {
+    leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
+  }
+
+  if (invitedUserId) {
+    const admin = createAdminClient()
+    // Mesmo shape de configuracoes/usuarios/actions.ts (inviteUser): cria o
+    // perfil vinculado à liderança recém-criada, já com role lideranca (que
+    // já tem supporters.create:true na matriz de permissões — ver
+    // lib/permissions.ts — por isso não precisa de mais nenhuma autorização
+    // separada pra ela cadastrar apoiadores).
+    const { error: profileError } = await admin.from("users_profiles").insert({
+      id: invitedUserId,
+      organization_id: session.profile.organization_id,
+      full_name: leader.name,
+      email: leader.email,
+      phone: leader.phone,
+      role: "lideranca",
+      leader_id: leader.id,
+    })
+
+    if (profileError) {
+      // Não deixar login nem liderança órfãos: desfaz os dois e avisa.
+      await admin.auth.admin.deleteUser(invitedUserId)
+      await deleteLeader(supabase, leader.id).catch(() => {})
+      return { error: `Não foi possível concluir o cadastro: falha ao criar o acesso de login (${profileError.message}).` }
+    }
+
+    revalidatePath("/configuracoes/usuarios")
+  }
+
   revalidatePath("/liderancas")
   revalidatePath("/mapa")
-  redirect(`/liderancas/${leader.id}`)
+  redirect(`/liderancas/${leader.id}${invitedUserId ? "?convite=enviado" : ""}`)
 }
 
 export async function updateLeaderAction(
@@ -139,15 +220,20 @@ export async function updateLeaderAction(
     longitude: coords.longitude,
     leader_type: parsed.data.leader_type || null,
     influence_level: parsed.data.influence_level || null,
+    expected_votes: parseVotes(parsed.data.expected_votes),
+    admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
   }
 
   // Liderança não pode se auto-promover a status "estratégica" nem alterar
   // o próprio nível de influência — RLS permite a escrita, então a barreira
-  // fica aqui (nota também deixada em rls_policies.sql).
+  // fica aqui (nota também deixada em rls_policies.sql). admin_estimated_votes
+  // segue a mesma regra: é a avaliação real do admin sobre a liderança, ela
+  // não pode nem ver nem mexer no próprio cadastro.
   if (isOwnRecord) {
     delete input.influence_level
     delete input.status
     delete input.can_view_attendances
+    delete input.admin_estimated_votes
   }
 
   await updateLeader(supabase, leaderId, input)

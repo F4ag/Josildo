@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getPessoasAtendidasReport } from "@/services/reports"
 import { listDistinctSupporterCities, listDistinctSupporterNeighborhoods } from "@/services/supporters"
 import { PrintButton } from "@/components/print-button"
+import { PrintLogo } from "@/components/print-logo"
 
 export const metadata: Metadata = { title: "Pessoas atendidas · Lidera+" }
 
@@ -30,6 +31,7 @@ export default async function RelatorioPessoasAtendidasPage({
 
   return (
     <div className="space-y-6">
+      <PrintLogo />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Pessoas atendidas</h1>

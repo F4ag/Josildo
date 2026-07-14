@@ -15,4 +15,17 @@
       display: none !important;
     }
   }
+
+  /* Oposto de .no-print: a Sidebar (que tem a logomarca) some ao imprimir
+   * (.no-print), então sem isso o relatório impresso ficava sem nenhuma
+   * logo. .print-only fica escondido na tela e só aparece no papel/PDF do
+   * navegador (Ctrl+P), pra assinar o relatório com a marca do Lidera+. */
+  .print-only {
+    display: none;
+  }
+  @media print {
+    .print-only {
+      display: block;
+    }
+  }
 }

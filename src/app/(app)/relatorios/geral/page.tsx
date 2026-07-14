@@ -8,6 +8,7 @@ import {
   listDistinctRegistrationNeighborhoods,
 } from "@/services/reports"
 import { PrintButton } from "@/components/print-button"
+import { PrintLogo } from "@/components/print-logo"
 import { Badge } from "@/components/ui/badge"
 
 export const metadata: Metadata = { title: "Todos os cadastros · Lidera+" }
@@ -41,6 +42,7 @@ export default async function RelatorioGeralPage({
 
   return (
     <div className="space-y-6">
+      <PrintLogo />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Todos os cadastros</h1>

@@ -1,5 +1,5 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
-import { reportStyles, formatDate } from "./shared-styles"
+import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer"
+import { reportStyles, formatDate, LOGO_PATH } from "./shared-styles"
 import { LEADER_STATUS_LABELS, type LeaderStatus } from "@/types/domain"
 import type { LeaderReportRow } from "@/services/reports"
 
@@ -34,6 +34,7 @@ export function LeadersReportDocument({ rows, generatedAt, groupBy = "bairro" }:
     <Document title={`Lidera+ — ${title}`}>
       <Page size="A4" orientation="landscape" style={reportStyles.page}>
         <View style={reportStyles.header}>
+          <Image style={reportStyles.logo} src={LOGO_PATH} />
           <Text style={reportStyles.title}>{title}</Text>
           <Text style={reportStyles.subtitle}>Lidera+ · Gerado em {formatDate(generatedAt)}</Text>
         </View>

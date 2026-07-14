@@ -8,6 +8,7 @@ import {
   createSupporter, updateSupporter, deleteSupporter, findPotentialDuplicates, getSupporterById,
   type SupporterInput,
 } from "@/services/supporters"
+import { createLeader, type LeaderInput } from "@/services/leaders"
 import { supporterSchema } from "@/lib/validations/supporter"
 import { can } from "@/lib/permissions"
 import { geocodeAddress } from "@/lib/geocoding"
@@ -169,6 +170,87 @@ export async function updateSupporterAction(
   revalidatePath(`/apoiadores/${supporterId}`)
   revalidatePath("/mapa")
   redirect(`/apoiadores/${supporterId}`)
+}
+
+/**
+ * Transforma um apoiador em liderança: cria um cadastro novo em leaders com
+ * os dados que fazem sentido lá (endereço, contato, data de nascimento,
+ * observações) e tenta apagar o cadastro de apoiador original. Reservada a
+ * admin_geral — mesmo padrão de exclusão (services/supporters.ts) e do
+ * convite de login embutido no cadastro de liderança (liderancas/actions.ts):
+ * é uma ação sensível o bastante pra não abrir pra admin_equipe/lideranca.
+ */
+export async function promoteSupporterToLeaderAction(
+  supporterId: string,
+  _prevState: SupporterActionState,
+): Promise<SupporterActionState> {
+  const session = await requireSessionUser()
+  const role = session.profile.role as UserRole
+
+  if (role !== "admin_geral") {
+    return { error: "Só o Admin Geral pode transformar um apoiador em liderança." }
+  }
+
+  const supabase = await createClient()
+  const supporter = await getSupporterById(supabase, supporterId)
+  if (!supporter) {
+    return { error: "Apoiador não encontrado." }
+  }
+
+  const leaderInput: LeaderInput = {
+    name: supporter.name,
+    nickname: null,
+    phone: supporter.phone,
+    email: supporter.email,
+    birth_date: supporter.birth_date,
+    address: supporter.address,
+    neighborhood: supporter.neighborhood,
+    neighborhood_id: supporter.neighborhood_id,
+    city: supporter.city,
+    state: supporter.state,
+    zip_code: supporter.zip_code,
+    latitude: supporter.latitude,
+    longitude: supporter.longitude,
+    // Quem já recrutava este apoiador vira o "padrinho" dela na hierarquia de
+    // lideranças (parent_leader_id) — mantém a árvore de indicação em vez de
+    // começar do zero. Campos administrativos (tipo, influência, votos,
+    // login) ficam em branco: quem decide isso é o Admin Geral, depois, como
+    // em qualquer outro cadastro novo de liderança.
+    parent_leader_id: supporter.leader_id,
+    leader_type: null,
+    influence_level: null,
+    status: "ativa",
+    can_view_attendances: false,
+    photo_url: null,
+    expected_votes: null,
+    admin_estimated_votes: null,
+    user_id: null,
+    notes: supporter.notes,
+  }
+
+  let leader
+  try {
+    leader = await createLeader(supabase, leaderInput, session.id, session.profile.organization_id)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao criar o cadastro de liderança." }
+  }
+
+  // Tenta apagar o cadastro de apoiador original — só funciona se não houver
+  // demanda/atendimento/interação vinculados (mesma trava de FK sem cascata
+  // de deleteSupporter, ver services/supporters.ts). Se falhar, a liderança
+  // já foi criada com sucesso mesmo assim: mantém os dois cadastros em vez de
+  // tratar isso como erro da promoção, e avisa na tela seguinte.
+  let supporterKept = false
+  try {
+    await deleteSupporter(supabase, supporterId)
+  } catch {
+    supporterKept = true
+  }
+
+  revalidatePath("/apoiadores")
+  revalidatePath("/liderancas")
+  revalidatePath("/mapa")
+  redirect(`/liderancas/${leader.id}?promovido=1${supporterKept ? "&apoiador_mantido=1" : ""}`)
 }
 
 export async function deleteSupporterAction(
