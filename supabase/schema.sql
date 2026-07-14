@@ -121,6 +121,14 @@ create table leaders (
   -- actions.ts e liderancas/leader-form.tsx, mesmo padrão de influence_level).
   expected_votes integer,
   admin_estimated_votes integer,
+  -- Local de votação (dado aberto do TSE, tabela global polling_locations,
+  -- criada mais abaixo — por isso a FK é adicionada só depois via alter
+  -- table, mesmo recurso já usado para users_profiles.leader_id acima)
+  -- informado no cadastro via autocomplete. Nullable e on delete set null:
+  -- cadastro não obrigatório, e um reimport futuro de polling_locations não
+  -- deve apagar o cadastro da liderança por causa disso. Alimenta o
+  -- relatório de expectativa x eleitorado por local.
+  polling_location_id uuid,
   notes text,
   created_by uuid references users_profiles(id),
   created_at timestamptz not null default now(),
@@ -134,6 +142,7 @@ create index idx_leaders_type on leaders(leader_type);
 create index idx_leaders_influence on leaders(influence_level);
 create index idx_leaders_user on leaders(user_id);
 create index idx_leaders_neighborhood_id on leaders(neighborhood_id);
+create index idx_leaders_polling_location_id on leaders(polling_location_id);
 create index idx_leaders_created_by on leaders(created_by);
 create index idx_leaders_org on leaders(organization_id);
 
@@ -171,6 +180,10 @@ create table supporters (
   consent_registration boolean not null default false,
   consent_date timestamptz,
   consent_origin text,
+  -- Local de votação — mesma nota de leaders.polling_location_id acima
+  -- (FK adicionada mais abaixo via alter table, depois de polling_locations
+  -- existir).
+  polling_location_id uuid,
   notes text,
   created_by uuid references users_profiles(id),
   created_at timestamptz not null default now(),
@@ -186,6 +199,7 @@ create index idx_supporters_birth_date on supporters(birth_date);
 create index idx_supporters_name_birth on supporters(name, birth_date);
 create index idx_supporters_name_address on supporters(name, address);
 create index idx_supporters_neighborhood_id on supporters(neighborhood_id);
+create index idx_supporters_polling_location_id on supporters(polling_location_id);
 create index idx_supporters_created_by on supporters(created_by);
 create index idx_supporters_org on supporters(organization_id);
 
@@ -420,6 +434,77 @@ create trigger trg_message_templates_updated_at before update on message_templat
   for each row execute function set_updated_at();
 create index idx_message_templates_created_by on message_templates(created_by);
 create index idx_message_templates_org on message_templates(organization_id);
+
+-- ----------------------------------------------------------------------------
+-- electoral_zones / polling_locations / electoral_sections — dados públicos
+-- do TSE (Portal de Dados Abertos, CC-BY, atualização mensal). NÃO é
+-- multi-tenant: é a mesma referência geográfica pra qualquer organização
+-- (por isso, diferente de todas as tabelas acima, não tem organization_id).
+-- Hierarquia: município → zona eleitoral → local de votação → seção.
+-- Populado pela Edge Function supabase/functions/import-electoral-data
+-- (baixa e filtra o arquivo nacional "eleitorado por local de votação" pra
+-- UF=PE — ver comentário no início do arquivo da function pra detalhes de
+-- por que o processamento roda lá e não aqui).
+-- ----------------------------------------------------------------------------
+create table electoral_zones (
+  id uuid primary key default gen_random_uuid(),
+  uf text not null default 'PE',
+  municipio_codigo text not null,
+  municipio_nome text not null,
+  zona_numero integer not null,
+  created_at timestamptz not null default now(),
+  unique (municipio_codigo, zona_numero)
+);
+create index idx_electoral_zones_municipio on electoral_zones(municipio_nome);
+
+create table polling_locations (
+  id uuid primary key default gen_random_uuid(),
+  zone_id uuid references electoral_zones(id) on delete cascade,
+  municipio_codigo text not null,
+  municipio_nome text not null,
+  zona_numero integer not null,
+  local_numero integer not null,
+  nome text not null,
+  endereco text,
+  bairro text,
+  cep text,
+  latitude numeric(10,7),
+  longitude numeric(10,7),
+  situacao text,
+  -- soma de QT_ELEITOR_SECAO de todas as seções deste local (última
+  -- importação) — usado pra comparar "expectativa x realidade" de votos.
+  eleitores_total integer,
+  created_at timestamptz not null default now(),
+  unique (municipio_codigo, zona_numero, local_numero)
+);
+create index idx_polling_locations_municipio on polling_locations(municipio_nome);
+create index idx_polling_locations_nome on polling_locations(nome);
+create index idx_polling_locations_bairro on polling_locations(bairro);
+create index idx_polling_locations_zone on polling_locations(zone_id);
+
+-- FKs de leaders/supporters.polling_location_id (colunas declaradas lá em
+-- cima, sem "references" inline, porque esta tabela só existe a partir
+-- daqui — mesmo recurso do fk_users_profiles_leader logo após leaders).
+alter table leaders
+  add constraint leaders_polling_location_id_fkey foreign key (polling_location_id)
+  references polling_locations(id) on delete set null;
+alter table supporters
+  add constraint supporters_polling_location_id_fkey foreign key (polling_location_id)
+  references polling_locations(id) on delete set null;
+
+create table electoral_sections (
+  id uuid primary key default gen_random_uuid(),
+  location_id uuid references polling_locations(id) on delete cascade,
+  municipio_codigo text not null,
+  zona_numero integer not null,
+  local_numero integer not null,
+  secao_numero integer not null,
+  eleitores integer,
+  situacao text,
+  created_at timestamptz not null default now(),
+  unique (municipio_codigo, zona_numero, secao_numero)
+);
+create index idx_electoral_sections_location on electoral_sections(location_id);
 
 -- ============================================================================
 -- Seeds mínimos (modelos de mensagem citados no prompt master, Módulos 9 e 12)

@@ -8,6 +8,7 @@ import {
   LEADER_STATUSES, LEADER_STATUS_LABELS, type Leader,
 } from "@/types/domain"
 import { fetchAddressByZipCode } from "@/lib/viacep"
+import { PollingLocationAutocomplete } from "@/components/polling-location-autocomplete"
 import type { ActionState } from "@/app/login/actions"
 
 const initialState: ActionState = { error: null }
@@ -43,12 +44,18 @@ type LeaderFormProps = {
    * junto com o cadastro, sem precisar do passo separado em Configurações >
    * Usuários depois. */
   showInviteLoginOption?: boolean
+  /** Rótulo já formatado do local de votação vinculado (calculado pela página
+   * a partir de defaultValues.polling_location_id via
+   * services/polling-locations.ts#formatPollingLocationLabel), pois o
+   * registro de Leader só guarda o id — sem isso o campo apareceria vazio
+   * na edição mesmo com um local já selecionado. */
+  pollingLocationDefaultLabel?: string | null
   cancelHref: string
 }
 
 export function LeaderForm({
   action, defaultValues, isOwnRecord = false, hideAdminFields = false,
-  showInviteLoginOption = false, cancelHref,
+  showInviteLoginOption = false, pollingLocationDefaultLabel, cancelHref,
 }: LeaderFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const d = defaultValues
@@ -161,6 +168,12 @@ export function LeaderForm({
           <input id="state" name="state" ref={stateRef} maxLength={2} placeholder="PE" defaultValue={d?.state ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none" />
         </div>
+
+        <PollingLocationAutocomplete
+          name="polling_location_id"
+          defaultId={d?.polling_location_id}
+          defaultLabel={pollingLocationDefaultLabel}
+        />
 
         <div>
           <label htmlFor="latitude" className="mb-1 block text-sm font-medium">Latitude</label>

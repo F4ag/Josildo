@@ -56,6 +56,7 @@ function parseSupporterForm(formData: FormData) {
     city: formData.get("city") || undefined,
     state: formData.get("state") || undefined,
     zip_code: formData.get("zip_code") || undefined,
+    polling_location_id: formData.get("polling_location_id") || "",
     latitude: formData.get("latitude") || "",
     longitude: formData.get("longitude") || "",
     leader_id: formData.get("leader_id") || "",
@@ -119,6 +120,7 @@ export async function createSupporterAction(
     leader_id: leaderId,
     latitude: coords.latitude,
     longitude: coords.longitude,
+    polling_location_id: parsed.data.polling_location_id || null,
     consent_date: new Date().toISOString(),
     consent_origin: "cadastro_interno",
   }
@@ -161,6 +163,7 @@ export async function updateSupporterAction(
     origin: parsed.data.origin || null,
     latitude: coords.latitude,
     longitude: coords.longitude,
+    polling_location_id: parsed.data.polling_location_id || null,
   }
   // Liderança não transfere o apoiador para outra rede.
   if (role === "lideranca") delete input.leader_id
@@ -206,6 +209,7 @@ export async function promoteSupporterToLeaderAction(
     address: supporter.address,
     neighborhood: supporter.neighborhood,
     neighborhood_id: supporter.neighborhood_id,
+    polling_location_id: supporter.polling_location_id,
     city: supporter.city,
     state: supporter.state,
     zip_code: supporter.zip_code,

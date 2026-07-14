@@ -30,6 +30,7 @@ function parseLeaderForm(formData: FormData) {
     city: formData.get("city") || undefined,
     state: formData.get("state") || undefined,
     zip_code: formData.get("zip_code") || undefined,
+    polling_location_id: formData.get("polling_location_id") || "",
     latitude: formData.get("latitude") || "",
     longitude: formData.get("longitude") || "",
     leader_type: formData.get("leader_type") || "",
@@ -121,7 +122,13 @@ export async function createLeaderAction(
     influence_level: parsed.data.influence_level || null,
     expected_votes: parseVotes(parsed.data.expected_votes),
     admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
-    user_id: invitedUserId,
+    polling_location_id: parsed.data.polling_location_id || null,
+    // user_id NÃO entra aqui: a FK leaders_user_id_fkey aponta pra
+    // users_profiles(id), e essa linha só é criada MAIS ABAIXO (depois da
+    // liderança existir, pois users_profiles.leader_id aponta pra leaders).
+    // Setar user_id já nesta inserção violava a FK (leader criado antes do
+    // perfil existir) — vinculamos com um UPDATE só depois que o perfil for
+    // criado com sucesso.
   }
 
   // Hierarquia: quando quem cadastra é a própria liderança, a nova linha
@@ -180,6 +187,17 @@ export async function createLeaderAction(
       return { error: `Não foi possível concluir o cadastro: falha ao criar o acesso de login (${profileError.message}).` }
     }
 
+    // Só agora o perfil existe de fato — completa o vínculo bidirecional
+    // atualizando leaders.user_id (usa o client de service_role pra não
+    // depender de nenhuma policy de update específica pra esse campo).
+    const { error: linkError } = await admin.from("leaders").update({ user_id: invitedUserId }).eq("id", leader.id)
+    if (linkError) {
+      await admin.auth.admin.deleteUser(invitedUserId)
+      await admin.from("users_profiles").delete().eq("id", invitedUserId)
+      await deleteLeader(supabase, leader.id).catch(() => {})
+      return { error: `Não foi possível concluir o cadastro: falha ao vincular o login à liderança (${linkError.message}).` }
+    }
+
     revalidatePath("/configuracoes/usuarios")
   }
 
@@ -222,6 +240,7 @@ export async function updateLeaderAction(
     influence_level: parsed.data.influence_level || null,
     expected_votes: parseVotes(parsed.data.expected_votes),
     admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
+    polling_location_id: parsed.data.polling_location_id || null,
   }
 
   // Liderança não pode se auto-promover a status "estratégica" nem alterar

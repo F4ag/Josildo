@@ -3,9 +3,8 @@
 // (vqrnjiwansfobxaeswnu) via generate_typescript_types.
 // NÃO editar à mão. Para regenerar após uma migration:
 //   npx supabase gen types typescript --project-id vqrnjiwansfobxaeswnu > src/types/database.types.ts
-// Última regeneração: coluna parent_leader_id em leaders (hierarquia de
-// lideranças cadastrando outras lideranças) — ver migration
-// leaders_parent_hierarchy.
+// Última regeneração: coluna polling_location_id em leaders/supporters
+// (vínculo com local de votação — dado do TSE já importado em polling_locations).
 // ============================================================================
 export type Json =
   | string
@@ -465,6 +464,77 @@ export type Database = {
           },
         ]
       }
+      electoral_sections: {
+        Row: {
+          created_at: string
+          eleitores: number | null
+          id: string
+          local_numero: number
+          location_id: string | null
+          municipio_codigo: string
+          secao_numero: number
+          situacao: string | null
+          zona_numero: number
+        }
+        Insert: {
+          created_at?: string
+          eleitores?: number | null
+          id?: string
+          local_numero: number
+          location_id?: string | null
+          municipio_codigo: string
+          secao_numero: number
+          situacao?: string | null
+          zona_numero: number
+        }
+        Update: {
+          created_at?: string
+          eleitores?: number | null
+          id?: string
+          local_numero?: number
+          location_id?: string | null
+          municipio_codigo?: string
+          secao_numero?: number
+          situacao?: string | null
+          zona_numero?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "electoral_sections_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "polling_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      electoral_zones: {
+        Row: {
+          created_at: string
+          id: string
+          municipio_codigo: string
+          municipio_nome: string
+          uf: string
+          zona_numero: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          municipio_codigo: string
+          municipio_nome: string
+          uf?: string
+          zona_numero: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          municipio_codigo?: string
+          municipio_nome?: string
+          uf?: string
+          zona_numero?: number
+        }
+        Relationships: []
+      }
       interactions: {
         Row: {
           created_at: string
@@ -555,6 +625,7 @@ export type Database = {
           parent_leader_id: string | null
           phone: string | null
           photo_url: string | null
+          polling_location_id: string | null
           state: string | null
           status: string
           updated_at: string
@@ -585,6 +656,7 @@ export type Database = {
           parent_leader_id?: string | null
           phone?: string | null
           photo_url?: string | null
+          polling_location_id?: string | null
           state?: string | null
           status?: string
           updated_at?: string
@@ -615,6 +687,7 @@ export type Database = {
           parent_leader_id?: string | null
           phone?: string | null
           photo_url?: string | null
+          polling_location_id?: string | null
           state?: string | null
           status?: string
           updated_at?: string
@@ -648,6 +721,13 @@ export type Database = {
             columns: ["parent_leader_id"]
             isOneToOne: false
             referencedRelation: "leaders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leaders_polling_location_id_fkey"
+            columns: ["polling_location_id"]
+            isOneToOne: false
+            referencedRelation: "polling_locations"
             referencedColumns: ["id"]
           },
           {
@@ -841,6 +921,68 @@ export type Database = {
         }
         Relationships: []
       }
+      polling_locations: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          created_at: string
+          eleitores_total: number | null
+          endereco: string | null
+          id: string
+          latitude: number | null
+          local_numero: number
+          longitude: number | null
+          municipio_codigo: string
+          municipio_nome: string
+          nome: string
+          situacao: string | null
+          zona_numero: number
+          zone_id: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          created_at?: string
+          eleitores_total?: number | null
+          endereco?: string | null
+          id?: string
+          latitude?: number | null
+          local_numero: number
+          longitude?: number | null
+          municipio_codigo: string
+          municipio_nome: string
+          nome: string
+          situacao?: string | null
+          zona_numero: number
+          zone_id?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          created_at?: string
+          eleitores_total?: number | null
+          endereco?: string | null
+          id?: string
+          latitude?: number | null
+          local_numero?: number
+          longitude?: number | null
+          municipio_codigo?: string
+          municipio_nome?: string
+          nome?: string
+          situacao?: string | null
+          zona_numero?: number
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "polling_locations_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "electoral_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supporters: {
         Row: {
           address: string
@@ -866,6 +1008,7 @@ export type Database = {
           organization_id: string
           origin: string | null
           phone: string
+          polling_location_id: string | null
           profession: string | null
           state: string | null
           updated_at: string
@@ -895,6 +1038,7 @@ export type Database = {
           organization_id: string
           origin?: string | null
           phone: string
+          polling_location_id?: string | null
           profession?: string | null
           state?: string | null
           updated_at?: string
@@ -924,6 +1068,7 @@ export type Database = {
           organization_id?: string
           origin?: string | null
           phone?: string
+          polling_location_id?: string | null
           profession?: string | null
           state?: string | null
           updated_at?: string
@@ -956,6 +1101,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supporters_polling_location_id_fkey"
+            columns: ["polling_location_id"]
+            isOneToOne: false
+            referencedRelation: "polling_locations"
             referencedColumns: ["id"]
           },
         ]

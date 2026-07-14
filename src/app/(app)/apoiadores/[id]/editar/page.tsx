@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getSupporterById } from "@/services/supporters"
 import { listLeaders } from "@/services/leaders"
+import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
 import { can } from "@/lib/permissions"
 import type { UserRole } from "@/types/domain"
 import { SupporterForm } from "../../supporter-form"
@@ -31,6 +32,9 @@ export default async function EditarApoiadorPage({
 
   const isLideranca = role === "lideranca"
   const leaders = isLideranca ? [] : await listLeaders(supabase)
+  const pollingLocation = supporter.polling_location_id
+    ? await getPollingLocationById(supabase, supporter.polling_location_id)
+    : null
   const boundAction = updateSupporterAction.bind(null, id)
 
   return (
@@ -41,6 +45,7 @@ export default async function EditarApoiadorPage({
         defaultValues={supporter}
         leaders={leaders.map((l) => ({ id: l.id, name: l.name }))}
         lockedToOwnNetwork={isLideranca}
+        pollingLocationDefaultLabel={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null}
         cancelHref={`/apoiadores/${id}`}
       />
     </div>

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { Download } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { getVotesSummary, getVotesByCity, getVotesByNeighborhood } from "@/services/reports"
+import { getVotesSummary, getVotesByCity, getVotesByNeighborhood, getVotesByPollingLocation } from "@/services/reports"
 import { listDistinctLeaderCities } from "@/services/leaders"
 import type { UserRole } from "@/types/domain"
 import { PrintButton } from "@/components/print-button"
@@ -31,16 +31,38 @@ export default async function RelatorioVotosPage({
 
   const params = await searchParams
   const supabase = await createClient()
-  const [summary, byCity, cities, byNeighborhood] = await Promise.all([
+  const [summary, byCity, cities, byNeighborhood, votesByPollingLocation] = await Promise.all([
     getVotesSummary(supabase),
     getVotesByCity(supabase),
     listDistinctLeaderCities(supabase),
     getVotesByNeighborhood(supabase, { city: params.cidade }),
+    getVotesByPollingLocation(supabase, { city: params.cidade }),
   ])
+  const { rows: byPollingLocation, leadersWithoutLocation } = votesByPollingLocation
 
   const pdfParams = new URLSearchParams()
   if (params.cidade) pdfParams.set("cidade", params.cidade)
   const pdfQuery = pdfParams.toString()
+
+  // Linha de total no rodapé das duas tabelas — soma dos grupos exibidos
+  // (respeita o filtro de cidade em "por bairro", por isso não reaproveita
+  // o summary geral, que sempre olha todas as lideranças).
+  const totalByCity = byCity.reduce(
+    (acc, row) => ({
+      leaderCount: acc.leaderCount + row.leaderCount,
+      expectedVotes: acc.expectedVotes + row.expectedVotes,
+      adminEstimatedVotes: acc.adminEstimatedVotes + row.adminEstimatedVotes,
+    }),
+    { leaderCount: 0, expectedVotes: 0, adminEstimatedVotes: 0 },
+  )
+  const totalByNeighborhood = byNeighborhood.reduce(
+    (acc, row) => ({
+      leaderCount: acc.leaderCount + row.leaderCount,
+      expectedVotes: acc.expectedVotes + row.expectedVotes,
+      adminEstimatedVotes: acc.adminEstimatedVotes + row.adminEstimatedVotes,
+    }),
+    { leaderCount: 0, expectedVotes: 0, adminEstimatedVotes: 0 },
+  )
 
   return (
     <div className="space-y-6">
@@ -100,6 +122,18 @@ export default async function RelatorioVotosPage({
               Nenhuma liderança cadastrada.
             </div>
           )}
+          {byCity.length > 0 && (
+            <div className="rounded-lg border border-black/10 bg-black/[0.02] p-4">
+              <div className="mb-1 flex items-start justify-between gap-2">
+                <p className="font-semibold text-foreground">Total</p>
+                <span className="text-xs text-foreground/60">{totalByCity.leaderCount} liderança(s)</span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/70">
+                <span>Informado: {totalByCity.expectedVotes}</span>
+                <span>Avaliação admin: {totalByCity.adminEstimatedVotes}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
@@ -126,6 +160,14 @@ export default async function RelatorioVotosPage({
                   <td colSpan={4} className="px-4 py-8 text-center text-foreground/50">
                     Nenhuma liderança cadastrada.
                   </td>
+                </tr>
+              )}
+              {byCity.length > 0 && (
+                <tr className="border-t border-black/10 bg-black/[0.02] font-semibold">
+                  <td className="px-4 py-3">Total</td>
+                  <td className="px-4 py-3 text-center">{totalByCity.leaderCount}</td>
+                  <td className="px-4 py-3 text-center">{totalByCity.expectedVotes}</td>
+                  <td className="px-4 py-3 text-center">{totalByCity.adminEstimatedVotes}</td>
                 </tr>
               )}
             </tbody>
@@ -167,6 +209,18 @@ export default async function RelatorioVotosPage({
               Nenhuma liderança cadastrada.
             </div>
           )}
+          {byNeighborhood.length > 0 && (
+            <div className="rounded-lg border border-black/10 bg-black/[0.02] p-4">
+              <div className="mb-1 flex items-start justify-between gap-2">
+                <p className="font-semibold text-foreground">Total</p>
+                <span className="text-xs text-foreground/60">{totalByNeighborhood.leaderCount} liderança(s)</span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/70">
+                <span>Informado: {totalByNeighborhood.expectedVotes}</span>
+                <span>Avaliação admin: {totalByNeighborhood.adminEstimatedVotes}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
@@ -194,6 +248,86 @@ export default async function RelatorioVotosPage({
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-foreground/50">
                     Nenhuma liderança cadastrada.
+                  </td>
+                </tr>
+              )}
+              {byNeighborhood.length > 0 && (
+                <tr className="border-t border-black/10 bg-black/[0.02] font-semibold">
+                  <td className="px-4 py-3">Total</td>
+                  <td className="px-4 py-3"></td>
+                  <td className="px-4 py-3 text-center">{totalByNeighborhood.leaderCount}</td>
+                  <td className="px-4 py-3 text-center">{totalByNeighborhood.expectedVotes}</td>
+                  <td className="px-4 py-3 text-center">{totalByNeighborhood.adminEstimatedVotes}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-1 text-sm font-medium text-foreground">Por local de votação</p>
+        <p className="mb-3 text-xs text-foreground/50">
+          Compara o informado pelas lideranças com o eleitorado total registrado em cada local, segundo o TSE — não é
+          resultado de urna (o sistema ainda não importa esse dado, que só existe depois da eleição), é a referência
+          de quantos eleitores existem ali, pra ver se a expectativa é realista.
+          {leadersWithoutLocation > 0 && (
+            <> {leadersWithoutLocation} liderança(s) ainda não têm local de votação cadastrado e não entram nesta tabela.</>
+          )}
+        </p>
+
+        <div className="no-print grid gap-3 sm:hidden">
+          {byPollingLocation.map((row) => (
+            <div key={row.id} className="rounded-lg border border-black/5 bg-white p-4">
+              <div className="mb-1 flex items-start justify-between gap-2">
+                <p className="font-medium text-foreground">{row.label}</p>
+                <span className="text-xs text-foreground/60">{row.leaderCount} liderança(s)</span>
+              </div>
+              <p className="text-xs text-foreground/50">{row.city ?? "—"}</p>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/70">
+                <span>Informado: {row.expectedVotes}</span>
+                <span>Avaliação admin: {row.adminEstimatedVotes}</span>
+                <span>Eleitorado (TSE): {row.registeredVoters ?? "—"}</span>
+                <span>Cobertura: {row.coveragePct != null ? `${row.coveragePct}%` : "—"}</span>
+              </div>
+            </div>
+          ))}
+          {byPollingLocation.length === 0 && (
+            <div className="rounded-lg border border-black/5 bg-white px-4 py-8 text-center text-sm text-foreground/50">
+              Nenhuma liderança com local de votação cadastrado ainda.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-lg border border-black/5 bg-white sm:block">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-black/[0.02] text-xs uppercase text-foreground/50">
+              <tr>
+                <th className="px-4 py-3">Local de votação</th>
+                <th className="px-4 py-3">Cidade</th>
+                <th className="px-4 py-3 text-center">Lideranças</th>
+                <th className="px-4 py-3 text-center">Informado (liderança)</th>
+                <th className="px-4 py-3 text-center">Avaliação (admin)</th>
+                <th className="px-4 py-3 text-center">Eleitorado (TSE)</th>
+                <th className="px-4 py-3 text-center">Cobertura</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byPollingLocation.map((row) => (
+                <tr key={row.id} className="border-t border-black/5">
+                  <td className="px-4 py-3 font-medium">{row.label}</td>
+                  <td className="px-4 py-3 text-foreground/70">{row.city ?? "—"}</td>
+                  <td className="px-4 py-3 text-center">{row.leaderCount}</td>
+                  <td className="px-4 py-3 text-center">{row.expectedVotes}</td>
+                  <td className="px-4 py-3 text-center">{row.adminEstimatedVotes}</td>
+                  <td className="px-4 py-3 text-center">{row.registeredVoters ?? "—"}</td>
+                  <td className="px-4 py-3 text-center">{row.coveragePct != null ? `${row.coveragePct}%` : "—"}</td>
+                </tr>
+              ))}
+              {byPollingLocation.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-foreground/50">
+                    Nenhuma liderança com local de votação cadastrado ainda.
                   </td>
                 </tr>
               )}

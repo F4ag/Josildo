@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getSupporterById } from "@/services/supporters"
+import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
 import { SUPPORTER_ORIGIN_LABELS, type SupporterOrigin, type UserRole } from "@/types/domain"
 import { WhatsAppButton } from "@/components/whatsapp-button"
 import { DeleteButton } from "@/components/delete-button"
@@ -23,9 +24,10 @@ export default async function ApoiadorDetalhePage({
 
   if (!supporter) notFound()
 
-  const [{ count: demandCount }, { count: attendanceCount }] = await Promise.all([
+  const [{ count: demandCount }, { count: attendanceCount }, pollingLocation] = await Promise.all([
     supabase.from("demands").select("id", { count: "exact", head: true }).eq("supporter_id", id),
     supabase.from("attendances").select("id", { count: "exact", head: true }).eq("supporter_id", id),
+    supporter.polling_location_id ? getPollingLocationById(supabase, supporter.polling_location_id) : Promise.resolve(null),
   ])
 
   const role = session?.profile.role as UserRole
@@ -87,6 +89,7 @@ export default async function ApoiadorDetalhePage({
         <Info label="Data de nascimento" value={supporter.birth_date} />
         <Info label="Bairro" value={supporter.neighborhood} />
         <Info label="Endereço" value={supporter.address} />
+        <Info label="Local de votação" value={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null} />
         <Info label="Origem do cadastro" value={supporter.origin ? SUPPORTER_ORIGIN_LABELS[supporter.origin as SupporterOrigin] : null} />
         <Info label="Profissão" value={supporter.profession} />
         <Info label="Consentimento WhatsApp" value={supporter.consent_whatsapp ? "Sim" : "Não"} />

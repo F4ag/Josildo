@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from "react-dom"
 import Link from "next/link"
 import { SUPPORTER_ORIGINS, SUPPORTER_ORIGIN_LABELS, type Supporter } from "@/types/domain"
 import { fetchAddressByZipCode } from "@/lib/viacep"
+import { PollingLocationAutocomplete } from "@/components/polling-location-autocomplete"
 import type { SupporterActionState } from "./actions"
 
 const initialState: SupporterActionState = { error: null }
@@ -25,11 +26,15 @@ type SupporterFormProps = {
   leaders?: { id: string; name: string }[]
   /** Liderança logada cadastrando na própria rede: some o seletor de liderança. */
   lockedToOwnNetwork?: boolean
+  /** Mesma lógica de leader-form.tsx: rótulo já formatado do local de
+   * votação vinculado, calculado pela página a partir do
+   * polling_location_id (o registro de Supporter só guarda o id). */
+  pollingLocationDefaultLabel?: string | null
   cancelHref: string
 }
 
 export function SupporterForm({
-  action, defaultValues, leaders, lockedToOwnNetwork = false, cancelHref,
+  action, defaultValues, leaders, lockedToOwnNetwork = false, pollingLocationDefaultLabel, cancelHref,
 }: SupporterFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const [forceDuplicate, setForceDuplicate] = useState(false)
@@ -128,6 +133,12 @@ export function SupporterForm({
           <input id="state" name="state" ref={stateRef} maxLength={2} placeholder="PE" defaultValue={d?.state ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none" />
         </div>
+
+        <PollingLocationAutocomplete
+          name="polling_location_id"
+          defaultId={d?.polling_location_id}
+          defaultLabel={pollingLocationDefaultLabel}
+        />
 
         <div>
           <label htmlFor="latitude" className="mb-1 block text-sm font-medium">Latitude</label>

@@ -308,6 +308,98 @@ export async function getVotesByNeighborhood(supabase: DB, filters?: { city?: st
 }
 
 // ----------------------------------------------------------------------------
+// Expectativa x eleitorado por local de votação — cruza expected_votes/
+// admin_estimated_votes (agrupados pelo polling_location_id que a própria
+// liderança tem cadastrado) com eleitores_total de polling_locations
+// (dado do TSE já importado, ver schema.sql). Chamamos esse segundo número
+// de "eleitorado" e não de "resultado real da eleição" de propósito: o
+// sistema ainda não importa boletim de urna/resultado oficial (isso só
+// existe depois do dia da votação) — o que dá pra comparar HOJE é a
+// expectativa informada contra o total de eleitores registrados naquele
+// local, como referência de teto/cobertura, não como resultado de votos.
+// ----------------------------------------------------------------------------
+export type VotesByPollingLocationRow = {
+  id: string
+  /** Nome do local de votação (polling_locations.nome). */
+  label: string
+  /** Município do local (polling_locations.municipio_nome). */
+  city: string | null
+  leaderCount: number
+  expectedVotes: number
+  adminEstimatedVotes: number
+  /** Eleitorado total registrado nesse local, segundo o TSE (referência —
+   * não é resultado de votação, ver nota acima). Null se o local não tiver
+   * esse dado (não deveria acontecer com os dados de PE já importados). */
+  registeredVoters: number | null
+  /** expectedVotes / registeredVoters em % (1 casa decimal) — null se não
+   * houver eleitorado cadastrado pra esse local. */
+  coveragePct: number | null
+}
+
+type LeaderPollingLocationRow = {
+  polling_location_id: string | null
+  expected_votes: number | null
+  admin_estimated_votes: number | null
+  polling_locations: { nome: string; municipio_nome: string; eleitores_total: number | null } | null
+}
+
+/**
+ * Agrupa por local de votação. Retorna também quantas lideranças ainda não
+ * têm local de votação informado (leadersWithoutLocation) — útil pra medir
+ * quão completo/confiável o relatório está, já que ele só reflete quem
+ * preencheu o campo no cadastro.
+ */
+export async function getVotesByPollingLocation(
+  supabase: DB,
+  filters?: { city?: string },
+): Promise<{ rows: VotesByPollingLocationRow[]; leadersWithoutLocation: number }> {
+  let query = supabase
+    .from("leaders")
+    .select("polling_location_id, expected_votes, admin_estimated_votes, polling_locations(nome, municipio_nome, eleitores_total)")
+  if (filters?.city) query = query.eq("city", filters.city)
+
+  const { data, error } = await query
+  if (error) throw new Error(`Falha ao gerar relatório por local de votação: ${error.message}`)
+
+  // Ver nota equivalente em services/supporters.ts sobre o cast de relações
+  // embutidas por causa do schema "any" do client.
+  const rows = data as unknown as LeaderPollingLocationRow[]
+
+  const groups = new Map<string, VotesByPollingLocationRow>()
+  let leadersWithoutLocation = 0
+
+  for (const row of rows) {
+    if (!row.polling_location_id || !row.polling_locations) {
+      leadersWithoutLocation += 1
+      continue
+    }
+    const current = groups.get(row.polling_location_id) ?? {
+      id: row.polling_location_id,
+      label: row.polling_locations.nome,
+      city: row.polling_locations.municipio_nome,
+      leaderCount: 0,
+      expectedVotes: 0,
+      adminEstimatedVotes: 0,
+      registeredVoters: row.polling_locations.eleitores_total,
+      coveragePct: null,
+    }
+    current.leaderCount += 1
+    current.expectedVotes += row.expected_votes ?? 0
+    current.adminEstimatedVotes += row.admin_estimated_votes ?? 0
+    groups.set(row.polling_location_id, current)
+  }
+
+  const result = Array.from(groups.values())
+    .map((row) => ({
+      ...row,
+      coveragePct: row.registeredVoters ? Math.round((row.expectedVotes / row.registeredVoters) * 1000) / 10 : null,
+    }))
+    .sort((a, b) => b.expectedVotes - a.expectedVotes)
+
+  return { rows: result, leadersWithoutLocation }
+}
+
+// ----------------------------------------------------------------------------
 // Helpers de agregação em memória
 // ----------------------------------------------------------------------------
 function countBy<T extends Record<string, unknown>>(rows: T[], key: keyof T): Map<string, number> {

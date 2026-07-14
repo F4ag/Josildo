@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getLeaderById } from "@/services/leaders"
+import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
 import {
   LEADER_STATUS_LABELS, LEADER_STATUS_COLOR, LEADER_TYPE_LABELS, INFLUENCE_LEVEL_LABELS,
   type LeaderStatus, type LeaderType, type InfluenceLevel, type UserRole,
@@ -33,11 +34,12 @@ export default async function LiderancaDetalhePage({
   // para não vazar se o registro existe ou não.
   if (!leader) notFound()
 
-  const [{ count: supporterCount }, { count: demandCount }, { data: subordinates }, parentLeader] = await Promise.all([
+  const [{ count: supporterCount }, { count: demandCount }, { data: subordinates }, parentLeader, pollingLocation] = await Promise.all([
     supabase.from("supporters").select("id", { count: "exact", head: true }).eq("leader_id", id),
     supabase.from("demands").select("id", { count: "exact", head: true }).eq("leader_id", id),
     supabase.from("leaders").select("id, name, status").eq("parent_leader_id", id).order("name", { ascending: true }),
     leader.parent_leader_id ? getLeaderById(supabase, leader.parent_leader_id) : Promise.resolve(null),
+    leader.polling_location_id ? getPollingLocationById(supabase, leader.polling_location_id) : Promise.resolve(null),
   ])
 
   const role = session?.profile.role as UserRole
@@ -113,6 +115,7 @@ export default async function LiderancaDetalhePage({
         <Info label="Bairro" value={leader.neighborhood} />
         <Info label="Cidade" value={[leader.city, leader.state].filter(Boolean).join(" / ") || null} />
         <Info label="Endereço" value={leader.address} />
+        <Info label="Local de votação" value={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null} />
         <Info label="Tipo" value={leader.leader_type ? LEADER_TYPE_LABELS[leader.leader_type as LeaderType] : null} />
         <Info
           label="Nível de influência"

@@ -15,6 +15,11 @@ export const leaderSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zip_code: z.string().optional(),
+  // Local de votação (autocomplete sobre polling_locations, dado do TSE) —
+  // o campo de texto é só exibição; o que realmente é salvo é o id
+  // selecionado, escrito num input hidden por
+  // components/polling-location-autocomplete.tsx.
+  polling_location_id: z.string().uuid().optional().or(z.literal("")),
   // Usadas pelo Mapa Territorial (Módulo 8) — sem isso preenchido no
   // cadastro, a liderança nunca aparece no mapa mesmo com endereço/bairro
   // certos. Mantidas como string aqui (a conversão pra number|null acontece

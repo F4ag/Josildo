@@ -5,7 +5,7 @@ import { renderToBuffer } from "@react-pdf/renderer"
 import { NextRequest, NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { getVotesSummary, getVotesByCity, getVotesByNeighborhood } from "@/services/reports"
+import { getVotesSummary, getVotesByCity, getVotesByNeighborhood, getVotesByPollingLocation } from "@/services/reports"
 import type { UserRole } from "@/types/domain"
 import { VotesReportDocument } from "@/lib/pdf/votes-report-document"
 
@@ -22,13 +22,21 @@ export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("cidade") ?? undefined
 
   const supabase = await createClient()
-  const [summary, byCity, byNeighborhood] = await Promise.all([
+  const [summary, byCity, byNeighborhood, votesByPollingLocation] = await Promise.all([
     getVotesSummary(supabase),
     getVotesByCity(supabase),
     getVotesByNeighborhood(supabase, { city }),
+    getVotesByPollingLocation(supabase, { city }),
   ])
   const buffer = await renderToBuffer(
-    <VotesReportDocument summary={summary} byCity={byCity} byNeighborhood={byNeighborhood} generatedAt={new Date()} />,
+    <VotesReportDocument
+      summary={summary}
+      byCity={byCity}
+      byNeighborhood={byNeighborhood}
+      byPollingLocation={votesByPollingLocation.rows}
+      leadersWithoutLocation={votesByPollingLocation.leadersWithoutLocation}
+      generatedAt={new Date()}
+    />,
   )
 
   return new NextResponse(new Uint8Array(buffer), {

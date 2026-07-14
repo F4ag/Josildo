@@ -13,6 +13,10 @@ export const supporterSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zip_code: z.string().optional(),
+  // Local de votação (autocomplete sobre polling_locations, dado do TSE) —
+  // mesma lógica de leader.ts: o campo de texto é só exibição, o id
+  // selecionado vem de um input hidden preenchido pelo componente.
+  polling_location_id: z.string().uuid().optional().or(z.literal("")),
   // Mesma lógica de leader.ts/demand.ts: string em vez de z.coerce.number()
   // pra não transformar "" em 0 (Null Island) — a conversão pra number|null
   // é feita à mão na Server Action, só depois de decidir se vamos usar o

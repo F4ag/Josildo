@@ -203,6 +203,7 @@ export type AgendaEvent = Tables<"agenda_events">
 export type MessageTemplate = Tables<"message_templates">
 export type Neighborhood = Tables<"neighborhoods">
 export type Notification = Tables<"notifications">
+export type PollingLocation = Tables<"polling_locations">
 
 /**
  * "Pessoa atendida" (Módulo 5) não é uma tabela própria — é um Supporter que

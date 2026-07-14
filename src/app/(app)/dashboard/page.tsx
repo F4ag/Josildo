@@ -1,16 +1,19 @@
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Users, UserPlus, HeartHandshake, ClipboardCheck, Stethoscope } from "lucide-react"
+import { Users, UserPlus, HeartHandshake, ClipboardCheck, Stethoscope, ArrowRight } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import {
   getDashboardSummary, listOverdueDemands, listBirthdaysToday, getDashboardTrends,
   getLeadersByCity, getLeadersByNeighborhood, getSupportersByCity, getSupportersByNeighborhood,
 } from "@/services/dashboard"
+import { getVotesSummary, getVotesByCity } from "@/services/reports"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { CategoryBarChart } from "@/components/dashboard/supporters-by-neighborhood-chart"
 import { CategoryDonutChart } from "@/components/dashboard/category-donut-chart"
+import { VotesByCityChart } from "@/components/dashboard/votes-by-city-chart"
 import { WhatsAppButton } from "@/components/whatsapp-button"
+import type { UserRole } from "@/types/domain"
 
 export const metadata: Metadata = { title: "Dashboard · Lidera+" }
 
@@ -19,6 +22,7 @@ export const metadata: Metadata = { title: "Dashboard · Lidera+" }
 export default async function DashboardPage() {
   const session = await getSessionUser()
   const supabase = await createClient()
+  const role = session?.profile.role as UserRole
 
   const [
     summary, overdueDemands, birthdaysToday, trends,
@@ -33,6 +37,13 @@ export default async function DashboardPage() {
     getSupportersByCity(supabase),
     getSupportersByNeighborhood(supabase),
   ])
+
+  // Expectativa de votos: cruza admin_estimated_votes (campo admin-only),
+  // então o gráfico só aparece pro admin_geral — mesma restrição do
+  // relatório completo em /relatorios/votos.
+  const [votesSummary, votesByCity] = role === "admin_geral"
+    ? await Promise.all([getVotesSummary(supabase), getVotesByCity(supabase)])
+    : [null, null]
 
   return (
     <div className="space-y-8">
@@ -140,6 +151,30 @@ export default async function DashboardPage() {
           />
         </div>
       </div>
+
+      {role === "admin_geral" && votesSummary && votesByCity && (
+        <div className="rounded-lg border border-black/5 bg-white p-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Expectativa de votos por cidade</p>
+              <p className="text-xs text-foreground/50">
+                Informado pelas lideranças: {votesSummary.totalExpectedVotes} · Avaliação do Admin Geral: {votesSummary.totalAdminEstimatedVotes}
+              </p>
+            </div>
+            <Link
+              href="/relatorios/votos"
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:opacity-80"
+            >
+              Ver detalhado
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </Link>
+          </div>
+          <VotesByCityChart
+            data={votesByCity}
+            emptyMessage="Sem expectativa de votos informada ainda."
+          />
+        </div>
+      )}
     </div>
   )
 }

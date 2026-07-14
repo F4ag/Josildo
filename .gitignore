@@ -13,3 +13,13 @@ public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
 public/fallback-*.js
+
+# Arquivos brutos de dados abertos do TSE, baixados manualmente como
+# referência durante a importação eleitoral (electoral_zones/
+# polling_locations/electoral_sections). Não fazem parte do código — o
+# dado real já está no Supabase, importado pela Edge Function
+# import-electoral-data, que busca o ZIP direto da fonte (TSE), sem
+# depender destes arquivos locais. Também passam de 100MB (limite do
+# GitHub), então nunca devem ser commitados.
+eleitorado_local_votacao_ATUAL.zip
+perfil_eleitor_secao_ATUAL_PE.zip

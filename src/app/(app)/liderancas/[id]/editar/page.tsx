@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getLeaderById } from "@/services/leaders"
+import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
 import { can } from "@/lib/permissions"
 import type { UserRole } from "@/types/domain"
 import { LeaderForm } from "../../leader-form"
@@ -21,6 +22,12 @@ export default async function EditarLiderancaPage({
   const leader = await getLeaderById(supabase, id)
 
   if (!leader) notFound()
+
+  // O cadastro só guarda o polling_location_id — sem isso, o autocomplete
+  // apareceria vazio na edição mesmo com um local já selecionado.
+  const pollingLocation = leader.polling_location_id
+    ? await getPollingLocationById(supabase, leader.polling_location_id)
+    : null
 
   const role = session?.profile.role as UserRole
   const isOwnRecord = role === "lideranca" && session?.profile.leader_id === id
@@ -41,6 +48,7 @@ export default async function EditarLiderancaPage({
         action={boundAction}
         defaultValues={leader}
         isOwnRecord={isOwnRecord}
+        pollingLocationDefaultLabel={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null}
         cancelHref={`/liderancas/${id}`}
       />
     </div>

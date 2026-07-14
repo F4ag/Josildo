@@ -494,6 +494,26 @@ create policy mt_admin_geral_write on message_templates
   with check (private.current_user_role() = 'admin_geral' and organization_id = private.current_user_org_id());
 
 -- ============================================================================
+-- electoral_zones / polling_locations / electoral_sections — referência
+-- geográfica pública do TSE, NÃO multi-tenant. Leitura liberada pra qualquer
+-- usuário autenticado (de qualquer organização); escrita só via service_role
+-- (Edge Function import-electoral-data), por isso não há policy de
+-- insert/update/delete pra authenticated/anon.
+-- ============================================================================
+alter table electoral_zones enable row level security;
+alter table polling_locations enable row level security;
+alter table electoral_sections enable row level security;
+
+create policy ez_select_authenticated on electoral_zones
+  for select using ((select auth.role()) = 'authenticated');
+
+create policy pl_select_authenticated on polling_locations
+  for select using ((select auth.role()) = 'authenticated');
+
+create policy es_select_authenticated on electoral_sections
+  for select using ((select auth.role()) = 'authenticated');
+
+-- ============================================================================
 -- Grants do schema "private"
 -- Sem isso, authenticated/anon recebem "permission denied for schema
 -- private" ao rodar QUALQUER query numa tabela cuja policy chame uma
