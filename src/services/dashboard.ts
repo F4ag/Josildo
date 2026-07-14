@@ -156,3 +156,77 @@ export async function getSupportersByCity(supabase: DB, limit = 10): Promise<Cat
 export async function getSupportersByNeighborhood(supabase: DB, limit = 10): Promise<CategoryCount[]> {
   return getCountsByColumn(supabase, "supporters", "neighborhood", limit)
 }
+
+// ----------------------------------------------------------------------------
+// Tendências (mini-gráfico de linha nos StatCards do topo)
+// ----------------------------------------------------------------------------
+
+/** Conta quantas linhas de `table` têm `dateColumn` em cada um dos últimos
+ * `days` dias (hoje incluso, começando `days-1` dias atrás). Retorna só os
+ * números, em ordem cronológica (mais antigo primeiro) — é o formato que o
+ * sparkline em components/dashboard/stat-card.tsx espera. Filtro opcional
+ * (ex.: status = "resolvida") pra tendências que não são "toda linha criada
+ * nesse dia", mas sim "toda linha que atingiu certo status nesse dia". */
+async function getDailyCounts(
+  supabase: DB,
+  table: "leaders" | "supporters" | "demands" | "attendances",
+  dateColumn: string,
+  days: number,
+  filter?: { column: string; value: string },
+): Promise<number[]> {
+  const since = new Date()
+  since.setHours(0, 0, 0, 0)
+  since.setDate(since.getDate() - (days - 1))
+
+  let query = supabase.from(table).select(dateColumn).gte(dateColumn, since.toISOString())
+  if (filter) query = query.eq(filter.column, filter.value)
+
+  const { data, error } = await query
+  if (error) throw new Error(`Falha ao calcular tendência de ${table}: ${error.message}`)
+
+  const buckets = new Array(days).fill(0) as number[]
+  for (const row of data as unknown as Record<string, string | null>[]) {
+    const value = row[dateColumn]
+    if (!value) continue
+    const dayIndex = Math.floor((new Date(value).getTime() - since.getTime()) / 86_400_000)
+    if (dayIndex >= 0 && dayIndex < days) buckets[dayIndex] += 1
+  }
+  return buckets
+}
+
+export type DashboardTrends = {
+  leaders: number[]
+  supporters: number[]
+  /** Proxy de "pessoas atendidas": não dá pra reconstruir historicamente
+   * quantas pessoas distintas já tinham demanda/atendimento em cada dia
+   * passado sem guardar snapshot, então aqui é o volume de demandas +
+   * atendimentos CRIADOS por dia — mostra o ritmo de atendimento à rede,
+   * não o total acumulado exato do card ao lado. */
+  attendanceActivity: number[]
+  demandsResolved: number[]
+  /** Idem: "atendimentos pendentes" é uma contagem do estado atual (não dá
+   * pra saber quantos estavam pendentes em cada dia passado sem snapshot).
+   * Usa o volume de atendimentos criados por dia como proxy de atividade. */
+  attendancesPending: number[]
+}
+
+/** Série diária dos últimos `days` dias, uma por StatCard do topo do
+ * Dashboard — usada só pro sparkline decorativo, não é uma métrica de
+ * precisão (ver ressalvas nos campos de DashboardTrends acima). */
+export async function getDashboardTrends(supabase: DB, days = 14): Promise<DashboardTrends> {
+  const [leaders, supporters, demandsCreated, attendancesCreated, demandsResolved] = await Promise.all([
+    getDailyCounts(supabase, "leaders", "created_at", days),
+    getDailyCounts(supabase, "supporters", "created_at", days),
+    getDailyCounts(supabase, "demands", "created_at", days),
+    getDailyCounts(supabase, "attendances", "created_at", days),
+    getDailyCounts(supabase, "demands", "completed_at", days, { column: "status", value: "resolvida" }),
+  ])
+
+  return {
+    leaders,
+    supporters,
+    attendanceActivity: demandsCreated.map((count, i) => count + (attendancesCreated[i] ?? 0)),
+    demandsResolved,
+    attendancesPending: attendancesCreated,
+  }
+}

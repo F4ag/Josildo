@@ -4,11 +4,12 @@ import { Users, UserPlus, HeartHandshake, ClipboardCheck, Stethoscope } from "lu
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import {
-  getDashboardSummary, listOverdueDemands, listBirthdaysToday,
+  getDashboardSummary, listOverdueDemands, listBirthdaysToday, getDashboardTrends,
   getLeadersByCity, getLeadersByNeighborhood, getSupportersByCity, getSupportersByNeighborhood,
 } from "@/services/dashboard"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { CategoryBarChart } from "@/components/dashboard/supporters-by-neighborhood-chart"
+import { CategoryDonutChart } from "@/components/dashboard/category-donut-chart"
 import { WhatsAppButton } from "@/components/whatsapp-button"
 
 export const metadata: Metadata = { title: "Dashboard · Lidera+" }
@@ -20,12 +21,13 @@ export default async function DashboardPage() {
   const supabase = await createClient()
 
   const [
-    summary, overdueDemands, birthdaysToday,
+    summary, overdueDemands, birthdaysToday, trends,
     leadersByCity, leadersByNeighborhood, supportersByCity, supportersByNeighborhood,
   ] = await Promise.all([
     getDashboardSummary(supabase),
     listOverdueDemands(supabase),
     listBirthdaysToday(supabase),
+    getDashboardTrends(supabase),
     getLeadersByCity(supabase),
     getLeadersByNeighborhood(supabase),
     getSupportersByCity(supabase),
@@ -44,23 +46,23 @@ export default async function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label="Lideranças ativas" value={summary.activeLeaders} href="/liderancas?status=ativa"
-          icon={Users} tone="primary"
+          icon={Users} tone="primary" trend={trends.leaders}
         />
         <StatCard
           label="Apoiadores" value={summary.totalSupporters} href="/apoiadores"
-          icon={UserPlus} tone="supporter"
+          icon={UserPlus} tone="supporter" trend={trends.supporters}
         />
         <StatCard
           label="Pessoas atendidas" value={summary.totalPessoasAtendidas} href="/pessoas-atendidas"
-          icon={HeartHandshake} tone="orange"
+          icon={HeartHandshake} tone="orange" trend={trends.attendanceActivity}
         />
         <StatCard
           label="Demandas resolvidas (mês)" value={summary.demandsResolvedThisMonth} href="/demandas?status=resolvida"
-          icon={ClipboardCheck} tone="secondary"
+          icon={ClipboardCheck} tone="secondary" trend={trends.demandsResolved}
         />
         <StatCard
           label="Atendimentos pendentes" value={summary.attendancesPending} href="/atendimentos"
-          icon={Stethoscope} tone="accent"
+          icon={Stethoscope} tone="accent" trend={trends.attendancesPending}
         />
       </div>
 
@@ -109,15 +111,15 @@ export default async function DashboardPage() {
         <div className="rounded-lg border border-black/5 bg-white p-4">
           <p className="mb-3 text-sm font-medium text-foreground">Lideranças por cidade</p>
           <CategoryBarChart
-            data={leadersByCity} color="#0B2545" unitLabel="liderança(s)"
+            data={leadersByCity} unitLabel="liderança(s)"
             emptyMessage="Sem lideranças com cidade cadastrada ainda."
           />
         </div>
 
         <div className="rounded-lg border border-black/5 bg-white p-4">
           <p className="mb-3 text-sm font-medium text-foreground">Lideranças por bairro</p>
-          <CategoryBarChart
-            data={leadersByNeighborhood} color="#D4A017" unitLabel="liderança(s)"
+          <CategoryDonutChart
+            data={leadersByNeighborhood} unitLabel="liderança(s)"
             emptyMessage="Sem lideranças com bairro cadastrado ainda."
           />
         </div>
@@ -125,15 +127,15 @@ export default async function DashboardPage() {
         <div className="rounded-lg border border-black/5 bg-white p-4">
           <p className="mb-3 text-sm font-medium text-foreground">Apoiadores por cidade</p>
           <CategoryBarChart
-            data={supportersByCity} color="#7C3AED" unitLabel="apoiador(es)"
+            data={supportersByCity} unitLabel="apoiador(es)"
             emptyMessage="Sem apoiadores com cidade cadastrada ainda."
           />
         </div>
 
         <div className="rounded-lg border border-black/5 bg-white p-4">
           <p className="mb-3 text-sm font-medium text-foreground">Apoiadores por bairro</p>
-          <CategoryBarChart
-            data={supportersByNeighborhood} color="#1E7A46" unitLabel="apoiador(es)"
+          <CategoryDonutChart
+            data={supportersByNeighborhood} unitLabel="apoiador(es)"
             emptyMessage="Sem apoiadores com bairro cadastrado ainda."
           />
         </div>
