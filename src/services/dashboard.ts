@@ -125,7 +125,13 @@ async function getCountsByColumn(
 
   const counts = new Map<string, number>()
   for (const row of data as unknown as Record<string, string>[]) {
+    // tsconfig tem noUncheckedIndexedAccess, então o TS trata acesso por
+    // índice dinâmico (row[column]) como possivelmente undefined mesmo o
+    // Record sendo <string, string> — na prática nunca é (o filtro
+    // .not(column, "is", null) já garante isso), mas o guard abaixo
+    // satisfaz o compilador e ainda protege contra linha malformada.
     const key = row[column]
+    if (!key) continue
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }
 
