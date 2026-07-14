@@ -189,7 +189,14 @@ async function getDailyCounts(
     const value = row[dateColumn]
     if (!value) continue
     const dayIndex = Math.floor((new Date(value).getTime() - since.getTime()) / 86_400_000)
-    if (dayIndex >= 0 && dayIndex < days) buckets[dayIndex] += 1
+    // Mesmo caso de noUncheckedIndexedAccess de getCountsByColumn acima:
+    // dayIndex já está garantido dentro de [0, days) pelo if, então
+    // buckets[dayIndex] nunca é undefined na prática — o guard abaixo só
+    // satisfaz o compilador.
+    if (dayIndex >= 0 && dayIndex < days) {
+      const current = buckets[dayIndex]
+      if (current !== undefined) buckets[dayIndex] = current + 1
+    }
   }
   return buckets
 }
