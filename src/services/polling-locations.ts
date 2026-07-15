@@ -34,8 +34,12 @@ function ilikeOrCondition(column: string, rawValue: string): string {
 }
 
 /** Busca por nome do local, bairro ou município — usada pelo autocomplete
- * (server action em lib/actions/polling-locations.ts). Limite baixo (8)
- * porque roda a cada digitação (com debounce no componente client). */
+ * (server action em lib/actions/polling-locations.ts). Limite de 40: alto o
+ * suficiente pra cobrir bairros densos (ex.: Rio Doce/Olinda tem 13 locais,
+ * bairros maiores em Recife podem ter mais) sem cortar opções de verdade —
+ * a lista já é rolável no componente (max-h-64 overflow-y-auto), e a query é
+ * barata (índice em nome/bairro/município, tabela só do estado). Antes era
+ * 8, e cortava silenciosamente bairros com mais de 8 locais.*/
 export async function searchPollingLocations(supabase: DB, query: string): Promise<PollingLocationSuggestion[]> {
   const orConditions = [
     ilikeOrCondition("nome", query),
@@ -49,7 +53,7 @@ export async function searchPollingLocations(supabase: DB, query: string): Promi
     .or(orConditions)
     .order("municipio_nome", { ascending: true })
     .order("nome", { ascending: true })
-    .limit(8)
+    .limit(40)
 
   if (error) throw new Error(`Falha ao buscar local de votação: ${error.message}`)
   return data
