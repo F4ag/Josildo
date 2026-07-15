@@ -37,7 +37,7 @@ export default async function RelatorioVotosPage({
     listDistinctLeaderCities(supabase),
     listDistinctLeaderNeighborhoods(supabase, { city: params.cidade }),
     getVotesByNeighborhood(supabase, { city: params.cidade, neighborhood: params.bairro }),
-    getVotesByPollingLocation(supabase, { city: params.cidade }),
+    getVotesByPollingLocation(supabase, { city: params.cidade, neighborhood: params.bairro }),
   ])
   const { rows: byPollingLocation, leadersWithoutLocation } = votesByPollingLocation
 
@@ -87,23 +87,23 @@ export default async function RelatorioVotosPage({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-black/5 bg-white p-4">
+        <div className="rounded-lg border border-primary/15 bg-primary/5 p-4">
           <p className="text-xs uppercase text-foreground/50">Expectativa Liderança</p>
           <p className="text-2xl font-semibold text-primary">{summary.totalExpectedVotes}</p>
           <p className="mt-1 text-xs text-foreground/50">
             {summary.leadersWithExpectedVotes} de {summary.totalLeaders} lideranças informaram uma expectativa.
           </p>
         </div>
-        <div className="rounded-lg border border-black/5 bg-white p-4">
+        <div className="rounded-lg border border-secondary/20 bg-secondary/5 p-4">
           <p className="text-xs uppercase text-foreground/50">Expectativa Admin Geral</p>
-          <p className="text-2xl font-semibold text-primary">{summary.totalAdminEstimatedVotes}</p>
+          <p className="text-2xl font-semibold text-secondary">{summary.totalAdminEstimatedVotes}</p>
           <p className="mt-1 text-xs text-foreground/50">
             {summary.leadersWithAdminEstimate} de {summary.totalLeaders} lideranças já foram avaliadas.
           </p>
         </div>
       </div>
 
-      <div>
+      <div className="rounded-xl border border-accent/20 bg-accent/5 p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium text-foreground">Por cidade</p>
           <form className="no-print flex gap-2">
@@ -189,7 +189,7 @@ export default async function RelatorioVotosPage({
         </div>
       </div>
 
-      <div>
+      <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium text-foreground">Por bairro</p>
           <form className="no-print flex flex-wrap gap-2">
@@ -284,8 +284,25 @@ export default async function RelatorioVotosPage({
         </div>
       </div>
 
-      <div>
-        <p className="mb-1 text-sm font-medium text-foreground">Por local de votação</p>
+      <div className="rounded-xl border border-secondary/20 bg-secondary/5 p-4 sm:p-5">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium text-foreground">Por local de votação</p>
+          <form className="no-print flex flex-wrap gap-2">
+            <select name="cidade" defaultValue={params.cidade ?? ""}
+              className="rounded-md border border-black/10 px-3 py-2 text-sm">
+              <option value="">Todas as cidades</option>
+              {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select name="bairro" defaultValue={params.bairro ?? ""}
+              className="rounded-md border border-black/10 px-3 py-2 text-sm">
+              <option value="">Todos os bairros</option>
+              {neighborhoods.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <button type="submit" className="rounded-md bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
+              Filtrar
+            </button>
+          </form>
+        </div>
         <p className="mb-3 text-xs text-foreground/50">
           Compara o informado pelas lideranças com o eleitorado total registrado em cada local, segundo o TSE — não é
           resultado de urna (o sistema ainda não importa esse dado, que só existe depois da eleição), é a referência

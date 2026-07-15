@@ -359,12 +359,13 @@ type LeaderPollingLocationRow = {
  */
 export async function getVotesByPollingLocation(
   supabase: DB,
-  filters?: { city?: string },
+  filters?: { city?: string; neighborhood?: string },
 ): Promise<{ rows: VotesByPollingLocationRow[]; leadersWithoutLocation: number }> {
   let query = supabase
     .from("leaders")
     .select("polling_location_id, expected_votes, admin_estimated_votes, polling_locations(nome, municipio_nome, eleitores_total)")
   if (filters?.city) query = query.eq("city", filters.city)
+  if (filters?.neighborhood) query = query.eq("neighborhood", filters.neighborhood)
 
   const { data, error } = await query
   if (error) throw new Error(`Falha ao gerar relatório por local de votação: ${error.message}`)

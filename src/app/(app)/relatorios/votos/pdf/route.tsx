@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     getVotesSummary(supabase),
     getVotesByCity(supabase, { city }),
     getVotesByNeighborhood(supabase, { city, neighborhood }),
-    getVotesByPollingLocation(supabase, { city }),
+    getVotesByPollingLocation(supabase, { city, neighborhood }),
   ])
   const buffer = await renderToBuffer(
     <VotesReportDocument
