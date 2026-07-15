@@ -228,9 +228,10 @@ export type VotesByGroupRow = {
   adminEstimatedVotes: number
 }
 
-async function listVoteRows(supabase: DB, filters?: { city?: string }) {
+async function listVoteRows(supabase: DB, filters?: { city?: string; neighborhood?: string }) {
   let query = supabase.from("leaders").select("city, neighborhood, expected_votes, admin_estimated_votes")
   if (filters?.city) query = query.eq("city", filters.city)
+  if (filters?.neighborhood) query = query.eq("neighborhood", filters.neighborhood)
   const { data, error } = await query
   if (error) throw new Error(`Falha ao gerar relatório de votos: ${error.message}`)
   return data
@@ -265,9 +266,12 @@ export async function getVotesSummary(supabase: DB): Promise<VotesSummary> {
 
 /** Soma expected_votes/admin_estimated_votes agrupado por cidade — ordenado
  * pelo total informado pela liderança (o campo que mais frequentemente vem
- * preenchido; a avaliação do admin pode ainda não existir pra várias). */
-export async function getVotesByCity(supabase: DB): Promise<VotesByGroupRow[]> {
-  const rows = await listVoteRows(supabase)
+ * preenchido; a avaliação do admin pode ainda não existir pra várias). Filtro
+ * opcional por cidade — reduz a tabela a uma única linha, útil pra isolar o
+ * relatório (e o PDF) de uma cidade específica, mesmo filtro que já existia
+ * só na tabela "por bairro". */
+export async function getVotesByCity(supabase: DB, filters?: { city?: string }): Promise<VotesByGroupRow[]> {
+  const rows = await listVoteRows(supabase, filters)
   const groups = new Map<string, VotesByGroupRow>()
 
   for (const row of rows) {
@@ -282,10 +286,14 @@ export async function getVotesByCity(supabase: DB): Promise<VotesByGroupRow[]> {
   return Array.from(groups.values()).sort((a, b) => b.expectedVotes - a.expectedVotes)
 }
 
-/** Mesma agregação, por bairro — com o mesmo filtro opcional por cidade dos
- * outros relatórios (cascata cidade→bairro). Chave de agrupamento combina
- * cidade+bairro pra não misturar bairros de mesmo nome em cidades diferentes. */
-export async function getVotesByNeighborhood(supabase: DB, filters?: { city?: string }): Promise<VotesByGroupRow[]> {
+/** Mesma agregação, por bairro — com o mesmo filtro em cascata cidade→bairro
+ * dos outros relatórios (ver relatorios/liderancas/page.tsx). Chave de
+ * agrupamento combina cidade+bairro pra não misturar bairros de mesmo nome
+ * em cidades diferentes. */
+export async function getVotesByNeighborhood(
+  supabase: DB,
+  filters?: { city?: string; neighborhood?: string },
+): Promise<VotesByGroupRow[]> {
   const rows = await listVoteRows(supabase, filters)
   const groups = new Map<string, VotesByGroupRow>()
 
@@ -397,6 +405,106 @@ export async function getVotesByPollingLocation(
     .sort((a, b) => b.expectedVotes - a.expectedVotes)
 
   return { rows: result, leadersWithoutLocation }
+}
+
+// ----------------------------------------------------------------------------
+// Cadastros (lideranças + apoiadores) por local de votação — relatório
+// separado do de expectativa de votos acima: aqui não entra expected_votes/
+// admin_estimated_votes (que só existe em leaders), é só a contagem de
+// quantos cadastros de cada tipo estão vinculados a cada local, pedido
+// explícito da Agência F4 pra saber onde a base de eleitores/rede está
+// concentrada, independente de expectativa.
+// ----------------------------------------------------------------------------
+export type RegistrationsByPollingLocationRow = {
+  id: string
+  /** Nome do local de votação (polling_locations.nome). */
+  label: string
+  /** Município do local (polling_locations.municipio_nome). */
+  city: string | null
+  leaderCount: number
+  supporterCount: number
+  totalCount: number
+}
+
+type PersonPollingLocationRow = {
+  polling_location_id: string | null
+  polling_locations: { nome: string; municipio_nome: string } | null
+}
+
+/**
+ * Agrupa lideranças e apoiadores pelo local de votação vinculado. O filtro
+ * de cidade usa a cidade cadastrada da própria pessoa (leaders.city /
+ * supporters.city — onde ela mora), mesma convenção dos outros relatórios,
+ * não a cidade do local de votação (podem divergir, embora raro).
+ * Retorna também quantos cadastros de cada tipo ainda não têm local de
+ * votação informado — mede quão completo o relatório está.
+ */
+export async function getRegistrationsByPollingLocation(
+  supabase: DB,
+  filters?: { city?: string },
+): Promise<{
+  rows: RegistrationsByPollingLocationRow[]
+  leadersWithoutLocation: number
+  supportersWithoutLocation: number
+}> {
+  let leadersQuery = supabase.from("leaders").select("polling_location_id, polling_locations(nome, municipio_nome)")
+  let supportersQuery = supabase.from("supporters").select("polling_location_id, polling_locations(nome, municipio_nome)")
+  if (filters?.city) {
+    leadersQuery = leadersQuery.eq("city", filters.city)
+    supportersQuery = supportersQuery.eq("city", filters.city)
+  }
+
+  const [{ data: leaderRows, error: leadersError }, { data: supporterRows, error: supportersError }] = await Promise.all([
+    leadersQuery,
+    supportersQuery,
+  ])
+  if (leadersError) throw new Error(`Falha ao gerar relatório de cadastros por local de votação: ${leadersError.message}`)
+  if (supportersError) throw new Error(`Falha ao gerar relatório de cadastros por local de votação: ${supportersError.message}`)
+
+  // Ver nota equivalente em services/supporters.ts sobre o cast de relações
+  // embutidas por causa do schema "any" do client.
+  const leaders = leaderRows as unknown as PersonPollingLocationRow[]
+  const supporters = supporterRows as unknown as PersonPollingLocationRow[]
+
+  const groups = new Map<string, RegistrationsByPollingLocationRow>()
+  let leadersWithoutLocation = 0
+  let supportersWithoutLocation = 0
+
+  function getOrCreate(row: PersonPollingLocationRow): RegistrationsByPollingLocationRow | null {
+    if (!row.polling_location_id || !row.polling_locations) return null
+    const current = groups.get(row.polling_location_id) ?? {
+      id: row.polling_location_id,
+      label: row.polling_locations.nome,
+      city: row.polling_locations.municipio_nome,
+      leaderCount: 0,
+      supporterCount: 0,
+      totalCount: 0,
+    }
+    groups.set(row.polling_location_id, current)
+    return current
+  }
+
+  for (const row of leaders) {
+    const group = getOrCreate(row)
+    if (!group) {
+      leadersWithoutLocation += 1
+      continue
+    }
+    group.leaderCount += 1
+    group.totalCount += 1
+  }
+  for (const row of supporters) {
+    const group = getOrCreate(row)
+    if (!group) {
+      supportersWithoutLocation += 1
+      continue
+    }
+    group.supporterCount += 1
+    group.totalCount += 1
+  }
+
+  const rows = Array.from(groups.values()).sort((a, b) => b.totalCount - a.totalCount)
+  return { rows, leadersWithoutLocation, supportersWithoutLocation }
 }
 
 // ----------------------------------------------------------------------------

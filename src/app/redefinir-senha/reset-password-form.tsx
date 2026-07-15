@@ -82,6 +82,16 @@ export function ResetPasswordForm() {
   const [state, formAction] = useFormState(updatePassword, initialState)
   const sessionReady = useSessionBridge()
 
+  // Navegação de página inteira (não redirect() no server nem router.push)
+  // de propósito: o middleware pode precisar trocar de subdomínio pra
+  // resolver o tenant da organização, e isso só funciona numa navegação real
+  // do navegador — mesmo motivo documentado em login/login-form.tsx.
+  useEffect(() => {
+    if (state.success && state.redirectTo) {
+      window.location.href = state.redirectTo
+    }
+  }, [state])
+
   if (!sessionReady) {
     return <p className="text-center text-sm text-foreground/60">Verificando link...</p>
   }

@@ -5,14 +5,14 @@ import { Download } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getVotesSummary, getVotesByCity, getVotesByNeighborhood, getVotesByPollingLocation } from "@/services/reports"
-import { listDistinctLeaderCities } from "@/services/leaders"
+import { listDistinctLeaderCities, listDistinctLeaderNeighborhoods } from "@/services/leaders"
 import type { UserRole } from "@/types/domain"
 import { PrintButton } from "@/components/print-button"
 import { PrintLogo } from "@/components/print-logo"
 
 export const metadata: Metadata = { title: "Expectativa de votos · Lidera+" }
 
-type SearchParams = { cidade?: string }
+type SearchParams = { cidade?: string; bairro?: string }
 
 // Relatório restrito a admin_geral (mais restrito que o resto do módulo
 // Relatórios, que admin_equipe também acessa) — cruza expected_votes (o que
@@ -31,17 +31,19 @@ export default async function RelatorioVotosPage({
 
   const params = await searchParams
   const supabase = await createClient()
-  const [summary, byCity, cities, byNeighborhood, votesByPollingLocation] = await Promise.all([
+  const [summary, byCity, cities, neighborhoods, byNeighborhood, votesByPollingLocation] = await Promise.all([
     getVotesSummary(supabase),
-    getVotesByCity(supabase),
+    getVotesByCity(supabase, { city: params.cidade }),
     listDistinctLeaderCities(supabase),
-    getVotesByNeighborhood(supabase, { city: params.cidade }),
+    listDistinctLeaderNeighborhoods(supabase, { city: params.cidade }),
+    getVotesByNeighborhood(supabase, { city: params.cidade, neighborhood: params.bairro }),
     getVotesByPollingLocation(supabase, { city: params.cidade }),
   ])
   const { rows: byPollingLocation, leadersWithoutLocation } = votesByPollingLocation
 
   const pdfParams = new URLSearchParams()
   if (params.cidade) pdfParams.set("cidade", params.cidade)
+  if (params.bairro) pdfParams.set("bairro", params.bairro)
   const pdfQuery = pdfParams.toString()
 
   // Linha de total no rodapé das duas tabelas — soma dos grupos exibidos
@@ -86,14 +88,14 @@ export default async function RelatorioVotosPage({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-black/5 bg-white p-4">
-          <p className="text-xs uppercase text-foreground/50">Informado pelas lideranças</p>
+          <p className="text-xs uppercase text-foreground/50">Expectativa Liderança</p>
           <p className="text-2xl font-semibold text-primary">{summary.totalExpectedVotes}</p>
           <p className="mt-1 text-xs text-foreground/50">
             {summary.leadersWithExpectedVotes} de {summary.totalLeaders} lideranças informaram uma expectativa.
           </p>
         </div>
         <div className="rounded-lg border border-black/5 bg-white p-4">
-          <p className="text-xs uppercase text-foreground/50">Avaliação do Admin Geral</p>
+          <p className="text-xs uppercase text-foreground/50">Expectativa Admin Geral</p>
           <p className="text-2xl font-semibold text-primary">{summary.totalAdminEstimatedVotes}</p>
           <p className="mt-1 text-xs text-foreground/50">
             {summary.leadersWithAdminEstimate} de {summary.totalLeaders} lideranças já foram avaliadas.
@@ -102,7 +104,19 @@ export default async function RelatorioVotosPage({
       </div>
 
       <div>
-        <p className="mb-3 text-sm font-medium text-foreground">Por cidade</p>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium text-foreground">Por cidade</p>
+          <form className="no-print flex gap-2">
+            <select name="cidade" defaultValue={params.cidade ?? ""}
+              className="rounded-md border border-black/10 px-3 py-2 text-sm">
+              <option value="">Todas as cidades</option>
+              {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <button type="submit" className="rounded-md bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
+              Filtrar
+            </button>
+          </form>
+        </div>
 
         <div className="no-print grid gap-3 sm:hidden">
           {byCity.map((row) => (
@@ -178,11 +192,16 @@ export default async function RelatorioVotosPage({
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium text-foreground">Por bairro</p>
-          <form className="no-print flex gap-2">
+          <form className="no-print flex flex-wrap gap-2">
             <select name="cidade" defaultValue={params.cidade ?? ""}
               className="rounded-md border border-black/10 px-3 py-2 text-sm">
               <option value="">Todas as cidades</option>
               {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select name="bairro" defaultValue={params.bairro ?? ""}
+              className="rounded-md border border-black/10 px-3 py-2 text-sm">
+              <option value="">Todos os bairros</option>
+              {neighborhoods.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             <button type="submit" className="rounded-md bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
               Filtrar

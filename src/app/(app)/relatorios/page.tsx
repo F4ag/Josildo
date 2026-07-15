@@ -1,6 +1,6 @@
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Users, MapPin, HeartHandshake, Layers, BarChart3, type LucideIcon } from "lucide-react"
+import { Users, MapPin, HeartHandshake, Layers, BarChart3, Landmark, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
 import { getSessionUser } from "@/lib/auth"
 import type { UserRole } from "@/types/domain"
@@ -51,6 +51,13 @@ const REPORTS: { href: string; title: string; description: string; icon: LucideI
     icon: BarChart3,
     color: "primary",
     adminOnly: true,
+  },
+  {
+    href: "/relatorios/cadastros-local-votacao",
+    title: "Cadastros por local de votação",
+    description: "Quantas lideranças e apoiadores estão vinculados a cada local de votação — não é expectativa de voto, é a base já cadastrada.",
+    icon: Landmark,
+    color: "accent",
   },
 ]
 

@@ -1,6 +1,5 @@
 "use server"
 
-import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { resetPasswordSchema } from "@/lib/validations/auth"
 import type { ActionState } from "../login/actions"
@@ -47,5 +46,14 @@ export async function updatePassword(
     return { error: "Não foi possível redefinir a senha. Peça um novo link de recuperação." }
   }
 
-  redirect("/login?senha_redefinida=1")
+  // NÃO usar redirect() do next/navigation aqui: mesmo problema documentado
+  // em login/actions.ts — essa Server Action é chamada via fetch() pelo
+  // useFormState, e um redirect que troca de host (ex.: lideramais.app.br ->
+  // flux45.lideramais.app.br, feito pelo middleware pra resolver o tenant da
+  // organização) quebra dentro dessa cadeia de fetch/RSC, derrubando a
+  // página com "Application error: a client-side exception has occurred".
+  // Devolvemos o destino e deixamos o componente cliente
+  // (reset-password-form.tsx) fazer uma navegação de página inteira
+  // (window.location.href), que segue redirect entre domínios sem problema.
+  return { error: null, success: true, redirectTo: "/login?senha_redefinida=1" }
 }

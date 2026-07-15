@@ -20,12 +20,13 @@ export async function GET(request: NextRequest) {
   }
 
   const city = request.nextUrl.searchParams.get("cidade") ?? undefined
+  const neighborhood = request.nextUrl.searchParams.get("bairro") ?? undefined
 
   const supabase = await createClient()
   const [summary, byCity, byNeighborhood, votesByPollingLocation] = await Promise.all([
     getVotesSummary(supabase),
-    getVotesByCity(supabase),
-    getVotesByNeighborhood(supabase, { city }),
+    getVotesByCity(supabase, { city }),
+    getVotesByNeighborhood(supabase, { city, neighborhood }),
     getVotesByPollingLocation(supabase, { city }),
   ])
   const buffer = await renderToBuffer(
