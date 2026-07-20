@@ -87,9 +87,14 @@ export default async function ApoiadorDetalhePage({
         <Info label="WhatsApp" value={supporter.phone} />
         <Info label="E-mail" value={supporter.email} />
         <Info label="Data de nascimento" value={supporter.birth_date} />
+        <Info label="CPF" value={supporter.cpf} />
+        <Info label="Nome da mãe" value={supporter.mother_name} />
         <Info label="Bairro" value={supporter.neighborhood} />
         <Info label="Endereço" value={supporter.address} />
+        <Info label="Complemento" value={supporter.complement} />
         <Info label="Local de votação" value={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null} />
+        <Info label="Zona eleitoral" value={supporter.electoral_zone} />
+        <Info label="Seção eleitoral" value={supporter.electoral_section} />
         <Info label="Origem do cadastro" value={supporter.origin ? SUPPORTER_ORIGIN_LABELS[supporter.origin as SupporterOrigin] : null} />
         <Info label="Profissão" value={supporter.profession} />
         <Info label="Consentimento WhatsApp" value={supporter.consent_whatsapp ? "Sim" : "Não"} />
