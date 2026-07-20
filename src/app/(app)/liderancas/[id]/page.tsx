@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
+import { Download } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getLeaderById } from "@/services/leaders"
@@ -53,6 +54,10 @@ export default async function LiderancaDetalhePage({
   // submit real (RLS) recusaria.
   const canEdit = role === "lideranca" ? isOwnRecord : can(role, "update", "leaders")
   const canDelete = can(role, "delete", "leaders")
+  // Mesma restrição da rota /relatorios (ADMIN_ONLY_ROUTE_PREFIXES em
+  // lib/permissions.ts) — sem isso o botão apareceria pra liderança, que
+  // não tem acesso a /relatorios/ficha-individual/pdf (403).
+  const canGenerateReports = can(role, "generate_reports")
   const hasLinkedRecords = (supporterCount ?? 0) > 0 || (demandCount ?? 0) > 0
 
   return (
@@ -85,6 +90,13 @@ export default async function LiderancaDetalhePage({
             <Link href={`/liderancas/${id}/editar`}
               className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
               Editar
+            </Link>
+          )}
+          {canGenerateReports && (
+            <Link href={`/relatorios/ficha-individual/pdf?tipo=lideranca&id=${id}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
+              <Download className="h-4 w-4" aria-hidden />
+              Baixar ficha em PDF
             </Link>
           )}
           {canDelete && (
