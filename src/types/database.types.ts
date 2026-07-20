@@ -607,8 +607,12 @@ export type Database = {
           birth_date: string | null
           can_view_attendances: boolean
           city: string | null
+          complement: string | null
+          cpf: string | null
           created_at: string
           created_by: string | null
+          electoral_section: string | null
+          electoral_zone: string | null
           email: string | null
           expected_votes: number | null
           id: string
@@ -616,6 +620,7 @@ export type Database = {
           latitude: number | null
           leader_type: string | null
           longitude: number | null
+          mother_name: string | null
           name: string
           neighborhood: string | null
           neighborhood_id: string | null
@@ -638,8 +643,12 @@ export type Database = {
           birth_date?: string | null
           can_view_attendances?: boolean
           city?: string | null
+          complement?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
+          electoral_section?: string | null
+          electoral_zone?: string | null
           email?: string | null
           expected_votes?: number | null
           id?: string
@@ -647,6 +656,7 @@ export type Database = {
           latitude?: number | null
           leader_type?: string | null
           longitude?: number | null
+          mother_name?: string | null
           name: string
           neighborhood?: string | null
           neighborhood_id?: string | null
@@ -669,8 +679,12 @@ export type Database = {
           birth_date?: string | null
           can_view_attendances?: boolean
           city?: string | null
+          complement?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
+          electoral_section?: string | null
+          electoral_zone?: string | null
           email?: string | null
           expected_votes?: number | null
           id?: string
@@ -678,6 +692,7 @@ export type Database = {
           latitude?: number | null
           leader_type?: string | null
           longitude?: number | null
+          mother_name?: string | null
           name?: string
           neighborhood?: string | null
           neighborhood_id?: string | null
@@ -988,19 +1003,24 @@ export type Database = {
           address: string
           birth_date: string
           city: string | null
+          complement: string | null
           consent_date: string | null
           consent_email: boolean
           consent_origin: string | null
           consent_registration: boolean
           consent_whatsapp: boolean
+          cpf: string | null
           created_at: string
           created_by: string | null
+          electoral_section: string | null
+          electoral_zone: string | null
           email: string | null
           gender: string | null
           id: string
           latitude: number | null
           leader_id: string | null
           longitude: number | null
+          mother_name: string | null
           name: string
           neighborhood: string | null
           neighborhood_id: string | null
@@ -1018,19 +1038,24 @@ export type Database = {
           address: string
           birth_date: string
           city?: string | null
+          complement?: string | null
           consent_date?: string | null
           consent_email?: boolean
           consent_origin?: string | null
           consent_registration?: boolean
           consent_whatsapp?: boolean
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
+          electoral_section?: string | null
+          electoral_zone?: string | null
           email?: string | null
           gender?: string | null
           id?: string
           latitude?: number | null
           leader_id?: string | null
           longitude?: number | null
+          mother_name?: string | null
           name: string
           neighborhood?: string | null
           neighborhood_id?: string | null
@@ -1048,19 +1073,24 @@ export type Database = {
           address?: string
           birth_date?: string
           city?: string | null
+          complement?: string | null
           consent_date?: string | null
           consent_email?: boolean
           consent_origin?: string | null
           consent_registration?: boolean
           consent_whatsapp?: boolean
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
+          electoral_section?: string | null
+          electoral_zone?: string | null
           email?: string | null
           gender?: string | null
           id?: string
           latitude?: number | null
           leader_id?: string | null
           longitude?: number | null
+          mother_name?: string | null
           name?: string
           neighborhood?: string | null
           neighborhood_id?: string | null

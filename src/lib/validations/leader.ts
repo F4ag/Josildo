@@ -10,7 +10,10 @@ export const leaderSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
   birth_date: z.string().optional().or(z.literal("")),
+  cpf: z.string().optional(),
+  mother_name: z.string().optional(),
   address: z.string().optional(),
+  complement: z.string().optional(),
   neighborhood: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -20,6 +23,10 @@ export const leaderSchema = z.object({
   // selecionado, escrito num input hidden por
   // components/polling-location-autocomplete.tsx.
   polling_location_id: z.string().uuid().optional().or(z.literal("")),
+  // Zona/seção eleitoral informadas manualmente — complementar ao
+  // polling_location_id acima (ver comentário em supabase/schema.sql).
+  electoral_zone: z.string().optional(),
+  electoral_section: z.string().optional(),
   // Usadas pelo Mapa Territorial (Módulo 8) — sem isso preenchido no
   // cadastro, a liderança nunca aparece no mapa mesmo com endereço/bairro
   // certos. Mantidas como string aqui (a conversão pra number|null acontece

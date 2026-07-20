@@ -7,7 +7,10 @@ export const supporterSchema = z.object({
   name: z.string().min(3, "Informe o nome completo."),
   phone: z.string().min(8, "Informe um WhatsApp válido com DDD."),
   birth_date: z.string().min(1, "Informe a data de nascimento."),
+  cpf: z.string().optional(),
+  mother_name: z.string().optional(),
   address: z.string().min(3, "Informe o endereço."),
+  complement: z.string().optional(),
   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
   neighborhood: z.string().optional(),
   city: z.string().optional(),
@@ -17,6 +20,10 @@ export const supporterSchema = z.object({
   // mesma lógica de leader.ts: o campo de texto é só exibição, o id
   // selecionado vem de um input hidden preenchido pelo componente.
   polling_location_id: z.string().uuid().optional().or(z.literal("")),
+  // Zona/seção eleitoral informadas manualmente — complementar ao
+  // polling_location_id acima (ver comentário em supabase/schema.sql).
+  electoral_zone: z.string().optional(),
+  electoral_section: z.string().optional(),
   // Mesma lógica de leader.ts/demand.ts: string em vez de z.coerce.number()
   // pra não transformar "" em 0 (Null Island) — a conversão pra number|null
   // é feita à mão na Server Action, só depois de decidir se vamos usar o

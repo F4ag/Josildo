@@ -101,6 +101,18 @@ export function SupporterForm({
         </div>
 
         <div>
+          <label htmlFor="cpf" className="mb-1 block text-sm font-medium">CPF</label>
+          <input id="cpf" name="cpf" placeholder="000.000.000-00" defaultValue={d?.cpf ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
+
+        <div>
+          <label htmlFor="mother_name" className="mb-1 block text-sm font-medium">Nome da mãe</label>
+          <input id="mother_name" name="mother_name" defaultValue={d?.mother_name ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
+
+        <div>
           <label htmlFor="zip_code" className="mb-1 block text-sm font-medium">CEP</label>
           <input id="zip_code" name="zip_code" placeholder="53000-000" defaultValue={d?.zip_code ?? undefined}
             onBlur={handleZipCodeBlur}
@@ -113,6 +125,12 @@ export function SupporterForm({
         <div className="sm:col-span-2">
           <label htmlFor="address" className="mb-1 block text-sm font-medium">Endereço *</label>
           <input id="address" name="address" ref={addressRef} required defaultValue={d?.address}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
+
+        <div>
+          <label htmlFor="complement" className="mb-1 block text-sm font-medium">Complemento</label>
+          <input id="complement" name="complement" placeholder="Casa, apartamento, bloco..." defaultValue={d?.complement ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
@@ -139,6 +157,18 @@ export function SupporterForm({
           defaultId={d?.polling_location_id}
           defaultLabel={pollingLocationDefaultLabel}
         />
+
+        <div>
+          <label htmlFor="electoral_zone" className="mb-1 block text-sm font-medium">Zona eleitoral</label>
+          <input id="electoral_zone" name="electoral_zone" placeholder="Ex.: 015" defaultValue={d?.electoral_zone ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
+
+        <div>
+          <label htmlFor="electoral_section" className="mb-1 block text-sm font-medium">Seção eleitoral</label>
+          <input id="electoral_section" name="electoral_section" placeholder="Ex.: 0123" defaultValue={d?.electoral_section ?? undefined}
+            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+        </div>
 
         <div>
           <label htmlFor="latitude" className="mb-1 block text-sm font-medium">Latitude</label>
