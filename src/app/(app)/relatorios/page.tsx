@@ -1,6 +1,6 @@
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Users, MapPin, HeartHandshake, Layers, BarChart3, Landmark, Vote, type LucideIcon } from "lucide-react"
+import { Users, MapPin, HeartHandshake, Layers, BarChart3, Landmark, Vote, FileText, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
 import { getSessionUser } from "@/lib/auth"
 import type { UserRole } from "@/types/domain"
@@ -65,6 +65,13 @@ const REPORTS: { href: string; title: string; description: string; icon: LucideI
     description: "Consulta ao eleitorado registrado por cidade, bairro e local de votação — dado aberto do TSE, sem cruzar com cadastros.",
     icon: Vote,
     color: "secondary",
+  },
+  {
+    href: "/relatorios/ficha-individual",
+    title: "Ficha individual",
+    description: "Busque uma liderança ou apoiador e imprima ou baixe em PDF a ficha completa, com todos os dados cadastrados.",
+    icon: FileText,
+    color: "primary",
   },
 ]
 
