@@ -115,7 +115,10 @@ export default async function LiderancaDetalhePage({
         <Info label="Bairro" value={leader.neighborhood} />
         <Info label="Cidade" value={[leader.city, leader.state].filter(Boolean).join(" / ") || null} />
         <Info label="Endereço" value={leader.address} />
+        <Info label="Complemento" value={leader.complement} />
         <Info label="Local de votação" value={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null} />
+        <Info label="Zona eleitoral" value={leader.electoral_zone} />
+        <Info label="Seção eleitoral" value={leader.electoral_section} />
         <Info label="Tipo" value={leader.leader_type ? LEADER_TYPE_LABELS[leader.leader_type as LeaderType] : null} />
         <Info
           label="Nível de influência"
@@ -123,6 +126,8 @@ export default async function LiderancaDetalhePage({
         />
         <Info label="E-mail" value={leader.email} />
         <Info label="Data de nascimento" value={leader.birth_date} />
+        <Info label="CPF" value={leader.cpf} />
+        <Info label="Nome da mãe" value={leader.mother_name} />
         <Info label="Pode ver atendimentos da rede?" value={leader.can_view_attendances ? "Sim" : "Não"} />
         <Info label="Expectativa de votos" value={leader.expected_votes != null ? String(leader.expected_votes) : null} />
         {/* Campo admin-only: nunca mostrar pra role lideranca, nem no próprio
