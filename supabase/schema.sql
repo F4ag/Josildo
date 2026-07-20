@@ -95,7 +95,10 @@ create table leaders (
   phone text,
   email text,
   birth_date date,
+  cpf text, -- opcional, texto livre, sem validação de dígito verificador
+  mother_name text,
   address text,
+  complement text, -- casa, apartamento, bloco, etc.
   neighborhood text,
   neighborhood_id uuid references neighborhoods(id),
   city text,
@@ -129,6 +132,13 @@ create table leaders (
   -- deve apagar o cadastro da liderança por causa disso. Alimenta o
   -- relatório de expectativa x eleitorado por local.
   polling_location_id uuid,
+  -- Zona/seção eleitoral informadas manualmente — dado complementar ao
+  -- polling_location_id (que vem do autocomplete sobre o dado do TSE já
+  -- importado). Mantidas como texto livre porque nem toda liderança sabe/tem
+  -- o local de votação exato cadastrado no autocomplete, mas pode saber zona
+  -- e seção de cabeça ou pelo título de eleitor.
+  electoral_zone text,
+  electoral_section text,
   notes text,
   created_by uuid references users_profiles(id),
   created_at timestamptz not null default now(),
@@ -160,7 +170,10 @@ create table supporters (
   phone text not null,
   email text,
   birth_date date not null,
+  cpf text, -- opcional, texto livre, sem validação de dígito verificador
+  mother_name text,
   address text not null,
+  complement text, -- casa, apartamento, bloco, etc.
   neighborhood text,
   neighborhood_id uuid references neighborhoods(id),
   city text,
@@ -184,6 +197,9 @@ create table supporters (
   -- (FK adicionada mais abaixo via alter table, depois de polling_locations
   -- existir).
   polling_location_id uuid,
+  -- Zona/seção eleitoral informadas manualmente — ver mesma nota em leaders acima.
+  electoral_zone text,
+  electoral_section text,
   notes text,
   created_by uuid references users_profiles(id),
   created_at timestamptz not null default now(),
