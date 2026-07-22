@@ -138,7 +138,7 @@ function NotFoundState({ tipo }: { tipo: Tipo }) {
 
 function FichaView({ ficha, pdfHref }: { ficha: FichaData; pdfHref: string }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-1">
       <PrintLogo />
       <div className="no-print flex items-center justify-between">
         <Link href="/relatorios/ficha-individual" className="inline-flex items-center gap-1.5 text-sm text-foreground/60 hover:underline">
@@ -156,22 +156,30 @@ function FichaView({ ficha, pdfHref }: { ficha: FichaData; pdfHref: string }) {
         </div>
       </div>
 
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">
+      <div className="print:mb-1">
+        <h1 className="text-xl font-semibold text-foreground print:text-sm">
           Ficha individual — {ficha.kind === "lideranca" ? "Liderança" : "Apoiador"}
         </h1>
-        <p className="text-sm text-foreground/60">{ficha.name}</p>
+        <p className="text-sm text-foreground/60 print:text-xs">{ficha.name}</p>
       </div>
 
-      <div className="space-y-4">
+      {/* Na tela cada seção é um card espaçado (bom pra leitura); no papel
+       * essa mesma folga (padding/gap/space-y) é o que estourava pra 2
+       * páginas — por isso as classes print: aqui comprimem tudo bem mais
+       * (fontes, espaçamentos, 1 coluna a mais no grid) sem mudar o layout
+       * em tela. */}
+      <div className="space-y-4 print:space-y-0">
         {ficha.sections.map((section) => (
-          <div key={section.title} className="rounded-lg border border-black/5 bg-white p-5">
-            <p className="mb-3 text-sm font-semibold text-foreground">{section.title}</p>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <div
+            key={section.title}
+            className="rounded-lg border border-black/5 bg-white p-5 print:break-inside-avoid print:rounded-none print:border-0 print:border-b print:border-black/10 print:p-1"
+          >
+            <p className="mb-3 text-sm font-semibold text-foreground print:mb-0.5 print:text-[9px]">{section.title}</p>
+            <div className="grid gap-4 sm:grid-cols-2 print:grid-cols-3 print:gap-x-3 print:gap-y-0.5">
               {section.fields.map((field) => (
-                <div key={field.label} className={field.label === "Observações" ? "sm:col-span-2" : undefined}>
-                  <p className="text-xs uppercase text-foreground/50">{field.label}</p>
-                  <p className="text-sm text-foreground">{field.value}</p>
+                <div key={field.label} className={field.label === "Observações" ? "sm:col-span-2 print:col-span-3" : undefined}>
+                  <p className="text-xs uppercase text-foreground/50 print:text-[6px] print:leading-tight">{field.label}</p>
+                  <p className="text-sm text-foreground print:text-[8px] print:leading-tight">{field.value}</p>
                 </div>
               ))}
             </div>
