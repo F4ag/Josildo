@@ -22,7 +22,7 @@ export function AppShell({ role, fullName, unreadNotifications, notifications, i
       <Sidebar role={role} isPlatformAdmin={isPlatformAdmin} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar fullName={fullName} role={role} unreadNotifications={unreadNotifications} notifications={notifications} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 print:p-0">{children}</main>
       </div>
     </div>
   )
