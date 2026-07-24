@@ -537,6 +537,7 @@ export type RegistrationsByZoneSectionRow = {
 }
 
 type PersonZoneSectionRow = {
+  city: string | null
   polling_location_id: string | null
   electoral_zone: string | null
   electoral_section: string | null
@@ -547,8 +548,15 @@ type PersonZoneSectionRow = {
  * Agrupa lideranças e apoiadores pela combinação de Local de votação + Zona
  * eleitoral + Seção eleitoral. O filtro de cidade usa a cidade cadastrada da
  * própria pessoa (leaders.city / supporters.city), mesma convenção dos
- * outros relatórios. Retorna também quantos cadastros de cada tipo não têm
- * nenhuma das 3 informações preenchidas.
+ * outros relatórios. A coluna "Cidade" exibida também é essa — a cidade de
+ * quem está cadastrado, não o município do local de votação
+ * (polling_locations.municipio_nome) — pra não confundir ao filtrar: filtrar
+ * por "Paulista" só devia trazer gente cadastrada em Paulista, mesmo que o
+ * local de votação vinculado fique oficialmente em outro município (comum em
+ * cidades vizinhas). Se um mesmo grupo tiver pessoas de mais de uma cidade
+ * cadastrada, todas aparecem juntas, separadas por "/". Retorna também
+ * quantos cadastros de cada tipo não têm nenhuma das 3 informações
+ * preenchidas.
  */
 export async function getRegistrationsByZoneSection(
   supabase: DB,
@@ -560,10 +568,10 @@ export async function getRegistrationsByZoneSection(
 }> {
   let leadersQuery = supabase
     .from("leaders")
-    .select("polling_location_id, electoral_zone, electoral_section, polling_locations(nome, municipio_nome)")
+    .select("city, polling_location_id, electoral_zone, electoral_section, polling_locations(nome, municipio_nome)")
   let supportersQuery = supabase
     .from("supporters")
-    .select("polling_location_id, electoral_zone, electoral_section, polling_locations(nome, municipio_nome)")
+    .select("city, polling_location_id, electoral_zone, electoral_section, polling_locations(nome, municipio_nome)")
   if (filters?.city) {
     leadersQuery = leadersQuery.eq("city", filters.city)
     supportersQuery = supportersQuery.eq("city", filters.city)
@@ -582,6 +590,7 @@ export async function getRegistrationsByZoneSection(
   const supporters = supporterRows as unknown as PersonZoneSectionRow[]
 
   const groups = new Map<string, RegistrationsByZoneSectionRow>()
+  const cityTracker = new Map<string, Set<string>>()
   let leadersWithoutInfo = 0
   let supportersWithoutInfo = 0
 
@@ -592,7 +601,7 @@ export async function getRegistrationsByZoneSection(
     const current = groups.get(key) ?? {
       id: key,
       pollingLocationLabel: locationLabel,
-      city: row.polling_locations?.municipio_nome ?? null,
+      city: null,
       zone: row.electoral_zone,
       section: row.electoral_section,
       leaderCount: 0,
@@ -600,6 +609,11 @@ export async function getRegistrationsByZoneSection(
       totalCount: 0,
     }
     groups.set(key, current)
+    if (row.city) {
+      const cities = cityTracker.get(key) ?? new Set<string>()
+      cities.add(row.city)
+      cityTracker.set(key, cities)
+    }
     return current
   }
 
@@ -620,6 +634,11 @@ export async function getRegistrationsByZoneSection(
     }
     group.supporterCount += 1
     group.totalCount += 1
+  }
+
+  for (const group of groups.values()) {
+    const cities = cityTracker.get(group.id)
+    group.city = cities && cities.size > 0 ? Array.from(cities).sort((a, b) => a.localeCompare(b)).join(" / ") : null
   }
 
   const rows = Array.from(groups.values()).sort((a, b) => b.totalCount - a.totalCount)
