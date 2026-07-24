@@ -509,6 +509,143 @@ export async function getRegistrationsByPollingLocation(
 }
 
 // ----------------------------------------------------------------------------
+// Cadastros (lideranças + apoiadores) por Local de votação + Zona + Seção
+// eleitoral — pedido explícito da Agência F4. Diferente do relatório acima
+// (que agrupa só pelo polling_location_id, dado oficial vinculado via
+// autocomplete), este agrupa pelas 3 informações juntas, exatamente como
+// aparecem juntas na Ficha individual (ver lib/ficha-individual.ts): Local
+// de votação (FK, oficial) + Zona eleitoral + Seção eleitoral (estes dois
+// são campos de texto livre, digitados manualmente, e não precisam bater
+// com a zona/seção oficial do local vinculado). Cada linha é uma combinação
+// distinta das 3; quem não tem NENHUMA das 3 preenchidas fica de fora e
+// entra na contagem de "sem informação".
+// ----------------------------------------------------------------------------
+export type RegistrationsByZoneSectionRow = {
+  /** Chave sintética (combinação local+zona+seção) — só usada como key de lista. */
+  id: string
+  /** Nome do local de votação (polling_locations.nome), ou null se não vinculado. */
+  pollingLocationLabel: string | null
+  /** Município do local vinculado, se houver. */
+  city: string | null
+  /** Zona eleitoral (campo de texto livre), ou null. */
+  zone: string | null
+  /** Seção eleitoral (campo de texto livre), ou null. */
+  section: string | null
+  leaderCount: number
+  supporterCount: number
+  totalCount: number
+}
+
+type PersonZoneSectionRow = {
+  city: string | null
+  polling_location_id: string | null
+  electoral_zone: string | null
+  electoral_section: string | null
+  polling_locations: { nome: string; municipio_nome: string } | null
+}
+
+/**
+ * Agrupa lideranças e apoiadores pela combinação de Local de votação + Zona
+ * eleitoral + Seção eleitoral. O filtro de cidade usa a cidade cadastrada da
+ * própria pessoa (leaders.city / supporters.city), mesma convenção dos
+ * outros relatórios. A coluna "Cidade" exibida também é essa — a cidade de
+ * quem está cadastrado, não o município do local de votação
+ * (polling_locations.municipio_nome) — pra não confundir ao filtrar: filtrar
+ * por "Paulista" só devia trazer gente cadastrada em Paulista, mesmo que o
+ * local de votação vinculado fique oficialmente em outro município (comum em
+ * cidades vizinhas). Se um mesmo grupo tiver pessoas de mais de uma cidade
+ * cadastrada, todas aparecem juntas, separadas por "/". Retorna também
+ * quantos cadastros de cada tipo não têm nenhuma das 3 informações
+ * preenchidas.
+ */
+export async function getRegistrationsByZoneSection(
+  supabase: DB,
+  filters?: { city?: string },
+): Promise<{
+  rows: RegistrationsByZoneSectionRow[]
+  leadersWithoutInfo: number
+  supportersWithoutInfo: number
+}> {
+  let leadersQuery = supabase
+    .from("leaders")
+    .select("city, polling_location_id, electoral_zone, electoral_section, polling_locations(nome, municipio_nome)")
+  let supportersQuery = supabase
+    .from("supporters")
+    .select("city, polling_location_id, electoral_zone, electoral_section, polling_locations(nome, municipio_nome)")
+  if (filters?.city) {
+    leadersQuery = leadersQuery.eq("city", filters.city)
+    supportersQuery = supportersQuery.eq("city", filters.city)
+  }
+
+  const [{ data: leaderRows, error: leadersError }, { data: supporterRows, error: supportersError }] = await Promise.all([
+    leadersQuery,
+    supportersQuery,
+  ])
+  if (leadersError) throw new Error(`Falha ao gerar relatório por local/zona/seção: ${leadersError.message}`)
+  if (supportersError) throw new Error(`Falha ao gerar relatório por local/zona/seção: ${supportersError.message}`)
+
+  // Ver nota equivalente em services/supporters.ts sobre o cast de relações
+  // embutidas por causa do schema "any" do client.
+  const leaders = leaderRows as unknown as PersonZoneSectionRow[]
+  const supporters = supporterRows as unknown as PersonZoneSectionRow[]
+
+  const groups = new Map<string, RegistrationsByZoneSectionRow>()
+  const cityTracker = new Map<string, Set<string>>()
+  let leadersWithoutInfo = 0
+  let supportersWithoutInfo = 0
+
+  function getOrCreate(row: PersonZoneSectionRow): RegistrationsByZoneSectionRow | null {
+    const locationLabel = row.polling_locations?.nome ?? null
+    if (!locationLabel && !row.electoral_zone && !row.electoral_section) return null
+    const key = `${locationLabel ?? "—"}::${row.electoral_zone ?? "—"}::${row.electoral_section ?? "—"}`
+    const current = groups.get(key) ?? {
+      id: key,
+      pollingLocationLabel: locationLabel,
+      city: null,
+      zone: row.electoral_zone,
+      section: row.electoral_section,
+      leaderCount: 0,
+      supporterCount: 0,
+      totalCount: 0,
+    }
+    groups.set(key, current)
+    if (row.city) {
+      const cities = cityTracker.get(key) ?? new Set<string>()
+      cities.add(row.city)
+      cityTracker.set(key, cities)
+    }
+    return current
+  }
+
+  for (const row of leaders) {
+    const group = getOrCreate(row)
+    if (!group) {
+      leadersWithoutInfo += 1
+      continue
+    }
+    group.leaderCount += 1
+    group.totalCount += 1
+  }
+  for (const row of supporters) {
+    const group = getOrCreate(row)
+    if (!group) {
+      supportersWithoutInfo += 1
+      continue
+    }
+    group.supporterCount += 1
+    group.totalCount += 1
+  }
+
+  for (const group of groups.values()) {
+    const cities = cityTracker.get(group.id)
+    group.city = cities && cities.size > 0 ? Array.from(cities).sort((a, b) => a.localeCompare(b)).join(" / ") : null
+  }
+
+  const rows = Array.from(groups.values()).sort((a, b) => b.totalCount - a.totalCount)
+  return { rows, leadersWithoutInfo, supportersWithoutInfo }
+}
+
+// ----------------------------------------------------------------------------
 // Helpers de agregação em memória
 // ----------------------------------------------------------------------------
 function countBy<T extends Record<string, unknown>>(rows: T[], key: keyof T): Map<string, number> {

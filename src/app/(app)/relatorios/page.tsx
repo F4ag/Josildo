@@ -1,6 +1,6 @@
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Users, MapPin, HeartHandshake, Layers, BarChart3, Landmark, Vote, type LucideIcon } from "lucide-react"
+import { Users, MapPin, HeartHandshake, Layers, BarChart3, Landmark, Vote, FileText, Tag, MapPinned, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
 import { getSessionUser } from "@/lib/auth"
 import type { UserRole } from "@/types/domain"
@@ -65,6 +65,27 @@ const REPORTS: { href: string; title: string; description: string; icon: LucideI
     description: "Consulta ao eleitorado registrado por cidade, bairro e local de votação — dado aberto do TSE, sem cruzar com cadastros.",
     icon: Vote,
     color: "secondary",
+  },
+  {
+    href: "/relatorios/local-zona-secao",
+    title: "Cadastros por local, zona e seção",
+    description: "Quantas lideranças e apoiadores estão em cada combinação de Local de votação, Zona eleitoral e Seção eleitoral.",
+    icon: MapPinned,
+    color: "primary",
+  },
+  {
+    href: "/relatorios/ficha-individual",
+    title: "Ficha individual",
+    description: "Busque uma liderança ou apoiador e imprima ou baixe em PDF a ficha completa, com todos os dados cadastrados.",
+    icon: FileText,
+    color: "primary",
+  },
+  {
+    href: "/relatorios/etiquetas",
+    title: "Etiquetas de correspondência",
+    description: "Etiqueta 15x5cm com nome e endereço completo, para lideranças ou apoiadores — todos, ou filtrados por cidade e bairro.",
+    icon: Tag,
+    color: "accent",
   },
 ]
 

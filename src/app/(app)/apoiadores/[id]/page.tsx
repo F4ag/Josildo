@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
+import { Download } from "lucide-react"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getSupporterById } from "@/services/supporters"
@@ -38,6 +39,10 @@ export default async function ApoiadorDetalhePage({
   // e pode apagar o de apoiador) pra reservar só ao Admin Geral, mesmo
   // quando admin_equipe já pode editar/cadastrar apoiadores normalmente.
   const canPromote = role === "admin_geral"
+  // Mesma restrição da rota /relatorios (ADMIN_ONLY_ROUTE_PREFIXES em
+  // lib/permissions.ts) — sem isso o botão apareceria pra liderança, que
+  // não tem acesso a /relatorios/ficha-individual/pdf (403).
+  const canGenerateReports = can(role, "generate_reports")
   const isPessoaAtendida = (demandCount ?? 0) > 0 || (attendanceCount ?? 0) > 0
 
   return (
@@ -49,6 +54,13 @@ export default async function ApoiadorDetalhePage({
             <Link href={`/apoiadores/${id}/editar`}
               className="rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
               Editar
+            </Link>
+          )}
+          {canGenerateReports && (
+            <Link href={`/relatorios/ficha-individual/pdf?tipo=apoiador&id=${id}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-black/10 px-3 py-1.5 text-sm font-medium hover:bg-black/5">
+              <Download className="h-4 w-4" aria-hidden />
+              Baixar ficha em PDF
             </Link>
           )}
           {canPromote && (
