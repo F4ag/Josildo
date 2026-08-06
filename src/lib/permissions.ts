@@ -92,7 +92,7 @@ const GLOBAL_PERMISSIONS: Record<UserRole, Partial<Record<PermissionAction, bool
     system_settings: false, export_data: true,
   },
   lideranca: {
-    generate_reports: false, send_messages: false, manage_users: false,
+    generate_reports: true, send_messages: false, manage_users: false,
     system_settings: false, export_data: false,
   },
 }
@@ -109,7 +109,7 @@ export function can(
 }
 
 /** Rotas que só admin_geral e admin_equipe podem abrir. */
-export const ADMIN_ONLY_ROUTE_PREFIXES = ["/configuracoes", "/relatorios", "/mensagens"] as const
+export const ADMIN_ONLY_ROUTE_PREFIXES = ["/configuracoes", "/mensagens"] as const
 
 /** Rotas fora do alcance de admin_equipe (só admin_geral). */
 export const ADMIN_GERAL_ONLY_ROUTE_PREFIXES = [
