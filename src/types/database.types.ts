@@ -464,6 +464,48 @@ export type Database = {
           },
         ]
       }
+      election_results_sections: {
+        Row: {
+          id: string
+          organization_id: string
+          section_id: string
+          turno: number
+          votos: number
+          imported_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          section_id: string
+          turno: number
+          votos?: number
+          imported_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          section_id?: string
+          turno?: number
+          votos?: number
+          imported_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "election_results_sections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "election_results_sections_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "electoral_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       electoral_sections: {
         Row: {
           created_at: string
@@ -909,6 +951,9 @@ export type Database = {
       organizations: {
         Row: {
           created_at: string
+          election_candidate_number: string | null
+          election_cargo: string | null
+          election_year: number | null
           id: string
           name: string
           plan: string
@@ -918,6 +963,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          election_candidate_number?: string | null
+          election_cargo?: string | null
+          election_year?: number | null
           id?: string
           name: string
           plan?: string
@@ -927,6 +975,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          election_candidate_number?: string | null
+          election_cargo?: string | null
+          election_year?: number | null
           id?: string
           name?: string
           plan?: string
