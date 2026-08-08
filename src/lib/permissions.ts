@@ -1,4 +1,4 @@
-TESTE_PASTE_123// ============================================================================
+// ============================================================================
 // Matriz de permissões do Lidera+ (Módulo 1 do prompt master).
 //
 // ATENÇÃO: isto é uma camada de UX (esconder botão, desabilitar campo,
