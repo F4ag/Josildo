@@ -646,6 +646,127 @@ export async function getRegistrationsByZoneSection(
 }
 
 // ----------------------------------------------------------------------------
+// Comparativo de votos — expectativa (expected_votes, informado pela própria
+// liderança) x resultado REAL, importado do TSE após a apuração (ver Edge
+// Function import-election-results). Diferente do relatório "Expectativa de
+// votos" (/relatorios/votos), este não usa admin_estimated_votes (campo
+// admin-only, ver nota em leaders_parent_hierarchy/RLS) — por isso não é
+// adminOnly, admin_equipe e liderança também acessam. Só existe dado real
+// depois que a organização configura o candidato (/configuracoes/eleicao) e
+// a eleição acontece; até lá, realVotes vem sempre 0/null.
+// ----------------------------------------------------------------------------
+export type VoteComparisonSummary = {
+  totalExpectedVotes: number
+  totalRealVotes: number
+  hasResults: boolean
+  lastImportedAt: string | null
+}
+
+export type VoteComparisonByPollingLocationRow = {
+  id: string
+  label: string
+  city: string | null
+  expectedVotes: number
+  realVotes: number
+  diffPct: number | null // (real - esperado) / esperado, em % — null se esperado for 0
+}
+
+type SectionLocationRow = { id: string; location_id: string | null }
+type ElectionResultRow = { section_id: string; votos: number; turno: number; imported_at: string }
+
+/** Carrega os dois lados da comparação já cruzados por local de votação —
+ * usado tanto pelo resumo quanto pela tabela agrupada, pra não duplicar as
+ * 3 queries (leaders, electoral_sections, election_results_sections). */
+async function loadVoteComparisonRows(
+  supabase: DB,
+  filters?: { city?: string; neighborhood?: string; turno?: number },
+) {
+  const turno = filters?.turno ?? 1
+
+  let leadersQuery = supabase
+    .from("leaders")
+    .select("polling_location_id, expected_votes, polling_locations(nome, municipio_nome)")
+  if (filters?.city) leadersQuery = leadersQuery.eq("city", filters.city)
+  if (filters?.neighborhood) leadersQuery = leadersQuery.eq("neighborhood", filters.neighborhood)
+
+  const [{ data: leadersData, error: leadersError }, { data: sectionsData, error: sectionsError }, { data: resultsData, error: resultsError }] =
+    await Promise.all([
+      leadersQuery,
+      supabase.from("electoral_sections").select("id, location_id"),
+      supabase.from("election_results_sections").select("section_id, votos, turno, imported_at").eq("turno", turno),
+    ])
+  if (leadersError) throw new Error(`Falha ao gerar comparativo de votos: ${leadersError.message}`)
+  if (sectionsError) throw new Error(`Falha ao gerar comparativo de votos: ${sectionsError.message}`)
+  if (resultsError) throw new Error(`Falha ao gerar comparativo de votos: ${resultsError.message}`)
+
+  const leaders = leadersData as unknown as LeaderPollingLocationRow[]
+  const sections = (sectionsData ?? []) as SectionLocationRow[]
+  const results = (resultsData ?? []) as ElectionResultRow[]
+
+  // section_id -> location_id, pra somar os votos reais (por seção) no nível
+  // de local de votação, mesmo agrupamento usado pra expectativa.
+  const sectionToLocation = new Map<string, string>()
+  for (const s of sections) {
+    if (s.location_id) sectionToLocation.set(s.id, s.location_id)
+  }
+
+  const realVotesByLocation = new Map<string, number>()
+  let lastImportedAt: string | null = null
+  for (const r of results) {
+    const locationId = sectionToLocation.get(r.section_id)
+    if (!locationId) continue
+    realVotesByLocation.set(locationId, (realVotesByLocation.get(locationId) ?? 0) + r.votos)
+    if (!lastImportedAt || r.imported_at > lastImportedAt) lastImportedAt = r.imported_at
+  }
+
+  return { leaders, realVotesByLocation, lastImportedAt, hasResults: results.length > 0 }
+}
+
+export async function getVoteComparisonSummary(
+  supabase: DB,
+  filters?: { turno?: number },
+): Promise<VoteComparisonSummary> {
+  const { leaders, realVotesByLocation, lastImportedAt, hasResults } = await loadVoteComparisonRows(supabase, filters)
+
+  let totalExpectedVotes = 0
+  for (const leader of leaders) totalExpectedVotes += leader.expected_votes ?? 0
+
+  let totalRealVotes = 0
+  for (const votos of realVotesByLocation.values()) totalRealVotes += votos
+
+  return { totalExpectedVotes, totalRealVotes, hasResults, lastImportedAt }
+}
+
+export async function getVoteComparisonByPollingLocation(
+  supabase: DB,
+  filters?: { city?: string; neighborhood?: string; turno?: number },
+): Promise<VoteComparisonByPollingLocationRow[]> {
+  const { leaders, realVotesByLocation } = await loadVoteComparisonRows(supabase, filters)
+
+  const groups = new Map<string, VoteComparisonByPollingLocationRow>()
+  for (const row of leaders) {
+    if (!row.polling_location_id || !row.polling_locations) continue
+    const current = groups.get(row.polling_location_id) ?? {
+      id: row.polling_location_id,
+      label: row.polling_locations.nome,
+      city: row.polling_locations.municipio_nome,
+      expectedVotes: 0,
+      realVotes: realVotesByLocation.get(row.polling_location_id) ?? 0,
+      diffPct: null,
+    }
+    current.expectedVotes += row.expected_votes ?? 0
+    groups.set(row.polling_location_id, current)
+  }
+
+  return Array.from(groups.values())
+    .map((row) => ({
+      ...row,
+      diffPct: row.expectedVotes > 0 ? Math.round(((row.realVotes - row.expectedVotes) / row.expectedVotes) * 1000) / 10 : null,
+    }))
+    .sort((a, b) => b.expectedVotes - a.expectedVotes)
+}
+
+// ----------------------------------------------------------------------------
 // Helpers de agregação em memória
 // ----------------------------------------------------------------------------
 function countBy<T extends Record<string, unknown>>(rows: T[], key: keyof T): Map<string, number> {
