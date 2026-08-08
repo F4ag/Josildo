@@ -34,3 +34,35 @@ select cron.schedule(
 -- Verificação:
 -- select jobid, jobname, schedule, active from cron.job where jobname = 'daily-alerts';
 -- select * from cron.job_run_details where jobid = (select jobid from cron.job where jobname = 'daily-alerts') order by start_time desc limit 5;
+
+-- ----------------------------------------------------------------------------
+-- election-results-sync — Edge Function import-election-results, a cada 2
+-- horas. A função sai rápido (sem custo real) se nenhuma organização tiver
+-- candidato configurado, ou se o arquivo do TSE ainda não tiver sido
+-- publicado (fetch retorna 404 até a apuração começar) — por isso o job
+-- fica sempre ativo, em vez de precisar ser ligado manualmente perto da
+-- eleição. No dia da eleição, dá pra chamar a function manualmente (mesma
+-- URL, headers de Authorization) pra não esperar o intervalo de 2h.
+--
+--   select cron.unschedule('election-results-sync');
+--   select cron.schedule('election-results-sync', '0 */2 * * *', $$ ... $$);
+-- ----------------------------------------------------------------------------
+
+select cron.schedule(
+  'election-results-sync',
+  '0 */2 * * *',
+  $$
+  select net.http_post(
+    url := 'https://vqrnjiwansfobxaeswnu.supabase.co/functions/v1/import-election-results',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxcm5qaXdhbnNmb2J4YWVzd251Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MjM1NjYsImV4cCI6MjA5OTA5OTU2Nn0.hRHQmgW-lIh1mL_BX0NCmF_fAGnpfqBVlHWpJiIABjg',
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+
+-- Verificação:
+-- select jobid, jobname, schedule, active from cron.job where jobname = 'election-results-sync';
+-- select * from cron.job_run_details where jobid = (select jobid from cron.job where jobname = 'election-results-sync') order by start_time desc limit 5;
