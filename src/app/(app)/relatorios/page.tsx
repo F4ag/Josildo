@@ -1,6 +1,6 @@
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Users, MapPin, HeartHandshake, Layers, BarChart3, Landmark, Vote, FileText, Tag, MapPinned, type LucideIcon } from "lucide-react"
+import { Users, MapPin, HeartHandshake, Layers, BarChart3, Landmark, Vote, FileText, Tag, MapPinned, TrendingUp, type LucideIcon } from "lucide-react"
 import { clsx } from "clsx"
 import { getSessionUser } from "@/lib/auth"
 import type { UserRole } from "@/types/domain"
@@ -51,6 +51,13 @@ const REPORTS: { href: string; title: string; description: string; icon: LucideI
     icon: BarChart3,
     color: "primary",
     adminOnly: true,
+  },
+  {
+    href: "/relatorios/comparativo-votos",
+    title: "Comparativo de votos",
+    description: "Expectativa informada pelas lideranças x resultado real da votação por seção, importado automaticamente do TSE após a apuração.",
+    icon: TrendingUp,
+    color: "secondary",
   },
   {
     href: "/relatorios/cadastros-local-votacao",
