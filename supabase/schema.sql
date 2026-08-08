@@ -522,6 +522,48 @@ create table electoral_sections (
 );
 create index idx_electoral_sections_location on electoral_sections(location_id);
 
+-- ----------------------------------------------------------------------------
+-- Comparativo de votos (resultado real x expectativa) — organizations ganha
+-- os dados do candidato de cada cliente (cargo e número, conforme o TSE) e
+-- o ano da eleição. Usado pela Edge Function import-election-results (ver
+-- supabase/functions/import-election-results) pra saber QUAL candidato
+-- filtrar no arquivo de resultado por seção do TSE. Cada organização tem um
+-- único candidato. Configurado pelo Admin Geral em /configuracoes/eleicao.
+--
+-- Sem coluna de "turno" aqui de propósito: o arquivo de resultado do TSE já
+-- traz NR_TURNO por linha, então a function grava o turno que vier nos
+-- dados, em vez de depender de pré-configuração a atualizar entre turnos.
+-- ----------------------------------------------------------------------------
+alter table organizations
+  add column election_year integer,
+  add column election_cargo text check (election_cargo in (
+    'prefeito', 'vice_prefeito', 'vereador',
+    'governador', 'vice_governador', 'senador',
+    'deputado_federal', 'deputado_estadual'
+  )),
+  add column election_candidate_number text;
+
+comment on column organizations.election_candidate_number is
+  'Número do candidato conforme registrado no TSE (mesmo formato do arquivo "Votação por seção eleitoral", ex: "12345").';
+
+-- election_results_sections — resultado REAL de votação por seção, para o
+-- candidato de cada organização. Multi-tenant (diferente de
+-- electoral_zones/polling_locations/electoral_sections logo acima, que são
+-- referência geográfica pública única, sem organization_id). Populada pela
+-- Edge Function import-election-results, agendada via pg_cron (ver
+-- scheduled_jobs.sql).
+create table election_results_sections (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  section_id uuid not null references electoral_sections(id) on delete cascade,
+  turno integer not null check (turno in (1, 2)),
+  votos integer not null default 0,
+  imported_at timestamptz not null default now(),
+  unique (organization_id, section_id, turno)
+);
+create index idx_election_results_sections_org on election_results_sections(organization_id);
+create index idx_election_results_sections_section on election_results_sections(section_id);
+
 -- ============================================================================
 -- Seeds mínimos (modelos de mensagem citados no prompt master, Módulos 9 e 12)
 -- ============================================================================
