@@ -1,4 +1,4 @@
-// ============================================================================
+TESTE_PASTE_123// ============================================================================
 // Matriz de permissões do Lidera+ (Módulo 1 do prompt master).
 //
 // ATENÇÃO: isto é uma camada de UX (esconder botão, desabilitar campo,
@@ -115,6 +115,7 @@ export const ADMIN_ONLY_ROUTE_PREFIXES = ["/configuracoes", "/mensagens"] as con
 export const ADMIN_GERAL_ONLY_ROUTE_PREFIXES = [
   "/configuracoes/usuarios",
   "/configuracoes/permissoes",
+  "/configuracoes/eleicao",
 ] as const
 
 export function canAccessRoute(role: UserRole, pathname: string): boolean {
