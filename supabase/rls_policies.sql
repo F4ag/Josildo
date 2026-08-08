@@ -514,6 +514,20 @@ create policy es_select_authenticated on electoral_sections
   for select using ((select auth.role()) = 'authenticated');
 
 -- ============================================================================
+-- election_results_sections — multi-tenant (diferente das três tabelas
+-- eleitorais públicas acima). Leitura pros três perfis da própria
+-- organização — mesmo alcance do relatório em /relatorios (não entra em
+-- ADMIN_ONLY_ROUTE_PREFIXES nem ADMIN_GERAL_ONLY_ROUTE_PREFIXES, ver
+-- permissions.ts). Escrita só via service_role (Edge Function
+-- import-election-results), por isso não há policy de insert/update/delete
+-- pra authenticated.
+-- ============================================================================
+alter table election_results_sections enable row level security;
+
+create policy ers_select_own_org on election_results_sections
+  for select using (organization_id = private.current_user_org_id());
+
+-- ============================================================================
 -- Grants do schema "private"
 -- Sem isso, authenticated/anon recebem "permission denied for schema
 -- private" ao rodar QUALQUER query numa tabela cuja policy chame uma
