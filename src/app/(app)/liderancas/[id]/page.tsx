@@ -23,10 +23,10 @@ export default async function LiderancaDetalhePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ convite?: string; promovido?: string; apoiador_mantido?: string }>
+  searchParams: Promise<{ convite?: string; link?: string; promovido?: string; apoiador_mantido?: string }>
 }) {
   const { id } = await params
-  const { convite, promovido, apoiador_mantido: apoiadorMantido } = await searchParams
+  const { convite, link: inviteLink, promovido, apoiador_mantido: apoiadorMantido } = await searchParams
   const supabase = await createClient()
   const [leader, session] = await Promise.all([getLeaderById(supabase, id), getSessionUser()])
 
@@ -66,6 +66,19 @@ export default async function LiderancaDetalhePage({
         <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4 text-sm text-secondary">
           Convite de acesso enviado{leader.email ? ` para ${leader.email}` : ""}. Assim que {leader.name} definir a
           senha, já vai poder entrar no sistema e cadastrar apoiadores na própria rede.
+        </div>
+      )}
+      {convite === "whatsapp" && inviteLink && (
+        <div className="flex flex-col gap-3 rounded-lg border border-secondary/30 bg-secondary/10 p-4 text-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Acesso criado para {leader.name}. Falta só enviar o link de definir senha pelo WhatsApp — o convite não
+            sai sozinho por esse canal, é só clicar no botão ao lado.
+          </span>
+          <WhatsAppButton
+            phone={leader.phone}
+            label="Enviar convite por WhatsApp"
+            message={`Olá, ${leader.name}! Você foi convidado(a) para acessar o Lidera+. Clique no link para definir sua senha: ${inviteLink}`}
+          />
         </div>
       )}
       {promovido === "1" && (
