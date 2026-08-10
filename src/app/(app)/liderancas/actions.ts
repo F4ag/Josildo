@@ -48,25 +48,23 @@ function parseLeaderForm(formData: FormData) {
   })
 }
 
-/** "" -> null, "150" -> 150. Mesma regra do parseCoord acima. */
 function parseVotes(value: string | undefined): number | null {
-  return value ? Number(value) : null
+  if (!value) return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
 }
 
-/** Só tenta geocodificar quando ninguém preencheu lat/lng à mão — o
- * cadastro manual sempre vence a busca automática. */
-async function resolveCoords(data: {
-  latitude?: string; longitude?: string
-  address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string
-}): Promise<{ latitude: number | null; longitude: number | null }> {
-  const manualLat = parseCoord(data.latitude)
-  const manualLng = parseCoord(data.longitude)
-  if (manualLat !== null && manualLng !== null) {
-    return { latitude: manualLat, longitude: manualLng }
-  }
+async function resolveCoords(data: { latitude: string; longitude: string; address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string }) {
+  const latitude = parseCoord(data.latitude)
+  const longitude = parseCoord(data.longitude)
+  if (latitude != null && longitude != null) return { latitude, longitude }
+  if (!data.address && !data.zip_code) return { latitude: null, longitude: null }
 
   const found = await geocodeAddress({
-    address: data.address, neighborhood: data.neighborhood, city: data.city, state: data.state,
+    address: data.address,
+    neighborhood: data.neighborhood,
+    city: data.city,
+    state: data.state,
     zipCode: data.zip_code,
   })
   return { latitude: found?.latitude ?? null, longitude: found?.longitude ?? null }
@@ -94,8 +92,12 @@ export async function createLeaderAction(
   // checkbox pra qualquer outro perfil (showInviteLoginOption em
   // liderancas/novo/page.tsx); isto aqui é a segunda barreira.
   const wantsLogin = role === "admin_geral" && formData.get("create_login") === "on"
+  const inviteChannel = formData.get("invite_channel") === "whatsapp" ? "whatsapp" : "email"
   if (wantsLogin && !parsed.data.email) {
     return { error: "Informe o e-mail da liderança para criar o acesso de login." }
+  }
+  if (wantsLogin && inviteChannel === "whatsapp" && !parsed.data.phone) {
+    return { error: "Informe o WhatsApp da liderança para enviar o convite por esse canal." }
   }
 
   const coords = await resolveCoords(parsed.data)
@@ -104,16 +106,39 @@ export async function createLeaderAction(
   // conta ou o convite falhar por qualquer motivo, a liderança nunca chega a
   // ser criada "pela metade" (cadastrada, mas sem explicação de por que o
   // login não saiu). Ver o mesmo cuidado em configuracoes/usuarios/actions.ts.
+  //
+  // Canal WhatsApp: Supabase Auth não manda WhatsApp sozinho, então em vez de
+  // inviteUserByEmail (que já dispara o e-mail automaticamente) usamos
+  // generateLink — cria o mesmo usuário e devolve o MESMO link de definir
+  // senha que iria por e-mail, mas SEM enviar nada. O link volta pro cliente
+  // via query string no redirect abaixo, pra abrir o wa.me (lib/whatsapp.ts,
+  // Módulo 12, mesmo esquema sem API paga usado no resto do app) com o
+  // número já preenchido.
   let invitedUserId: string | null = null
+  let whatsappInviteLink: string | null = null
   if (wantsLogin) {
     const admin = createAdminClient()
-    const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email!, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
-    })
-    if (inviteError || !invited.user) {
-      return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
+    const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`
+    if (inviteChannel === "whatsapp") {
+      const { data: linked, error: linkError } = await admin.auth.admin.generateLink({
+        type: "invite",
+        email: parsed.data.email!,
+        options: { redirectTo },
+      })
+      if (linkError || !linked.user) {
+        return { error: `Não foi possível gerar o convite para este e-mail: ${linkError?.message ?? "erro desconhecido"}.` }
+      }
+      invitedUserId = linked.user.id
+      whatsappInviteLink = linked.properties.action_link
+    } else {
+      const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email!, {
+        redirectTo,
+      })
+      if (inviteError || !invited.user) {
+        return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
+      }
+      invitedUserId = invited.user.id
     }
-    invitedUserId = invited.user.id
   }
 
   const supabase = await createClient()
@@ -208,7 +233,13 @@ export async function createLeaderAction(
 
   revalidatePath("/liderancas")
   revalidatePath("/mapa")
-  redirect(`/liderancas/${leader.id}${invitedUserId ? "?convite=enviado" : ""}`)
+  let query = ""
+  if (invitedUserId && inviteChannel === "whatsapp" && whatsappInviteLink) {
+    query = `?convite=whatsapp&link=${encodeURIComponent(whatsappInviteLink)}`
+  } else if (invitedUserId) {
+    query = "?convite=enviado"
+  }
+  redirect(`/liderancas/${leader.id}${query}`)
 }
 
 export async function updateLeaderAction(
