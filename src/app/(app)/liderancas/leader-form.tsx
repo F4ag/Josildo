@@ -110,7 +110,8 @@ export function LeaderForm({
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
           {showInviteLoginOption && (
             <p className="mt-1 text-xs text-foreground/50">
-              Necessário se você marcar &quot;criar acesso de login&quot; abaixo — é pra esse e-mail que o convite vai.
+              Necessário se você marcar &quot;criar acesso de login&quot; abaixo — o login fica vinculado a esse e-mail
+              mesmo se o convite for enviado por WhatsApp.
             </p>
           )}
         </div>
@@ -118,14 +119,33 @@ export function LeaderForm({
         {showInviteLoginOption && (
           <div className="sm:col-span-2 flex items-start gap-2 rounded-md border border-black/10 bg-black/[0.02] p-3">
             <input id="create_login" name="create_login" type="checkbox" className="mt-0.5 h-4 w-4" />
-            <label htmlFor="create_login" className="text-sm">
-              <span className="font-medium text-foreground">Criar acesso de login agora e enviar convite por e-mail</span>
-              <br />
-              <span className="text-xs text-foreground/50">
-                Assim que ela definir a senha, já pode entrar no sistema e cadastrar apoiadores na própria rede —
-                sem precisar de um segundo passo em Configurações &gt; Usuários.
-              </span>
-            </label>
+            <div className="text-sm">
+              <label htmlFor="create_login">
+                <span className="font-medium text-foreground">Criar acesso de login agora</span>
+                <br />
+                <span className="text-xs text-foreground/50">
+                  Assim que ela definir a senha, já pode entrar no sistema e cadastrar apoiadores na própria rede —
+                  sem precisar de um segundo passo em Configurações &gt; Usuários.
+                </span>
+              </label>
+              <fieldset className="mt-3">
+                <legend className="text-xs font-medium text-foreground/70">Enviar convite por:</legend>
+                <div className="mt-1 flex gap-4">
+                  <label className="flex items-center gap-1.5 text-sm">
+                    <input type="radio" name="invite_channel" value="email" defaultChecked className="h-3.5 w-3.5" />
+                    E-mail
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm">
+                    <input type="radio" name="invite_channel" value="whatsapp" className="h-3.5 w-3.5" />
+                    WhatsApp
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-foreground/50">
+                  O login sempre é vinculado ao e-mail informado acima — o canal escolhido aqui é só por onde o
+                  link para definir a senha chega até a liderança (o número usado é o do campo WhatsApp acima).
+                </p>
+              </fieldset>
+            </div>
           </div>
         )}
 
