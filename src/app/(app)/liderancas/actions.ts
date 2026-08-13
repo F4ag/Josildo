@@ -54,7 +54,7 @@ function parseVotes(value: string | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-async function resolveCoords(data: { latitude: string; longitude: string; address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string }) {
+async function resolveCoords(data: { latitude?: string; longitude?: string; address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string }) {
   const latitude = parseCoord(data.latitude)
   const longitude = parseCoord(data.longitude)
   if (latitude != null && longitude != null) return { latitude, longitude }
