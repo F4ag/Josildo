@@ -129,6 +129,17 @@ export async function updateDemandStatus(
   })
 }
 
+/** Restrita a admin_geral (ver can(role, "delete", "demands") em
+ * permissions.ts e a policy dm_admin_geral_all em rls_policies.sql — é a
+ * única que cobre DELETE nessa tabela, então RLS já barra admin_equipe e
+ * lideranca mesmo que alguém burle a checagem da action). demand_updates
+ * tem "on delete cascade" pra demand_id (ver schema.sql), então o
+ * histórico some junto sem precisar apagar à mão. */
+export async function deleteDemand(supabase: DB, id: string) {
+  const { error } = await supabase.from("demands").delete().eq("id", id)
+  if (error) throw new Error(`Falha ao excluir demanda: ${error.message}`)
+}
+
 export async function listDistinctDemandNeighborhoods(supabase: DB) {
   const { data, error } = await supabase.from("demands").select("neighborhood").not("neighborhood", "is", null)
   if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
