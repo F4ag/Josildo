@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge"
 import { WhatsAppButton } from "@/components/whatsapp-button"
 import { DeleteButton } from "@/components/delete-button"
 import { can } from "@/lib/permissions"
-import { deleteLeaderAction } from "../actions"
+import { deleteLeaderAction, resendInviteAction } from "../actions"
+import { ResendInviteForm } from "../resend-invite-form"
 
 export const metadata: Metadata = { title: "Liderança · Lidera+" }
 
@@ -124,6 +125,19 @@ export default async function LiderancaDetalhePage({
           )}
         </div>
       </div>
+
+      {/* Só admin_geral mexe em login (mesma restrição de sempre — ver
+          resendInviteAction em actions.ts) e só faz sentido reenviar se já
+          existir um acesso criado; sem user_id a liderança nunca teve
+          convite disparado (isso é feito no cadastro, ou em Configurações >
+          Usuários pra quem já existe sem conta). */}
+      {role === "admin_geral" && leader.user_id && (
+        <ResendInviteForm
+          action={resendInviteAction.bind(null, id)}
+          currentEmail={leader.email}
+          hasPhone={Boolean(leader.phone)}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-black/5 bg-white p-4">
