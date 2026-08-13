@@ -9,8 +9,10 @@ import {
   type DemandStatus, type DemandType, type Priority, type UserRole,
 } from "@/types/domain"
 import { Badge } from "@/components/ui/badge"
+import { DeleteButton } from "@/components/delete-button"
 import { can } from "@/lib/permissions"
 import { StatusUpdateForm } from "../status-update-form"
+import { deleteDemandAction } from "../actions"
 
 export const metadata: Metadata = { title: "Demanda · Lidera+" }
 
@@ -31,6 +33,7 @@ export default async function DemandaDetalhePage({
 
   const role = session?.profile.role as UserRole
   const canUpdateStatus = can(role, "update_status", "demands")
+  const canDelete = can(role, "delete", "demands")
 
   return (
     <div className="space-y-6">
@@ -46,6 +49,12 @@ export default async function DemandaDetalhePage({
             {DEMAND_STATUS_LABELS[demand.status as DemandStatus]}
           </Badge>
           <Badge tone="cinza">{PRIORITY_LABELS[demand.priority as Priority]}</Badge>
+          {canDelete && (
+            <DeleteButton
+              action={deleteDemandAction.bind(null, id)}
+              confirmMessage={`Tem certeza que deseja excluir a demanda "${demand.title}"? Essa ação não pode ser desfeita.`}
+            />
+          )}
         </div>
       </div>
 
