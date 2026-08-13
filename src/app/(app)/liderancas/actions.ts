@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createLeader, updateLeader, deleteLeader, type LeaderInput } from "@/services/leaders"
+import { createLeader, updateLeader, deleteLeader, getLeaderById, type LeaderInput } from "@/services/leaders"
 import { leaderSchema } from "@/lib/validations/leader"
 import { can } from "@/lib/permissions"
 import { geocodeAddress } from "@/lib/geocoding"
@@ -321,4 +321,104 @@ export async function deleteLeaderAction(
   revalidatePath("/liderancas")
   revalidatePath("/mapa")
   redirect("/liderancas")
+}
+
+/**
+ * Reenvia o convite de acesso de uma liderança que já tem login criado —
+ * pra quando o e-mail original foi digitado errado (ou a pessoa simplesmente
+ * não recebeu) e não tinha como reenviar sem excluir e recadastrar do zero.
+ * Mesma restrição de sempre pra mexer em login (admin_geral, client de
+ * service_role — ver createLeaderAction acima e
+ * configuracoes/usuarios/actions.ts).
+ *
+ * Não serve pra CRIAR o primeiro acesso de uma liderança que nunca teve
+ * login (isso é feito no cadastro, ou em Configurações > Usuários pra quem
+ * já existe sem conta — listLeadersWithoutAccount em services/leaders.ts).
+ */
+export async function resendInviteAction(
+  leaderId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireSessionUser()
+  const role = session.profile.role as UserRole
+
+  if (role !== "admin_geral") {
+    return { error: "Seu perfil não pode reenviar convites de acesso." }
+  }
+
+  const supabase = await createClient()
+  const leader = await getLeaderById(supabase, leaderId)
+  if (!leader) {
+    return { error: "Liderança não encontrada." }
+  }
+  if (!leader.user_id) {
+    return {
+      error:
+        "Essa liderança ainda não tem acesso de login criado — crie o acesso primeiro em Configurações > Usuários.",
+    }
+  }
+
+  const rawEmail = (formData.get("resend_email") as string | null)?.trim()
+  const email = rawEmail || leader.email
+  if (!email) {
+    return { error: "Informe um e-mail para vincular o acesso." }
+  }
+
+  const channel = formData.get("resend_channel") === "whatsapp" ? "whatsapp" : "email"
+  if (channel === "whatsapp" && !leader.phone) {
+    return { error: "Essa liderança não tem WhatsApp cadastrado — informe o número no cadastro antes de reenviar por esse canal." }
+  }
+
+  const admin = createAdminClient()
+  const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`
+
+  // Corrigindo o e-mail digitado errado: o e-mail em auth.users é a fonte
+  // da verdade de PRA ONDE o link de definir senha vai — leaders.email e
+  // users_profiles.email são só espelho pra exibição/contato. Sem
+  // atualizar os três juntos aqui, o reenvio continuaria saindo pro
+  // endereço errado mesmo depois de "corrigir" só o cadastro.
+  if (email !== leader.email) {
+    const { error: updateAuthError } = await admin.auth.admin.updateUserById(leader.user_id, {
+      email,
+      email_confirm: false,
+    })
+    if (updateAuthError) {
+      return { error: `Não foi possível atualizar o e-mail do acesso: ${updateAuthError.message}.` }
+    }
+    await admin.from("leaders").update({ email }).eq("id", leaderId)
+    await admin.from("users_profiles").update({ email }).eq("id", leader.user_id)
+  }
+
+  if (channel === "whatsapp") {
+    // Mesmo esquema do convite inicial (createLeaderAction acima), mas com
+    // type "recovery" em vez de "invite": o usuário já existe (foi criado
+    // no cadastro original), e "invite" só funciona pra usuário novo — pra
+    // um que já existe ele falha com "already registered". "recovery" gera
+    // o mesmo link de definir senha pra usuário existente, também sem
+    // enviar nada sozinho.
+    const { data: linked, error: linkError } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    })
+    if (linkError || !linked.user) {
+      return { error: `Não foi possível gerar o novo link de convite: ${linkError?.message ?? "erro desconhecido"}.` }
+    }
+    revalidatePath(`/liderancas/${leaderId}`)
+    redirect(`/liderancas/${leaderId}?convite=whatsapp&link=${encodeURIComponent(linked.properties.action_link)}`)
+  }
+
+  // Canal e-mail: resetPasswordForEmail (client comum, não admin) dispara
+  // e-mail de verdade pra um usuário que já existe — diferente de
+  // generateLink, que só devolve o link sem enviar. É o mecanismo padrão
+  // do Supabase pra "reenviar", já que inviteUserByEmail (usado no
+  // cadastro original) só funciona pra usuário que ainda não existe.
+  const { error: resendError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+  if (resendError) {
+    return { error: `Não foi possível reenviar o convite por e-mail: ${resendError.message}.` }
+  }
+
+  revalidatePath(`/liderancas/${leaderId}`)
+  redirect(`/liderancas/${leaderId}?convite=enviado`)
 }
