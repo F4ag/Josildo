@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
-import { createDemand, getDemandById, updateDemandStatus, type DemandInput } from "@/services/demands"
+import { createDemand, getDemandById, updateDemandStatus, deleteDemand, type DemandInput } from "@/services/demands"
 import { demandSchema, demandStatusUpdateSchema } from "@/lib/validations/demand"
 import { can } from "@/lib/permissions"
 import { geocodeAddress } from "@/lib/geocoding"
@@ -129,4 +129,29 @@ export async function updateDemandStatusAction(
   revalidatePath("/demandas")
   revalidatePath("/mapa")
   return { error: null, success: true }
+}
+
+/** Exclusão é ação sensível: só admin_geral (mesma regra da RLS —
+ * policy dm_admin_geral_all — ver comentário em services/demands.ts). */
+export async function deleteDemandAction(
+  demandId: string,
+  _prevState: ActionState,
+): Promise<ActionState> {
+  const session = await requireSessionUser()
+  const role = session.profile.role as UserRole
+
+  if (!can(role, "delete", "demands")) {
+    return { error: "Seu perfil não pode excluir demandas." }
+  }
+
+  const supabase = await createClient()
+  try {
+    await deleteDemand(supabase, demandId)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao excluir demanda." }
+  }
+
+  revalidatePath("/demandas")
+  revalidatePath("/mapa")
+  redirect("/demandas")
 }
