@@ -43,6 +43,25 @@ export async function updatePassword(
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
 
   if (error) {
+    // "Peça um novo link" só faz sentido quando o problema É o link/sessão
+    // (expirado, já usado, ausente). Usar essa mensagem pra QUALQUER erro
+    // — como fazia antes — confunde quem digitou a mesma senha de novo ou
+    // uma senha fraca: a pessoa acha que precisa de um link novo quando só
+    // precisa escolher outra senha. error.code vem estruturado do
+    // supabase-js (AuthApiError#code) desde a v2.45, que é a que este
+    // projeto usa — ver package.json.
+    if (error.code === "same_password") {
+      return { error: "A nova senha precisa ser diferente da senha atual." }
+    }
+    if (error.code === "weak_password") {
+      return { error: "Essa senha é fraca demais. Tente uma combinação mais forte." }
+    }
+    if (error.code === "over_request_rate_limit" || error.code === "over_email_send_rate_limit") {
+      return { error: "Muitas tentativas em seguida. Aguarde um minuto e tente de novo." }
+    }
+    // session_not_found / auth_session_missing / token expirado ou já usado
+    // caem aqui — é o único grupo pra que "peça um novo link" é o conselho
+    // certo.
     return { error: "Não foi possível redefinir a senha. Peça um novo link de recuperação." }
   }
 
