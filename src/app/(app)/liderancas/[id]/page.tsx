@@ -72,8 +72,9 @@ export default async function LiderancaDetalhePage({
       {convite === "whatsapp" && inviteLink && (
         <div className="flex flex-col gap-3 rounded-lg border border-secondary/30 bg-secondary/10 p-4 text-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
           <span>
-            Acesso criado para {leader.name}. Falta só enviar o link de definir senha pelo WhatsApp — o convite não
-            sai sozinho por esse canal, é só clicar no botão ao lado.
+            Acesso criado para {leader.name}. O botão ao lado abre o WhatsApp com a mensagem já pronta — falta só
+            apertar Enviar lá dentro. O link é de uso único: se não sair na primeira vez, use &quot;Reenviar convite
+            de acesso&quot; abaixo pra gerar um link novo, em vez de tentar reabrir este mesmo link depois.
           </span>
           <WhatsAppButton
             phone={leader.phone}
