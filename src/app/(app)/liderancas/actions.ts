@@ -102,23 +102,30 @@ export async function createLeaderAction(
 
   const coords = await resolveCoords(parsed.data)
 
-  // Convite acontece ANTES de criar a linha em leaders: se o e-mail já tiver
-  // conta ou o convite falhar por qualquer motivo, a liderança nunca chega a
-  // ser criada "pela metade" (cadastrada, mas sem explicação de por que o
-  // login não saiu). Ver o mesmo cuidado em configuracoes/usuarios/actions.ts.
+  // Login é criado ANTES da liderança (mesmo cuidado de sempre: se a
+  // liderança falhar depois, o rollback abaixo desfaz o login, então nunca
+  // fica uma liderança "pela metade" sem explicação de por que o acesso não
+  // saiu — ver mesmo raciocínio em configuracoes/usuarios/actions.ts).
   //
-  // Canal WhatsApp: Supabase Auth não manda WhatsApp sozinho, então em vez de
-  // inviteUserByEmail (que já dispara o e-mail automaticamente) usamos
-  // generateLink — cria o mesmo usuário e devolve o MESMO link de definir
-  // senha que iria por e-mail, mas SEM enviar nada. O link volta pro cliente
-  // via query string no redirect abaixo, pra abrir o wa.me (lib/whatsapp.ts,
-  // Módulo 12, mesmo esquema sem API paga usado no resto do app) com o
-  // número já preenchido.
+  // MAS o disparo do convite em si (e-mail ou WhatsApp) só acontece DEPOIS
+  // que TUDO — login, liderança, perfil, vínculo — já foi criado com
+  // sucesso, no fim desta função. Antes, o canal e-mail usava
+  // inviteUserByEmail aqui, que cria o usuário E manda o e-mail no mesmo
+  // passo — se createLeader (ou a criação do perfil, ou o vínculo)
+  // falhasse por qualquer motivo LOGO DEPOIS, o rollback apagava o login,
+  // mas o e-mail já tinha saído e continuava "válido" na caixa de entrada.
+  // A pessoa clicava minutos depois num link de uma conta que já não
+  // existia mais e via "link inválido ou expirado" sem nenhuma pista do
+  // motivo real (bug real, encontrado em produção — ver conversa com o
+  // Josildo). Por isso agora o canal e-mail também usa createUser (que,
+  // como generateLink, NUNCA envia nada sozinho) — só cria a conta em
+  // silêncio — e o disparo de verdade vira responsabilidade só do bloco no
+  // fim da função, que só roda se absolutamente tudo tiver dado certo.
   let invitedUserId: string | null = null
   let whatsappInviteLink: string | null = null
+  const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`
   if (wantsLogin) {
     const admin = createAdminClient()
-    const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`
     if (inviteChannel === "whatsapp") {
       const { data: linked, error: linkError } = await admin.auth.admin.generateLink({
         type: "invite",
@@ -131,13 +138,14 @@ export async function createLeaderAction(
       invitedUserId = linked.user.id
       whatsappInviteLink = linked.properties.action_link
     } else {
-      const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email!, {
-        redirectTo,
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email: parsed.data.email!,
+        email_confirm: false,
       })
-      if (inviteError || !invited.user) {
-        return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
+      if (createError || !created.user) {
+        return { error: `Não foi possível criar o acesso para este e-mail: ${createError?.message ?? "erro desconhecido"}.` }
       }
-      invitedUserId = invited.user.id
+      invitedUserId = created.user.id
     }
   }
 
@@ -229,6 +237,19 @@ export async function createLeaderAction(
     }
 
     revalidatePath("/configuracoes/usuarios")
+  }
+
+  // Só chega aqui se login + liderança + perfil + vínculo deram certo (todo
+  // caminho de erro acima já retornou antes). Agora sim, com tudo pronto,
+  // dispara o convite de verdade pro canal e-mail — mesmo mecanismo já
+  // comprovado confiável em "esqueci senha" (login/actions.ts) e no reenvio
+  // por e-mail (resendInviteAction abaixo): resetPasswordForEmail dispara
+  // o e-mail de "definir senha" de verdade pra um usuário que já existe.
+  // Falha aqui não desfaz o cadastro (login/liderança já existem de fato) —
+  // só significa que o admin vai precisar usar "Reenviar convite de
+  // acesso" na página da liderança.
+  if (invitedUserId && inviteChannel === "email") {
+    await supabase.auth.resetPasswordForEmail(parsed.data.email!, { redirectTo }).catch(() => {})
   }
 
   revalidatePath("/liderancas")
