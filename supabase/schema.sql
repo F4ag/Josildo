@@ -83,7 +83,14 @@ create index idx_neighborhoods_org on neighborhoods(organization_id);
 create table leaders (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id),
-  user_id uuid references users_profiles(id), -- se a liderança tem login
+  -- on delete set null: um login (users_profiles) pode ser apagado sem
+  -- travar por causa desta FK — a liderança só perde o vínculo de acesso,
+  -- continua existindo. Simétrico à FK inversa (users_profiles.leader_id,
+  -- ver fk_users_profiles_leader mais abaixo): sem os dois SET NULL, apagar
+  -- QUALQUER um dos dois lados (login OU liderança) travava indefinidamente
+  -- quando a liderança tinha acesso — cada FK bloqueava a exclusão do outro
+  -- lado (bug real, corrigido nesta migration — antes as duas eram NO ACTION).
+  user_id uuid references users_profiles(id) on delete set null, -- se a liderança tem login
   -- Hierarquia: quem cadastrou/indicou esta liderança (uma liderança com
   -- login pode cadastrar outras "abaixo" dela). Null = topo da hierarquia
   -- (cadastrada por admin_geral/admin_equipe). on delete set null pra não
@@ -156,8 +163,11 @@ create index idx_leaders_polling_location_id on leaders(polling_location_id);
 create index idx_leaders_created_by on leaders(created_by);
 create index idx_leaders_org on leaders(organization_id);
 
+-- on delete set null: ver mesma nota em leaders.user_id acima — sem isso,
+-- excluir uma liderança com login travava com FK violation mesmo sem
+-- nenhum apoiador/demanda vinculado, só por causa desta referência de volta.
 alter table users_profiles
-  add constraint fk_users_profiles_leader foreign key (leader_id) references leaders(id);
+  add constraint fk_users_profiles_leader foreign key (leader_id) references leaders(id) on delete set null;
 create index idx_users_profiles_leader on users_profiles(leader_id);
 
 -- ----------------------------------------------------------------------------
