@@ -334,8 +334,16 @@ create table interactions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id),
   person_type text check (person_type in ('lideranca','apoiador')),
-  leader_id uuid references leaders(id),
-  supporter_id uuid references supporters(id),
+  -- on delete cascade: interactions é log/histórico, não registro primário —
+  -- ver mesmo raciocínio em demand_updates.demand_id acima. Sem isso, apagar
+  -- uma liderança/apoiador com histórico de interações (gerado automaticamente
+  -- a cada demanda/atendimento criado ou atualizado — ver logInteraction em
+  -- services/demands.ts e services/attendances.ts) falhava com FK violation
+  -- mesmo depois de remover as demandas/atendimentos, porque o rastro de
+  -- interações ficava órfão e sem CASCADE bloqueava a exclusão (bug real,
+  -- corrigido nesta migration — antes as duas FKs eram NO ACTION).
+  leader_id uuid references leaders(id) on delete cascade,
+  supporter_id uuid references supporters(id) on delete cascade,
   interaction_type text check (interaction_type in (
     'ligacao','whatsapp','email','visita','reuniao','evento',
     'demanda','atendimento','aniversario','outro'
