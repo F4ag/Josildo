@@ -33,18 +33,28 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
 
   const { full_name, email, phone, role, leader_id } = parsed.data
   const admin = createAdminClient()
+  const supabase = await createClient()
+  const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`
 
-  // Cria o login e dispara o e-mail de convite. Aponta direto pra
-  // /redefinir-senha (não mais via /auth/confirm) — ver comentário
-  // equivalente em login/actions.ts sobre o fragmento da URL (#access_token=...)
-  // se perdendo no salto extra de redirecionamento.
-  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
+  // Cria o login em silêncio (createUser nunca notifica ninguém sozinho,
+  // diferente de inviteUserByEmail) — o e-mail de convite só é disparado no
+  // fim desta função, DEPOIS que perfil e vínculo já tiverem dado certo.
+  // Antes disso usava inviteUserByEmail aqui, que manda o e-mail no mesmo
+  // passo em que cria o usuário: se a inserção do perfil falhasse logo
+  // depois, o rollback apagava o login, mas o e-mail já enviado continuava
+  // "válido" na caixa de entrada — a pessoa clicava minutos depois num link
+  // de conta que não existia mais e via "link inválido ou expirado" sem
+  // pista nenhuma do motivo real (bug real, encontrado em produção — mesmo
+  // problema corrigido em liderancas/actions.ts/createLeaderAction).
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: false,
   })
 
-  if (inviteError || !invited.user) {
-    return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
+  if (createError || !created.user) {
+    return { error: `Não foi possível criar o acesso para este e-mail: ${createError?.message ?? "erro desconhecido"}.` }
   }
+  const invitedUserId = created.user.id
 
   // organization_id vem sempre do admin_geral que está convidando — o
   // convidado nunca pode entrar em outra organização (multi-tenant, ver
@@ -54,7 +64,7 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
   // Lideranças, que hoje só listam a tabela leaders (ver liderancas/novo).
   const canLinkLeader = role === "lideranca" || role === "admin_equipe"
   const { error: profileError } = await admin.from("users_profiles").insert({
-    id: invited.user.id,
+    id: invitedUserId,
     organization_id: session.profile.organization_id,
     full_name,
     email,
@@ -65,7 +75,7 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
 
   if (profileError) {
     // Não deixar um auth.users órfão sem perfil.
-    await admin.auth.admin.deleteUser(invited.user.id)
+    await admin.auth.admin.deleteUser(invitedUserId)
     return { error: `Não foi possível salvar o perfil: ${profileError.message}.` }
   }
 
@@ -76,10 +86,17 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
     // sem isso o próprio dono do pin não conseguiria vê-lo no Mapa/Relatório.
     // Pra lideranca isso não é necessário: a visibilidade dela usa leader_id,
     // não created_by (ver ld_lideranca_select_self).
-    const leaderUpdate: { user_id: string; created_by?: string } = { user_id: invited.user.id }
-    if (role === "admin_equipe") leaderUpdate.created_by = invited.user.id
+    const leaderUpdate: { user_id: string; created_by?: string } = { user_id: invitedUserId }
+    if (role === "admin_equipe") leaderUpdate.created_by = invitedUserId
     await admin.from("leaders").update(leaderUpdate).eq("id", leader_id)
   }
+
+  // Só chega aqui se perfil + vínculo deram certo — agora sim dispara o
+  // e-mail de verdade, mesmo mecanismo confiável já usado em "esqueci
+  // senha" e no reenvio por e-mail (resendInviteAction em liderancas/
+  // actions.ts). Falha aqui não desfaz o cadastro — o admin pode reenviar
+  // depois.
+  await supabase.auth.resetPasswordForEmail(email, { redirectTo }).catch(() => {})
 
   revalidatePath("/configuracoes/usuarios")
   return { error: null, success: true }
