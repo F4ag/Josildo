@@ -120,7 +120,9 @@ export default async function LiderancaDetalhePage({
               confirmMessage={
                 hasLinkedRecords
                   ? `${leader.name} tem ${supporterCount ?? 0} apoiador(es) e ${demandCount ?? 0} demanda(s) vinculados — a exclusão vai ser recusada até esses vínculos serem removidos ou transferidos. Tentar mesmo assim?`
-                  : `Tem certeza que deseja excluir ${leader.name}? Essa ação não pode ser desfeita.`
+                  : leader.user_id
+                    ? `Tem certeza que deseja excluir ${leader.name}? O acesso de login dela também será excluído. Essa ação não pode ser desfeita.`
+                    : `Tem certeza que deseja excluir ${leader.name}? Essa ação não pode ser desfeita.`
               }
             />
           )}
