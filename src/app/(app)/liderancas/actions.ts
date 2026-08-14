@@ -312,10 +312,31 @@ export async function deleteLeaderAction(
   }
 
   const supabase = await createClient()
+  // Pego o user_id ANTES de excluir — depois que a liderança some, não tem
+  // mais como descobrir qual login estava vinculado a ela.
+  const leader = await getLeaderById(supabase, leaderId)
+  const userIdToRemove = leader?.user_id ?? null
+
   try {
     await deleteLeader(supabase, leaderId)
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Falha ao excluir liderança." }
+  }
+
+  // Exclusão em cascata do acesso de login, quando existir: excluir só a
+  // liderança e deixar a conta órfã (só desvinculada, não apagada — ver
+  // leaders_user_id_fkey em schema.sql) causava confusão real — ex.: tentar
+  // recadastrar a mesma pessoa com o mesmo e-mail falhava com "already
+  // registered", porque a conta antiga continuava existindo sem nenhuma
+  // liderança vinculada. Feito só DEPOIS de confirmar que a liderança foi
+  // excluída com sucesso: se a exclusão acima falhar (apoiadores/demandas
+  // vinculados), a conta de login nem é tocada — sem efeito colateral
+  // parcial. Falha ao apagar a conta em si (ex.: race condition) não deve
+  // impedir a resposta de sucesso pro usuário, já que a liderança já foi
+  // excluída de fato — por isso o catch silencioso aqui.
+  if (userIdToRemove) {
+    const admin = createAdminClient()
+    await admin.auth.admin.deleteUser(userIdToRemove).catch(() => {})
   }
 
   revalidatePath("/liderancas")
