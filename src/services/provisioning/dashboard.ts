@@ -31,11 +31,14 @@ async function clonarTerritorioDaCidade(
   // vira o template — comportamento aceitável dado o volume atual (2
   // clientes).
   const cm = createCadastroMestreClient()
-  const { data: clientesNaCidade } = await cm
+  const { data: clientesNaCidade, error: clientesError } = await cm
     .from("cliente")
     .select("id")
     .eq("cidade", cidadeReferencia)
     .neq("id", clienteIdNovo)
+  if (clientesError) {
+    return { status: "erro", mensagem: `Dashboard (buscar clientes da cidade): ${clientesError.message}` }
+  }
 
   const clienteTemplate = clientesNaCidade?.[0]
   if (!clienteTemplate) {
@@ -45,10 +48,13 @@ async function clonarTerritorioDaCidade(
   // Traz o id da própria rpa-template junto (além dos dados a copiar) — evita
   // um round-trip redundante pra redescobrir esse id só pra buscar os
   // bairros dela mais abaixo.
-  const { data: rpasTemplate } = await dashboard
+  const { data: rpasTemplate, error: rpasTemplateError } = await dashboard
     .from("rpas")
     .select("id, numero, nome, meta_ativa, observacoes")
     .eq("cliente_id", clienteTemplate.id)
+  if (rpasTemplateError) {
+    return { status: "erro", mensagem: `Dashboard (buscar RPAs template): ${rpasTemplateError.message}` }
+  }
 
   if (!rpasTemplate || rpasTemplate.length === 0) {
     return { status: "ok" } // cliente daquela cidade existe mas ainda não tem território no Dashboard
@@ -68,10 +74,17 @@ async function clonarTerritorioDaCidade(
     }
     rpasClonadas.push(novaRpa.id)
 
-    const { data: bairrosTemplate } = await dashboard
+    const { data: bairrosTemplate, error: bairrosTemplateError } = await dashboard
       .from("bairros")
       .select("nome, tipo, prioridade")
       .eq("rpa_id", rpaTemplateId)
+    if (bairrosTemplateError) {
+      await limparRpasClonadas(dashboard, rpasClonadas)
+      return {
+        status: "erro",
+        mensagem: `Dashboard (buscar bairros da RPA ${rpaDados.numero}): ${bairrosTemplateError.message}`,
+      }
+    }
 
     for (const bairro of bairrosTemplate ?? []) {
       const { error: bairroError } = await dashboard.from("bairros").insert({ ...bairro, rpa_id: novaRpa.id })
@@ -93,12 +106,13 @@ export async function provisionarDashboard(
   clienteId: string,
 ): Promise<ProvisioningStepResult> {
   const cm = createCadastroMestreClient()
-  const { data: jaFeito } = await cm
+  const { data: jaFeito, error: buscaError } = await cm
     .from("integracao_sistema")
     .select("identificador_externo")
     .eq("cliente_id", clienteId)
     .eq("sistema", "dashboard")
     .maybeSingle()
+  if (buscaError) return { status: "erro", mensagem: `Dashboard (checar integração existente): ${buscaError.message}` }
   if (jaFeito) return { status: "ok" }
 
   const dashboard = createDashboardClient()
@@ -138,7 +152,21 @@ export async function provisionarDashboard(
     // Aqui a clonagem (se aconteceu) teve sucesso, então precisa ser desfeita
     // explicitamente — senão um retry duplicaria o território clonado, já
     // que o check de idempotência só olha integracao_sistema.
-    const { data: rpasDoCliente } = await dashboard.from("rpas").select("id").eq("cliente_id", clienteId)
+    const { data: rpasDoCliente, error: rpasDoClienteError } = await dashboard
+      .from("rpas")
+      .select("id")
+      .eq("cliente_id", clienteId)
+    if (rpasDoClienteError) {
+      // Não sabemos quais rpas apagar — não tratamos como "nenhuma" (isso
+      // deixaria o território clonado órfão em silêncio). Sinaliza o erro
+      // combinado; perfil/usuário ainda são desfeitos abaixo.
+      await dashboard.from("perfis").delete().eq("id", invited.user.id)
+      await dashboard.auth.admin.deleteUser(invited.user.id)
+      return {
+        status: "erro",
+        mensagem: `Dashboard (registrar integração): ${integracaoError.message}; falha adicional ao tentar desfazer território clonado: ${rpasDoClienteError.message}`,
+      }
+    }
     await limparRpasClonadas(dashboard, (rpasDoCliente ?? []).map((rpa) => rpa.id))
     await dashboard.from("perfis").delete().eq("id", invited.user.id)
     await dashboard.auth.admin.deleteUser(invited.user.id)

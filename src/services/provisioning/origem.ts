@@ -7,12 +7,13 @@ export async function provisionarOrigem(
   clienteId: string,
 ): Promise<ProvisioningStepResult> {
   const cm = createCadastroMestreClient()
-  const { data: jaFeito } = await cm
+  const { data: jaFeito, error: buscaError } = await cm
     .from("integracao_sistema")
     .select("identificador_externo")
     .eq("cliente_id", clienteId)
     .eq("sistema", "origem")
     .maybeSingle()
+  if (buscaError) return { status: "erro", mensagem: `Origem (checar integração existente): ${buscaError.message}` }
   if (jaFeito) return { status: "ok" }
 
   const origem = createOrigemClient()
