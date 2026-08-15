@@ -23,3 +23,4 @@ public/fallback-*.js
 # GitHub), então nunca devem ser commitados.
 eleitorado_local_votacao_ATUAL.zip
 perfil_eleitor_secao_ATUAL_PE.zip
+.worktrees/
