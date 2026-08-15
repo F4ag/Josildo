@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
+import { createCadastroMestreClient } from "@/lib/supabase/external-projects"
 import { electionSettingsSchema } from "@/lib/validations/election"
 import type { ActionState } from "@/app/login/actions"
 
@@ -14,10 +15,21 @@ async function assertAdminGeral() {
   return session
 }
 
-// Atualiza só a própria organização do Admin Geral logado — nunca recebe
-// organization_id do form, sempre usa session.profile.organization_id, pra
-// não dar brecha de um admin_geral de um cliente editar outro (RLS também
-// bloquearia isso, mas não custa não depender só dela aqui).
+// election_cargo no Lidera+ é um CHECK constraint (snake_case); campanha.cargo
+// no Cadastro Mestre é texto livre capitalizado (ver supabase/schema.sql do
+// Cadastro Mestre, Seção 2, tabela campanha). Sem esse mapa, o Cadastro
+// Mestre receberia "deputado_federal" em vez de "Deputado Federal".
+const CARGO_LABELS: Record<string, string> = {
+  prefeito: "Prefeito",
+  vice_prefeito: "Vice-Prefeito",
+  vereador: "Vereador",
+  governador: "Governador",
+  vice_governador: "Vice-Governador",
+  senador: "Senador",
+  deputado_federal: "Deputado Federal",
+  deputado_estadual: "Deputado Estadual",
+}
+
 export async function updateElectionSettings(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const session = await assertAdminGeral()
 
@@ -38,6 +50,32 @@ export async function updateElectionSettings(_prevState: ActionState, formData: 
 
   if (error) {
     return { error: `Não foi possível salvar: ${error.message}` }
+  }
+
+  // Propaga pro Cadastro Mestre — não bloqueia a resposta se falhar (dado já
+  // está salvo aqui, que é o que importa pro usuário); só loga pra
+  // diagnóstico manual depois.
+  try {
+    const cm = createCadastroMestreClient()
+    const { data: integracao } = await cm
+      .from("integracao_sistema")
+      .select("cliente_id")
+      .eq("sistema", "lidera_mais")
+      .eq("identificador_externo", session.profile.organization_id)
+      .maybeSingle()
+
+    if (integracao) {
+      await cm
+        .from("campanha")
+        .update({
+          cargo: parsed.data.election_cargo ? CARGO_LABELS[parsed.data.election_cargo] : null,
+          numero_urna: parsed.data.election_candidate_number,
+          ano_eleicao: parsed.data.election_year,
+        })
+        .eq("cliente_id", integracao.cliente_id)
+    }
+  } catch (propagationError) {
+    console.error("[eleicao] falha ao propagar pro Cadastro Mestre:", propagationError)
   }
 
   revalidatePath("/configuracoes/eleicao")
