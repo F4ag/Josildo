@@ -45,6 +45,7 @@ export async function createClientAction(
   const parsed = createOrganizationSchema.safeParse({
     name: formData.get("name"),
     slug: formData.get("slug"),
+    cidade: formData.get("cidade"),
     admin_full_name: formData.get("admin_full_name"),
     admin_email: formData.get("admin_email"),
   })
@@ -53,7 +54,7 @@ export async function createClientAction(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
-  const { name, slug, admin_full_name, admin_email } = parsed.data
+  const { name, slug, cidade, admin_full_name, admin_email } = parsed.data
   const admin = createAdminClient()
 
   if (await isSlugTaken(admin, slug)) {
@@ -93,7 +94,6 @@ export async function createClientAction(
     return { error: `Não foi possível salvar o perfil do responsável: ${profileError.message}.` }
   }
 
-  const cidade = formData.get("cidade") as string
   const provisioningInput = {
     organizationId: org.id,
     nome: name,
@@ -101,7 +101,22 @@ export async function createClientAction(
     adminEmail: admin_email,
     adminNome: admin_full_name,
   }
-  const provisioning = await provisionarClienteCrossSistema(provisioningInput)
+
+  let provisioning: ProvisioningReport
+  try {
+    provisioning = await provisionarClienteCrossSistema(provisioningInput)
+  } catch (err) {
+    // A organização, o convite e o perfil no Lidera+ já foram commitados com
+    // sucesso neste ponto — um erro inesperado aqui (ex.: env var de service
+    // role de um dos sistemas externos ausente/mal configurada, que
+    // createBussolaClient/createOrigemClient/createDashboardClient lançam via
+    // envOrThrow) não deve desfazer isso. Reporta as 4 etapas como erro pra a
+    // UI oferecer retry por etapa, mas mantém success:true da parte que já
+    // commitou.
+    const mensagem = `Falha inesperada ao provisionar: ${err instanceof Error ? err.message : "erro desconhecido"}`
+    const falhaGenerica = { status: "erro" as const, mensagem }
+    provisioning = { cadastroMestre: falhaGenerica, bussola: falhaGenerica, origem: falhaGenerica, dashboard: falhaGenerica }
+  }
 
   revalidatePath("/clientes")
   return { error: null, success: true, slug: org.slug, provisioning, provisioningInput }
