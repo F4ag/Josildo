@@ -5,6 +5,28 @@ import { resetPasswordSchema } from "@/lib/validations/auth"
 import type { ActionState } from "../login/actions"
 
 /**
+ * Checa se já existe uma sessão válida ANTES de tentar trocar o código do
+ * link — chamado sempre no início de useSessionBridge, em reset-password-
+ * form.tsx.
+ *
+ * Por quê: o cookie de sessão é do NAVEGADOR, não da aba. Se a pessoa abre o
+ * mesmo link de recuperação em mais de uma aba (ou clica nele de novo depois
+ * de já ter funcionado numa aba anterior), a PRIMEIRA troca bem-sucedida já
+ * deixa o navegador inteiro autenticado — inclusive as outras abas. O bug
+ * real que isso corrige: sem essa checagem, uma aba "atrasada" chamava
+ * exchangeRecoveryCode com um código JÁ USADO, e o próprio
+ * exchangeCodeForSession (mesmo retornando erro) podia sobrescrever o
+ * cookie de sessão bom que já existia — derrubando a sessão que a outra aba
+ * tinha acabado de estabelecer. Agora, se já existe sessão, a troca nem é
+ * tentada: nada é escrito por cima do que já está funcionando.
+ */
+export async function hasActiveSession(): Promise<boolean> {
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getUser()
+  return Boolean(data.user)
+}
+
+/**
  * O link de recuperação/convite do Supabase (flow PKCE, padrão do projeto)
  * chega em /redefinir-senha como `?code=xxxxx` — um código de uso único que
  * precisa ser trocado por uma sessão de verdade. Isso só pode ser feito
