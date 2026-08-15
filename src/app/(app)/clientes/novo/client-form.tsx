@@ -89,6 +89,18 @@ export function ClientForm() {
         </p>
       </div>
 
+      <div>
+        <label htmlFor="cidade" className="mb-1 block text-sm font-medium">Cidade</label>
+        <input
+          id="cidade" name="cidade" required
+          placeholder="Ex.: Olinda"
+          className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-foreground/50">
+          Cidade onde este cliente atua — usada para provisionar o cliente nos outros sistemas do ecossistema.
+        </p>
+      </div>
+
       <div className="border-t border-black/5 pt-4">
         <p className="mb-3 text-sm font-medium text-foreground">Responsável (Admin Geral)</p>
 
