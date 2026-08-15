@@ -10,6 +10,8 @@ import {
 } from "@/services/organizations"
 import { createOrganizationSchema, updateOrganizationSchema } from "@/lib/validations/organization"
 import type { ActionState } from "@/app/login/actions"
+import { provisionarClienteCrossSistema } from "@/services/provisioning/orchestrator"
+import type { ProvisioningReport } from "@/services/provisioning/orchestrator"
 
 // Mesma constante de app/(app)/clientes/page.tsx e lib/supabase/middleware.ts
 // — a organização "Lidera+" original (pré-multi-tenant) nunca pode ser
@@ -20,6 +22,8 @@ export type CreateClientActionState = {
   error: string | null
   success?: boolean
   slug?: string
+  provisioning?: ProvisioningReport
+  provisioningInput?: import("@/services/provisioning/types").ProvisioningInput
 }
 
 /** Só contas com is_platform_admin (Agência F4) — nunca um admin_geral de
@@ -89,8 +93,18 @@ export async function createClientAction(
     return { error: `Não foi possível salvar o perfil do responsável: ${profileError.message}.` }
   }
 
+  const cidade = formData.get("cidade") as string
+  const provisioningInput = {
+    organizationId: org.id,
+    nome: name,
+    cidade,
+    adminEmail: admin_email,
+    adminNome: admin_full_name,
+  }
+  const provisioning = await provisionarClienteCrossSistema(provisioningInput)
+
   revalidatePath("/clientes")
-  return { error: null, success: true, slug: org.slug }
+  return { error: null, success: true, slug: org.slug, provisioning, provisioningInput }
 }
 
 export type UpdateClientActionState = { error: string | null; success?: boolean }
