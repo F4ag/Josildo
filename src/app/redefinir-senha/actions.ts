@@ -27,13 +27,23 @@ export async function hasActiveSession(): Promise<boolean> {
 }
 
 /**
- * O link de recuperação/convite do Supabase (flow PKCE, padrão do projeto)
- * chega em /redefinir-senha como `?code=xxxxx` — um código de uso único que
- * precisa ser trocado por uma sessão de verdade. Isso só pode ser feito
- * aqui, numa Server Action (ou Route Handler): Server Components não têm
- * permissão do Next.js para gravar cookies, então se essa troca acontecesse
- * lá a sessão nunca seria persistida e o formulário de troca de senha
- * continuaria falhando mesmo com o "code" certo na URL.
+ * Fallback defensivo para o flow PKCE (`?code=xxxxx`). Não é mais o formato
+ * gerado de propósito — desde a correção em lib/supabase/reset-email-client.ts,
+ * todo e-mail de definir/redefinir senha usa flow implicit (`#access_token=`,
+ * ver reset-password-form.tsx). Mantido só para links antigos, já enviados
+ * antes da correção, que ainda possam estar numa caixa de entrada.
+ *
+ * Por que PKCE quebrava sempre nesse projeto: resetPasswordForEmail (chamado
+ * do lado do servidor, pelo client de sessão de quem dispara o convite/reset)
+ * grava o code_verifier num cookie do NAVEGADOR DE QUEM CHAMOU a função — não
+ * do navegador que vai abrir o e-mail depois, quase sempre um aparelho
+ * diferente. Sem esse cookie, essa troca aqui sempre falha (localmente, sem
+ * nem chegar a chamar a rede — ver AuthPKCECodeVerifierMissingError em
+ * @supabase/auth-js). Isso só pode ser feito aqui, numa Server Action (ou
+ * Route Handler): Server Components não têm permissão do Next.js para gravar
+ * cookies, então se essa troca acontecesse lá a sessão nunca seria
+ * persistida e o formulário de troca de senha continuaria falhando mesmo com
+ * o "code" certo na URL.
  */
 export async function exchangeRecoveryCode(code: string): Promise<{ error: string | null }> {
   const supabase = await createClient()

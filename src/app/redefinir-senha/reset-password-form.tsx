@@ -23,15 +23,26 @@ function SubmitButton() {
 
 /**
  * O link de recuperação/convite do Supabase chega em /redefinir-senha de uma
- * de duas formas possíveis, dependendo do template de e-mail em uso:
+ * de duas formas possíveis:
  *
- * 1) `?code=xxxxx` (flow PKCE — é o que este projeto usa hoje com o template
- *    padrão do Supabase) — um código de uso único que precisa ser trocado por
- *    uma sessão de verdade via exchangeRecoveryCode, uma Server Action (só
- *    ela consegue gravar o cookie de sessão; Server Components não podem).
- * 2) `#access_token=...&refresh_token=...` (flow baseado em fragmento de
- *    URL) — o fragmento nunca é enviado ao servidor, então precisa ser lido
- *    aqui no navegador e virar sessão via setSession no client SDK.
+ * 1) `#access_token=...&refresh_token=...` (flow implicit — é o que este
+ *    projeto usa hoje: todo disparo de resetPasswordForEmail passa por
+ *    createResetEmailClient(), ver lib/supabase/reset-email-client.ts) — o
+ *    fragmento nunca é enviado ao servidor, então precisa ser lido aqui no
+ *    navegador e virar sessão via setSession no client SDK. Não depende de
+ *    nada salvo previamente, então funciona em qualquer navegador/aparelho
+ *    que abrir o link — inclusive um diferente do que pediu o link.
+ * 2) `?code=xxxxx` (flow PKCE) — mantido só como fallback defensivo, caso
+ *    algum link antigo (enviado antes desta correção) ainda esteja numa
+ *    caixa de entrada. Não gerar mais links assim de propósito: PKCE precisa
+ *    de um "code_verifier" salvo no MESMO navegador que vai abrir o link, e
+ *    aqui quem dispara o e-mail quase nunca é o mesmo navegador de quem
+ *    recebe (admin convidando liderança, "esqueci senha" às vezes aberto no
+ *    e-mail do celular) — a troca falha sempre que os navegadores são
+ *    diferentes. Foi exatamente isso que causava "Não foi possível redefinir
+ *    a senha" mesmo em link recém-aberto (confirmado nos logs de auth do
+ *    Supabase: o /verify do link aparecia, mas nunca um /token depois — a
+ *    troca falhava localmente, sem chegar a chamar a rede).
  *
  * Sem este resgate (qualquer um dos dois casos), a página carrega sem sessão
  * nenhuma e a troca de senha falha silenciosamente com "peça um novo link".
@@ -44,29 +55,36 @@ function SubmitButton() {
  * Checando antes, uma aba "atrasada" simplesmente aproveita a sessão que já
  * existe, em vez de tentar (e falhar, com efeito colateral) trocar de novo.
  */
-function useSessionBridge() {
-  const [ready, setReady] = useState(false)
+type SessionBridgeStatus = "loading" | "ready" | "invalid"
+
+function useSessionBridge(): SessionBridgeStatus {
+  const [status, setStatus] = useState<SessionBridgeStatus>("loading")
 
   useEffect(() => {
     async function run() {
       if (await hasActiveSession()) {
-        setReady(true)
+        setStatus("ready")
         return
       }
 
       const code = new URLSearchParams(window.location.search).get("code")
 
       if (code) {
-        await exchangeRecoveryCode(code)
+        const { error } = await exchangeRecoveryCode(code)
         // Limpa o "code" da URL pra não deixar o token visível/reaproveitável.
         window.history.replaceState(null, "", window.location.pathname)
-        setReady(true)
+        // O retorno de exchangeRecoveryCode era ignorado antes — mesmo uma
+        // troca que falhasse (link expirado, já usado, code_verifier
+        // ausente) deixava a página seguir pro formulário como se nada
+        // tivesse acontecido, e o erro só aparecia depois, ao salvar a
+        // senha, sem nenhuma pista do motivo real.
+        setStatus(error ? "invalid" : "ready")
         return
       }
 
       const hash = window.location.hash
       if (!hash || !hash.includes("access_token")) {
-        setReady(true)
+        setStatus("invalid")
         return
       }
 
@@ -75,25 +93,25 @@ function useSessionBridge() {
       const refresh_token = params.get("refresh_token")
 
       if (!access_token || !refresh_token) {
-        setReady(true)
+        setStatus("invalid")
         return
       }
 
       const supabase = createClient()
-      await supabase.auth.setSession({ access_token, refresh_token })
+      const { error } = await supabase.auth.setSession({ access_token, refresh_token })
       window.history.replaceState(null, "", window.location.pathname + window.location.search)
-      setReady(true)
+      setStatus(error ? "invalid" : "ready")
     }
 
     run()
   }, [])
 
-  return ready
+  return status
 }
 
 export function ResetPasswordForm() {
   const [state, formAction] = useFormState(updatePassword, initialState)
-  const sessionReady = useSessionBridge()
+  const sessionStatus = useSessionBridge()
 
   // Navegação de página inteira (não redirect() no server nem router.push)
   // de propósito: o middleware pode precisar trocar de subdomínio pra
@@ -105,8 +123,19 @@ export function ResetPasswordForm() {
     }
   }, [state])
 
-  if (!sessionReady) {
+  if (sessionStatus === "loading") {
     return <p className="text-center text-sm text-foreground/60">Verificando link...</p>
+  }
+
+  // Detectado ANTES de mostrar o formulário: sem isso, a pessoa preenchia a
+  // senha duas vezes pra só então descobrir, ao clicar em salvar, que o link
+  // nunca teve (ou já perdeu) uma sessão válida.
+  if (sessionStatus === "invalid") {
+    return (
+      <p role="alert" className="text-center text-sm text-status-atrasada">
+        Este link não é válido ou já foi usado. Peça um novo link de recuperação.
+      </p>
+    )
   }
 
   return (

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createResetEmailClient } from "@/lib/supabase/reset-email-client"
 import { createLeader, updateLeader, deleteLeader, getLeaderById, type LeaderInput } from "@/services/leaders"
 import { leaderSchema } from "@/lib/validations/leader"
 import { can } from "@/lib/permissions"
@@ -249,7 +250,12 @@ export async function createLeaderAction(
   // só significa que o admin vai precisar usar "Reenviar convite de
   // acesso" na página da liderança.
   if (invitedUserId && inviteChannel === "email") {
-    await supabase.auth.resetPasswordForEmail(parsed.data.email!, { redirectTo }).catch(() => {})
+    // createResetEmailClient(), não `supabase` (o client de sessão do admin
+    // que está cadastrando) — ver lib/supabase/reset-email-client.ts. Usar o
+    // client de sessão aqui é o motivo real de "Peça um novo link" acontecer
+    // sempre nesse fluxo: o code_verifier do PKCE ficava gravado no cookie
+    // do ADMIN, nunca no navegador da liderança que abre o e-mail.
+    await createResetEmailClient().auth.resetPasswordForEmail(parsed.data.email!, { redirectTo }).catch(() => {})
   }
 
   revalidatePath("/liderancas")
@@ -451,12 +457,14 @@ export async function resendInviteAction(
     redirect(`/liderancas/${leaderId}?convite=whatsapp&link=${encodeURIComponent(linked.properties.action_link)}`)
   }
 
-  // Canal e-mail: resetPasswordForEmail (client comum, não admin) dispara
-  // e-mail de verdade pra um usuário que já existe — diferente de
-  // generateLink, que só devolve o link sem enviar. É o mecanismo padrão
-  // do Supabase pra "reenviar", já que inviteUserByEmail (usado no
-  // cadastro original) só funciona pra usuário que ainda não existe.
-  const { error: resendError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+  // Canal e-mail: resetPasswordForEmail dispara e-mail de verdade pra um
+  // usuário que já existe — diferente de generateLink, que só devolve o link
+  // sem enviar. É o mecanismo padrão do Supabase pra "reenviar", já que
+  // inviteUserByEmail (usado no cadastro original) só funciona pra usuário
+  // que ainda não existe. createResetEmailClient(), não `supabase` — mesmo
+  // motivo do bloco de convite inicial acima (ver
+  // lib/supabase/reset-email-client.ts).
+  const { error: resendError } = await createResetEmailClient().auth.resetPasswordForEmail(email, { redirectTo })
   if (resendError) {
     return { error: `Não foi possível reenviar o convite por e-mail: ${resendError.message}.` }
   }

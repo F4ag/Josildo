@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createResetEmailClient } from "@/lib/supabase/reset-email-client"
 import { inviteUserSchema } from "@/lib/validations/user"
 import { setUserStatus } from "@/services/users"
 import type { ActionState } from "@/app/login/actions"
@@ -33,7 +34,6 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
 
   const { full_name, email, phone, role, leader_id } = parsed.data
   const admin = createAdminClient()
-  const supabase = await createClient()
   const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`
 
   // Cria o login em silêncio (createUser nunca notifica ninguém sozinho,
@@ -95,8 +95,9 @@ export async function inviteUser(_prevState: ActionState, formData: FormData): P
   // e-mail de verdade, mesmo mecanismo confiável já usado em "esqueci
   // senha" e no reenvio por e-mail (resendInviteAction em liderancas/
   // actions.ts). Falha aqui não desfaz o cadastro — o admin pode reenviar
-  // depois.
-  await supabase.auth.resetPasswordForEmail(email, { redirectTo }).catch(() => {})
+  // depois. createResetEmailClient(), não o client de sessão do admin_geral
+  // logado — ver lib/supabase/reset-email-client.ts.
+  await createResetEmailClient().auth.resetPasswordForEmail(email, { redirectTo }).catch(() => {})
 
   revalidatePath("/configuracoes/usuarios")
   return { error: null, success: true }
