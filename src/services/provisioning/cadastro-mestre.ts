@@ -7,6 +7,11 @@ import type { ProvisioningInput, ProvisioningStepResult } from "./types"
  * organizationId do Lidera+ via integracao_sistema (sistema='lidera_mais').
  * Se já existir, reaproveita — nunca cria um cliente duplicado ao reexecutar
  * uma etapa que falhou depois desta.
+ *
+ * TOCTOU risk (Time of Check, Time of Use): duas chamadas concorrentes para
+ * o mesmo organizationId podem ambas passar neste check antes que qualquer uma
+ * escreva integracao_sistema, criando duplicatas. Aceitável em produção pois
+ * este é um gatilho admin de baixa frequência, não tráfego high-concurrency.
  */
 export async function provisionarCadastroMestre(
   input: ProvisioningInput,
@@ -42,6 +47,7 @@ export async function provisionarCadastroMestre(
     .insert({ cliente_id: cliente.id, nome: "Campanha", status: "planejamento" })
 
   if (campanhaError) {
+    await cm.from("cliente").delete().eq("id", cliente.id)
     return { status: "erro", mensagem: `Falha ao criar campanha: ${campanhaError.message}` }
   }
 
@@ -52,6 +58,8 @@ export async function provisionarCadastroMestre(
   })
 
   if (integracaoError) {
+    await cm.from("campanha").delete().eq("cliente_id", cliente.id)
+    await cm.from("cliente").delete().eq("id", cliente.id)
     return { status: "erro", mensagem: `Falha ao registrar integração: ${integracaoError.message}` }
   }
 
