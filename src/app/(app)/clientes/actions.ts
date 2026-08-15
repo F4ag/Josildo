@@ -61,7 +61,11 @@ export async function retryProvisioningStepAction(
     return { status: "erro", mensagem: "Cadastro Mestre ainda não foi provisionado para este cliente — não é possível repetir esta etapa isoladamente." }
   }
 
-  return RETRY_STEPS[etapa](input, integracao.cliente_id)
+  try {
+    return await RETRY_STEPS[etapa](input, integracao.cliente_id)
+  } catch (err) {
+    return { status: "erro", mensagem: `Falha inesperada ao provisionar: ${err instanceof Error ? err.message : "erro desconhecido"}` }
+  }
 }
 
 export async function createClientAction(

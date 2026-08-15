@@ -160,9 +160,18 @@ function ProvisioningStatus({ report, input }: { report: ProvisioningReport; inp
 
   async function retry(etapa: (typeof RETRYABLE_STEPS)[number]) {
     setRetrying(etapa)
-    const result = await retryProvisioningStepAction(input, etapa)
-    setResults((prev) => ({ ...prev, [etapa]: result }))
-    setRetrying(null)
+    try {
+      const result = await retryProvisioningStepAction(input, etapa)
+      setResults((prev) => ({ ...prev, [etapa]: result }))
+    } catch (err) {
+      const errorResult: ProvisioningStepResult = {
+        status: "erro",
+        mensagem: `Falha ao tentar novamente: ${err instanceof Error ? err.message : "erro desconhecido"}`,
+      }
+      setResults((prev) => ({ ...prev, [etapa]: errorResult }))
+    } finally {
+      setRetrying(null)
+    }
   }
 
   return (
