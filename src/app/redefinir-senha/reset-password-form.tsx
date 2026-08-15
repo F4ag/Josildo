@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import { createClient } from "@/lib/supabase/client"
-import { updatePassword, exchangeRecoveryCode } from "./actions"
+import { updatePassword, exchangeRecoveryCode, hasActiveSession } from "./actions"
 import type { ActionState } from "../login/actions"
 
 const initialState: ActionState = { error: null }
@@ -35,12 +35,25 @@ function SubmitButton() {
  *
  * Sem este resgate (qualquer um dos dois casos), a página carrega sem sessão
  * nenhuma e a troca de senha falha silenciosamente com "peça um novo link".
+ *
+ * ANTES de tentar qualquer um dos dois, sempre checa primeiro se já existe
+ * sessão ativa (hasActiveSession) — ver comentário completo em actions.ts.
+ * Resumo: o cookie é do navegador inteiro, não da aba; se o link já foi
+ * aberto com sucesso em outra aba (ou antes, na mesma aba), tentar trocar de
+ * novo um código já usado podia sobrescrever e derrubar essa sessão boa.
+ * Checando antes, uma aba "atrasada" simplesmente aproveita a sessão que já
+ * existe, em vez de tentar (e falhar, com efeito colateral) trocar de novo.
  */
 function useSessionBridge() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     async function run() {
+      if (await hasActiveSession()) {
+        setReady(true)
+        return
+      }
+
       const code = new URLSearchParams(window.location.search).get("code")
 
       if (code) {
