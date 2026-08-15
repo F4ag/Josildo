@@ -54,6 +54,37 @@ export async function exchangeRecoveryCode(code: string): Promise<{ error: strin
   return { error: null }
 }
 
+/**
+ * Troca um `token_hash` (gerado por admin.generateLink, usado hoje só pro
+ * canal WhatsApp — ver liderancas/actions.ts) por uma sessão de verdade.
+ *
+ * De propósito, SÓ é chamada a partir de um clique explícito da pessoa (ver
+ * reset-password-form.tsx, tela de "Confirmar convite" antes do formulário)
+ * — nunca automaticamente ao carregar a página. Motivo: o link do
+ * admin.generateLink aponta pro /verify do Supabase, um GET de uso único.
+ * Quando esse link é mandado por WhatsApp, o próprio WhatsApp busca a URL
+ * sozinho pra montar a prévia da mensagem (link preview) — sem nenhuma ação
+ * da pessoa — e esse GET automático já CONSOME o token. Confirmado nos logs
+ * de auth do Supabase: um /verify bem-sucedido, e ~19 segundos depois outro
+ * /verify pro mesmo link com "One-time token not found" (o clique de
+ * verdade, já tarde demais). Por isso agora o token não vai mais direto no
+ * link (que qualquer prévia automática consegue buscar): vai só o
+ * `token_hash`, e a troca de verdade só acontece aqui, num Server Action
+ * disparado por um POST de clique real — bots de prévia de link nunca
+ * enviam formulário, só fazem GET.
+ */
+export async function verifyInviteToken(
+  tokenHash: string,
+  type: "invite" | "recovery",
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+  if (error) {
+    return { error: error.message }
+  }
+  return { error: null }
+}
+
 export async function updatePassword(
   _prevState: ActionState,
   formData: FormData,

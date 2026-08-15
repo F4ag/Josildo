@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import { createClient } from "@/lib/supabase/client"
-import { updatePassword, exchangeRecoveryCode, hasActiveSession } from "./actions"
+import { updatePassword, exchangeRecoveryCode, hasActiveSession, verifyInviteToken } from "./actions"
 import type { ActionState } from "../login/actions"
 
 const initialState: ActionState = { error: null }
@@ -23,16 +23,30 @@ function SubmitButton() {
 
 /**
  * O link de recuperação/convite do Supabase chega em /redefinir-senha de uma
- * de duas formas possíveis:
+ * de três formas possíveis:
  *
  * 1) `#access_token=...&refresh_token=...` (flow implicit — é o que este
- *    projeto usa hoje: todo disparo de resetPasswordForEmail passa por
- *    createResetEmailClient(), ver lib/supabase/reset-email-client.ts) — o
- *    fragmento nunca é enviado ao servidor, então precisa ser lido aqui no
- *    navegador e virar sessão via setSession no client SDK. Não depende de
- *    nada salvo previamente, então funciona em qualquer navegador/aparelho
- *    que abrir o link — inclusive um diferente do que pediu o link.
- * 2) `?code=xxxxx` (flow PKCE) — mantido só como fallback defensivo, caso
+ *    projeto usa hoje pro canal e-mail: todo disparo de resetPasswordForEmail
+ *    passa por createResetEmailClient(), ver lib/supabase/reset-email-client.ts)
+ *    — o fragmento nunca é enviado ao servidor, então precisa ser lido aqui
+ *    no navegador e virar sessão via setSession no client SDK. Não depende
+ *    de nada salvo previamente, então funciona em qualquer navegador/
+ *    aparelho que abrir o link — inclusive um diferente do que pediu o link.
+ * 2) `?token_hash=...&type=invite|recovery` (canal WhatsApp, gerado por
+ *    admin.generateLink em liderancas/actions.ts) — DE PROPÓSITO não é
+ *    trocado automaticamente aqui: fica pendente até a pessoa confirmar com
+ *    um clique (ver ConfirmInviteButton mais abaixo). O link do
+ *    generateLink aponta pro /verify do Supabase, um GET de uso único; o
+ *    próprio WhatsApp busca a URL sozinho pra montar a prévia da mensagem
+ *    assim que ela é enviada, e esse GET automático consome o token antes da
+ *    pessoa sequer ver a mensagem. Confirmado nos logs de auth do Supabase:
+ *    um /verify bem-sucedido, e ~19s depois outro pro mesmo link com
+ *    "One-time token not found" (o toque de verdade, já tarde demais). Por
+ *    isso o link agora carrega só o token_hash (não o link direto do
+ *    Supabase), e a troca de verdade (verifyInviteToken) só roda a partir de
+ *    um POST de clique real — bots de prévia de link nunca enviam
+ *    formulário, só fazem GET.
+ * 3) `?code=xxxxx` (flow PKCE) — mantido só como fallback defensivo, caso
  *    algum link antigo (enviado antes desta correção) ainda esteja numa
  *    caixa de entrada. Não gerar mais links assim de propósito: PKCE precisa
  *    de um "code_verifier" salvo no MESMO navegador que vai abrir o link, e
@@ -44,10 +58,10 @@ function SubmitButton() {
  *    Supabase: o /verify do link aparecia, mas nunca um /token depois — a
  *    troca falhava localmente, sem chegar a chamar a rede).
  *
- * Sem este resgate (qualquer um dos dois casos), a página carrega sem sessão
- * nenhuma e a troca de senha falha silenciosamente com "peça um novo link".
+ * Sem este resgate, a página carrega sem sessão nenhuma e a troca de senha
+ * falha silenciosamente com "peça um novo link".
  *
- * ANTES de tentar qualquer um dos dois, sempre checa primeiro se já existe
+ * ANTES de tentar qualquer um dos casos, sempre checa primeiro se já existe
  * sessão ativa (hasActiveSession) — ver comentário completo em actions.ts.
  * Resumo: o cookie é do navegador inteiro, não da aba; se o link já foi
  * aberto com sucesso em outra aba (ou antes, na mesma aba), tentar trocar de
@@ -55,7 +69,11 @@ function SubmitButton() {
  * Checando antes, uma aba "atrasada" simplesmente aproveita a sessão que já
  * existe, em vez de tentar (e falhar, com efeito colateral) trocar de novo.
  */
-type SessionBridgeStatus = "loading" | "ready" | "invalid"
+type SessionBridgeStatus =
+  | "loading"
+  | "ready"
+  | "invalid"
+  | { pendingConfirm: { tokenHash: string; type: "invite" | "recovery" } }
 
 function useSessionBridge(): SessionBridgeStatus {
   const [status, setStatus] = useState<SessionBridgeStatus>("loading")
@@ -67,7 +85,8 @@ function useSessionBridge(): SessionBridgeStatus {
         return
       }
 
-      const code = new URLSearchParams(window.location.search).get("code")
+      const search = new URLSearchParams(window.location.search)
+      const code = search.get("code")
 
       if (code) {
         const { error } = await exchangeRecoveryCode(code)
@@ -79,6 +98,15 @@ function useSessionBridge(): SessionBridgeStatus {
         // tivesse acontecido, e o erro só aparecia depois, ao salvar a
         // senha, sem nenhuma pista do motivo real.
         setStatus(error ? "invalid" : "ready")
+        return
+      }
+
+      const tokenHash = search.get("token_hash")
+      const type = search.get("type")
+      if (tokenHash && (type === "invite" || type === "recovery")) {
+        // Não troca aqui — só fica pendente até a pessoa confirmar com um
+        // clique. Ver comentário completo acima (item 2).
+        setStatus({ pendingConfirm: { tokenHash, type } })
         return
       }
 
@@ -109,6 +137,35 @@ function useSessionBridge(): SessionBridgeStatus {
   return status
 }
 
+function ConfirmInviteButton({ tokenHash, type }: { tokenHash: string; type: "invite" | "recovery" }) {
+  const [pending, setPending] = useState(false)
+
+  return (
+    <div className="space-y-3 text-center">
+      <p className="text-sm text-foreground/70">Você foi convidado(a) para o Lidera+.</p>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={async () => {
+          setPending(true)
+          await verifyInviteToken(tokenHash, type)
+          // Recarrega a página inteira, já sem token_hash/type na URL (em vez
+          // de só trocar o estado local), pra que useSessionBridge rode de
+          // novo do zero: com sucesso, hasActiveSession acha a sessão recém-
+          // criada (ready); sem sucesso (link já usado/expirado), nenhum
+          // parâmetro reconhecido sobra na URL, e cai direto em "invalid" —
+          // o mesmo caminho que qualquer outra visita normal usa, sem
+          // duplicar lógica de mensagem de erro aqui.
+          window.location.href = window.location.pathname
+        }}
+        className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+      >
+        {pending ? "Confirmando..." : "Confirmar convite"}
+      </button>
+    </div>
+  )
+}
+
 export function ResetPasswordForm() {
   const [state, formAction] = useFormState(updatePassword, initialState)
   const sessionStatus = useSessionBridge()
@@ -136,6 +193,11 @@ export function ResetPasswordForm() {
         Este link não é válido ou já foi usado. Peça um novo link de recuperação.
       </p>
     )
+  }
+
+  if (typeof sessionStatus === "object") {
+    const { tokenHash, type } = sessionStatus.pendingConfirm
+    return <ConfirmInviteButton tokenHash={tokenHash} type={type} />
   }
 
   return (

@@ -137,7 +137,16 @@ export async function createLeaderAction(
         return { error: `Não foi possível gerar o convite para este e-mail: ${linkError?.message ?? "erro desconhecido"}.` }
       }
       invitedUserId = linked.user.id
-      whatsappInviteLink = linked.properties.action_link
+      // token_hash na URL (não linked.properties.action_link, que aponta
+      // direto pro /verify do Supabase) — ver comentário completo em
+      // redefinir-senha/reset-password-form.tsx (item 2). Resumo: o
+      // action_link é um GET de uso único, e o próprio WhatsApp busca a URL
+      // sozinho pra montar a prévia da mensagem assim que ela é enviada,
+      // consumindo o token antes da liderança sequer ver a mensagem. Com só
+      // o token_hash, a troca de verdade fica pendente até um clique real
+      // em /redefinir-senha (verifyInviteToken), imune a esse tipo de busca
+      // automática (que nunca envia formulário, só faz GET).
+      whatsappInviteLink = `${redirectTo}?token_hash=${encodeURIComponent(linked.properties.hashed_token)}&type=invite`
     } else {
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email: parsed.data.email!,
@@ -454,7 +463,11 @@ export async function resendInviteAction(
       return { error: `Não foi possível gerar o novo link de convite: ${linkError?.message ?? "erro desconhecido"}.` }
     }
     revalidatePath(`/liderancas/${leaderId}`)
-    redirect(`/liderancas/${leaderId}?convite=whatsapp&link=${encodeURIComponent(linked.properties.action_link)}`)
+    // token_hash, não linked.properties.action_link — mesmo motivo do
+    // convite inicial acima (createLeaderAction): o action_link é um GET de
+    // uso único que a própria prévia de link do WhatsApp consome sozinha.
+    const whatsappLink = `${redirectTo}?token_hash=${encodeURIComponent(linked.properties.hashed_token)}&type=recovery`
+    redirect(`/liderancas/${leaderId}?convite=whatsapp&link=${encodeURIComponent(whatsappLink)}`)
   }
 
   // Canal e-mail: resetPasswordForEmail dispara e-mail de verdade pra um
