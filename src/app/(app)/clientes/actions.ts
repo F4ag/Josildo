@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireSessionUser } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createCadastroMestreClient } from "@/lib/supabase/external-projects"
 import {
   isSlugTaken, isEmailTaken, createOrganizationRow, getOrganizationById, updateOrganizationRow,
   deleteOrganizationCascade,
@@ -12,6 +13,10 @@ import { createOrganizationSchema, updateOrganizationSchema } from "@/lib/valida
 import type { ActionState } from "@/app/login/actions"
 import { provisionarClienteCrossSistema } from "@/services/provisioning/orchestrator"
 import type { ProvisioningReport } from "@/services/provisioning/orchestrator"
+import { provisionarBussola } from "@/services/provisioning/bussola"
+import { provisionarOrigem } from "@/services/provisioning/origem"
+import { provisionarDashboard } from "@/services/provisioning/dashboard"
+import type { ProvisioningInput, ProvisioningStepResult } from "@/services/provisioning/types"
 
 // Mesma constante de app/(app)/clientes/page.tsx e lib/supabase/middleware.ts
 // — a organização "Lidera+" original (pré-multi-tenant) nunca pode ser
@@ -34,6 +39,29 @@ async function assertPlatformAdmin() {
     throw new Error("Apenas a Agência F4 pode gerenciar clientes da plataforma.")
   }
   return session
+}
+
+const RETRY_STEPS = { bussola: provisionarBussola, origem: provisionarOrigem, dashboard: provisionarDashboard } as const
+
+export async function retryProvisioningStepAction(
+  input: ProvisioningInput,
+  etapa: keyof typeof RETRY_STEPS,
+): Promise<ProvisioningStepResult> {
+  await assertPlatformAdmin()
+
+  const cm = createCadastroMestreClient()
+  const { data: integracao, error } = await cm
+    .from("integracao_sistema")
+    .select("cliente_id")
+    .eq("sistema", "lidera_mais")
+    .eq("identificador_externo", input.organizationId)
+    .maybeSingle()
+
+  if (error || !integracao) {
+    return { status: "erro", mensagem: "Cadastro Mestre ainda não foi provisionado para este cliente — não é possível repetir esta etapa isoladamente." }
+  }
+
+  return RETRY_STEPS[etapa](input, integracao.cliente_id)
 }
 
 export async function createClientAction(

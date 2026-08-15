@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import Link from "next/link"
-import { createClientAction, type CreateClientActionState } from "../actions"
+import { createClientAction, type CreateClientActionState, retryProvisioningStepAction } from "../actions"
+import type { ProvisioningReport } from "@/services/provisioning/orchestrator"
+import type { ProvisioningInput, ProvisioningStepResult } from "@/services/provisioning/types"
 
 const initialState: CreateClientActionState = { error: null }
 
@@ -47,13 +49,16 @@ export function ClientForm() {
 
   if (state.success) {
     return (
-      <div className="max-w-lg rounded-lg border border-black/5 bg-white p-6">
+      <div className="max-w-lg space-y-4 rounded-lg border border-black/5 bg-white p-6">
         <p className="text-sm text-foreground/80">
           Cliente criado. O responsável vai receber um e-mail para definir a senha. Assim que
           entrar, o acesso já vai estar isolado em{" "}
           <strong>{state.slug}.{ROOT_DOMAIN}</strong>.
         </p>
-        <Link href="/clientes" className="mt-4 inline-block text-sm text-secondary hover:underline">
+        {state.provisioning && state.provisioningInput && (
+          <ProvisioningStatus report={state.provisioning} input={state.provisioningInput} />
+        )}
+        <Link href="/clientes" className="inline-block text-sm text-secondary hover:underline">
           Voltar para a lista de clientes
         </Link>
       </div>
@@ -137,5 +142,60 @@ export function ClientForm() {
         </Link>
       </div>
     </form>
+  )
+}
+
+const STEP_LABELS: Record<keyof ProvisioningReport, string> = {
+  cadastroMestre: "Cadastro Mestre",
+  bussola: "Bússola",
+  origem: "Origem",
+  dashboard: "Dashboard",
+}
+
+const RETRYABLE_STEPS = ["bussola", "origem", "dashboard"] as const
+
+function ProvisioningStatus({ report, input }: { report: ProvisioningReport; input: ProvisioningInput }) {
+  const [results, setResults] = useState(report)
+  const [retrying, setRetrying] = useState<string | null>(null)
+
+  async function retry(etapa: (typeof RETRYABLE_STEPS)[number]) {
+    setRetrying(etapa)
+    const result = await retryProvisioningStepAction(input, etapa)
+    setResults((prev) => ({ ...prev, [etapa]: result }))
+    setRetrying(null)
+  }
+
+  return (
+    <div className="rounded-md border border-black/5 bg-black/[0.02] p-3">
+      <p className="mb-2 text-xs font-medium uppercase text-foreground/50">Provisionamento nos outros sistemas</p>
+      <ul className="space-y-1">
+        {(Object.keys(STEP_LABELS) as (keyof ProvisioningReport)[]).map((key) => {
+          const result: ProvisioningStepResult = results[key]
+          const canRetry = result.status === "erro" && (RETRYABLE_STEPS as readonly string[]).includes(key)
+          return (
+            <li key={key} className="flex items-center justify-between text-sm">
+              <span>{STEP_LABELS[key]}</span>
+              <span className="flex items-center gap-2">
+                {result.status === "ok" ? (
+                  <span className="text-secondary">✓ Pronto</span>
+                ) : (
+                  <span className="text-status-atrasada" title={result.mensagem}>✗ Falhou</span>
+                )}
+                {canRetry && (
+                  <button
+                    type="button"
+                    disabled={retrying === key}
+                    onClick={() => retry(key as (typeof RETRYABLE_STEPS)[number])}
+                    className="rounded border border-black/10 px-2 py-0.5 text-xs hover:bg-black/5 disabled:opacity-60"
+                  >
+                    {retrying === key ? "Tentando..." : "Tentar de novo"}
+                  </button>
+                )}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
