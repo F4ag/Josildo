@@ -33,20 +33,32 @@ async function runProvisioning(input: ProvisioningInput): Promise<ProvisioningRe
 }
 
 /**
- * Dedupe em memória por organizationId: fecha a mesma janela de race que o
- * advisory lock do Cadastro Mestre (Layer 1) só cobre pra aquela etapa
- * específica. Bússola/Origem/Dashboard têm o mesmo formato TOCTOU no próprio
- * check de idempotência (SELECT integracao_sistema) e não temos acesso DDL
- * pra aplicar o mesmo advisory lock lá — então a defesa fica na origem: duas
- * chamadas concorrentes de provisionarClienteCrossSistema pro mesmo
- * organizationId reaproveitam a MESMA promise em vez de rodar o pipeline
- * inteiro duas vezes.
+ * Dedupe em memória por organizationId: se duas chamadas concorrentes de
+ * provisionarClienteCrossSistema chegarem com o MESMO organizationId já
+ * conhecido (ex.: duplo clique num retry de uma etapa já provisionada),
+ * reaproveitam a MESMA promise em vez de rodar o pipeline inteiro duas vezes.
+ * Esse é o único caso que este mapa protege.
  *
- * Limitação conhecida: isso é local ao processo Node. Se este app rodar com
- * mais de uma réplica/instância, cada processo tem seu próprio mapa e a
- * dedupe não protege entre processos. Aceitável hoje porque o deploy atual é
- * de instância única — não é uma lacuna sendo introduzida silenciosamente,
- * é uma limitação assumida dado o deploy atual.
+ * O que isso NÃO cobre: no fluxo de criação, organizationId é um UUID recém
+ * gerado por createOrganizationRow imediatamente antes de chamar o
+ * orchestrator — dois cliques rápidos de double-submit no navegador geram
+ * dois organizationId diferentes (uma chave de mapa diferente cada), então a
+ * dedupe não tem como enxergar esse caso. E não é a defesa principal contra a
+ * duplicação encontrada em teste E2E ao vivo (ver ledger da Task 8): lá, a
+ * duplicação ocorreu de um jeito que nenhuma dedupe em nível de aplicação
+ * consegue observar — as próprias requisições HTTP ao Supabase pareceram
+ * duplicar abaixo da camada da aplicação. Quem fecha essa lacuna
+ * independente da causa raiz são as constraints de unicidade em nível de
+ * banco (adicionadas diretamente no projeto Cadastro Mestre e capturadas
+ * neste branch em
+ * supabase/migrations/2026-08-15_cadastro_mestre_provisionar_cliente_lidera_mais.sql).
+ *
+ * Limitação conhecida (ainda válida, mesmo com o acima): isso é local ao
+ * processo Node. Se este app rodar com mais de uma réplica/instância, cada
+ * processo tem seu próprio mapa e a dedupe não protege entre processos.
+ * Aceitável hoje porque o deploy atual é de instância única — não é uma
+ * lacuna sendo introduzida silenciosamente, é uma limitação assumida dado o
+ * deploy atual.
  */
 const emAndamento = new Map<string, Promise<ProvisioningReport>>()
 

@@ -49,7 +49,8 @@ export async function provisionarOrigem(
     .from("organization_members")
     .insert({ organization_id: org.id, user_id: invited.user.id, role: "owner" })
   if (memberError) {
-    await origem.auth.admin.deleteUser(invited.user.id)
+    const { error: rollbackUserError } = await origem.auth.admin.deleteUser(invited.user.id)
+    if (rollbackUserError) console.error("[provisioning:origem] falha ao desfazer usuário (rollback membro):", rollbackUserError)
     const { error: rollbackProjectError } = await origem.from("brand_projects").delete().eq("organization_id", org.id)
     if (rollbackProjectError) console.error("[provisioning:origem] falha ao desfazer projeto de marca (rollback membro):", rollbackProjectError)
     const { error: rollbackOrgError } = await origem.from("organizations").delete().eq("id", org.id)
@@ -70,7 +71,8 @@ export async function provisionarOrigem(
     // brand_projects (filho de org) -> organizations (pai).
     const { error: rollbackMemberError } = await origem.from("organization_members").delete().eq("organization_id", org.id)
     if (rollbackMemberError) console.error("[provisioning:origem] falha ao desfazer membro (rollback integração):", rollbackMemberError)
-    await origem.auth.admin.deleteUser(invited.user.id)
+    const { error: rollbackUserError } = await origem.auth.admin.deleteUser(invited.user.id)
+    if (rollbackUserError) console.error("[provisioning:origem] falha ao desfazer usuário (rollback integração):", rollbackUserError)
     const { error: rollbackProjectError } = await origem.from("brand_projects").delete().eq("organization_id", org.id)
     if (rollbackProjectError) console.error("[provisioning:origem] falha ao desfazer projeto de marca (rollback integração):", rollbackProjectError)
     const { error: rollbackOrgError } = await origem.from("organizations").delete().eq("id", org.id)

@@ -52,7 +52,7 @@ export async function updateElectionSettings(_prevState: ActionState, formData: 
     if (integracaoError) {
       console.error("[eleicao] falha ao consultar integracao_sistema no Cadastro Mestre:", integracaoError)
     } else if (integracao) {
-      const { error: campanhaError } = await cm
+      const { data: campanhaAtualizada, error: campanhaError } = await cm
         .from("campanha")
         .update({
           cargo: parsed.data.election_cargo ? ELECTION_CARGO_LABELS[parsed.data.election_cargo] : null,
@@ -60,9 +60,14 @@ export async function updateElectionSettings(_prevState: ActionState, formData: 
           ano_eleicao: parsed.data.election_year,
         })
         .eq("cliente_id", integracao.cliente_id)
+        .select("id")
 
       if (campanhaError) {
         console.error("[eleicao] falha ao atualizar campanha no Cadastro Mestre:", campanhaError)
+      } else if (!campanhaAtualizada || campanhaAtualizada.length === 0) {
+        console.error(
+          `[eleicao] update em campanha não encontrou nenhuma linha para cliente_id=${integracao.cliente_id}`,
+        )
       }
     }
   } catch (propagationError) {

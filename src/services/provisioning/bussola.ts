@@ -46,7 +46,8 @@ export async function provisionarBussola(
     ativo: true,
   })
   if (perfilError) {
-    await bussola.auth.admin.deleteUser(invited.user.id)
+    const { error: rollbackUserError } = await bussola.auth.admin.deleteUser(invited.user.id)
+    if (rollbackUserError) console.error("[provisioning:bussola] falha ao desfazer usuário (rollback perfil):", rollbackUserError)
     const { error: rollbackOrgError } = await bussola.from("organizacoes").delete().eq("id", org.id)
     if (rollbackOrgError) console.error("[provisioning:bussola] falha ao desfazer organização (rollback perfil):", rollbackOrgError)
     return { status: "erro", mensagem: `Bússola (perfil): ${perfilError.message}` }
@@ -65,7 +66,8 @@ export async function provisionarBussola(
     // referencia ele.
     const { error: rollbackPerfilError } = await bussola.from("perfis").delete().eq("id", invited.user.id)
     if (rollbackPerfilError) console.error("[provisioning:bussola] falha ao desfazer perfil (rollback integração):", rollbackPerfilError)
-    await bussola.auth.admin.deleteUser(invited.user.id)
+    const { error: rollbackUserError } = await bussola.auth.admin.deleteUser(invited.user.id)
+    if (rollbackUserError) console.error("[provisioning:bussola] falha ao desfazer usuário (rollback integração):", rollbackUserError)
     const { error: rollbackOrgError } = await bussola.from("organizacoes").delete().eq("id", org.id)
     if (rollbackOrgError) console.error("[provisioning:bussola] falha ao desfazer organização (rollback integração):", rollbackOrgError)
     return { status: "erro", mensagem: `Bússola (registrar integração): ${integracaoError.message}` }

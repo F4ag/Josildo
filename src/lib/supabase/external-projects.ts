@@ -2,24 +2,23 @@ import "server-only"
 import { createClient as createExternalClient } from "@supabase/supabase-js"
 
 // Clients para os outros 3 projetos Supabase do ecossistema (Cadastro Mestre,
-// Bússola, Origem) — usados SÓ pela Central de Estratégia
-// (app/(app)/central-estrategia), a única tela do Lidera+ que precisa
-// atravessar projeto. Nenhum outro módulo deve importar este arquivo.
+// Bússola, Origem) e para o Dashboard — usados pela Central de Estratégia
+// (app/(app)/central-estrategia) e também pelo pipeline de provisionamento
+// cross-sistema (app/(app)/clientes/novo, app/(app)/configuracoes/eleicao, e
+// a action de retry em app/(app)/clientes/actions.ts), que precisam atravessar
+// projeto para criar/consultar dados nesses outros sistemas.
 //
 // Diferente de lib/supabase/admin.ts (que aponta pro PRÓPRIO projeto
 // Lidera+), estes clients apontam pra bancos externos — por isso não usam o
 // tipo `Database` deste projeto (o schema é de outro banco).
-//
-// Dashboard NÃO tem client aqui: suas tabelas usam cliente_id do Cadastro
-// Mestre direto, mas a leitura em si segue pendente da confirmação de acesso
-// (ver observação em services/central-estrategia.ts).
 
 function envOrThrow(name: string): string {
   const value = process.env[name]
   if (!value) {
     throw new Error(
       `${name} não configurada. Defina em .env.local (ver .env.example) — ` +
-        "necessária para a Central de Estratégia consultar outro projeto do ecossistema.",
+        "necessária para funcionalidades que consultam outros projetos do ecossistema " +
+        "(Central de Estratégia, provisionamento de clientes).",
     )
   }
   return value

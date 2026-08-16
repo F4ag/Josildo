@@ -5,7 +5,7 @@ import { useFormState, useFormStatus } from "react-dom"
 import Link from "next/link"
 import { createClientAction, type CreateClientActionState, retryProvisioningStepAction } from "../actions"
 import type { ProvisioningReport } from "@/services/provisioning/orchestrator"
-import type { ProvisioningInput, ProvisioningStepResult } from "@/services/provisioning/types"
+import type { ProvisioningStepResult } from "@/services/provisioning/types"
 
 const initialState: CreateClientActionState = { error: null }
 
@@ -55,8 +55,8 @@ export function ClientForm() {
           entrar, o acesso já vai estar isolado em{" "}
           <strong>{state.slug}.{ROOT_DOMAIN}</strong>.
         </p>
-        {state.provisioning && state.provisioningInput && (
-          <ProvisioningStatus report={state.provisioning} input={state.provisioningInput} />
+        {state.provisioning && state.organizationId && (
+          <ProvisioningStatus report={state.provisioning} organizationId={state.organizationId} />
         )}
         <Link href="/clientes" className="inline-block text-sm text-secondary hover:underline">
           Voltar para a lista de clientes
@@ -154,14 +154,14 @@ const STEP_LABELS: Record<keyof ProvisioningReport, string> = {
 
 const RETRYABLE_STEPS = ["bussola", "origem", "dashboard"] as const
 
-function ProvisioningStatus({ report, input }: { report: ProvisioningReport; input: ProvisioningInput }) {
+function ProvisioningStatus({ report, organizationId }: { report: ProvisioningReport; organizationId: string }) {
   const [results, setResults] = useState(report)
   const [retrying, setRetrying] = useState<string | null>(null)
 
   async function retry(etapa: (typeof RETRYABLE_STEPS)[number]) {
     setRetrying(etapa)
     try {
-      const result = await retryProvisioningStepAction(input, etapa)
+      const result = await retryProvisioningStepAction(organizationId, etapa)
       setResults((prev) => ({ ...prev, [etapa]: result }))
     } catch (err) {
       const errorResult: ProvisioningStepResult = {

@@ -1,10 +1,12 @@
 import { z } from "zod"
 
-// Mesmos valores do CHECK constraint organizations.election_cargo (ver
-// supabase/schema.sql), do mapa CARGO_TSE_LABEL na Edge Function
-// import-election-results, e do mapeamento em
-// app/(app)/configuracoes/eleicao/actions.ts (propagação para Cadastro Mestre)
-// — se adicionar um cargo aqui, adicionar em todos os quatro lugares.
+// Mesmos valores em três lugares: o CHECK constraint
+// organizations.election_cargo (ver supabase/schema.sql), o mapa
+// CARGO_TSE_LABEL na Edge Function import-election-results, e
+// ELECTION_CARGOS/ELECTION_CARGO_LABELS aqui neste arquivo — que é a própria
+// fonte única de onde app/(app)/configuracoes/eleicao/actions.ts importa os
+// labels, não um quarto lugar separado. Se adicionar um cargo aqui, adicionar
+// também nos outros dois.
 export const ELECTION_CARGOS = [
   "prefeito", "vice_prefeito", "vereador",
   "governador", "vice_governador", "senador",

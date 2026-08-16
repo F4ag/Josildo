@@ -28,7 +28,7 @@ export type CreateClientActionState = {
   success?: boolean
   slug?: string
   provisioning?: ProvisioningReport
-  provisioningInput?: import("@/services/provisioning/types").ProvisioningInput
+  organizationId?: string
 }
 
 /** Só contas com is_platform_admin (Agência F4) — nunca um admin_geral de
@@ -44,7 +44,7 @@ async function assertPlatformAdmin() {
 const RETRY_STEPS = { bussola: provisionarBussola, origem: provisionarOrigem, dashboard: provisionarDashboard } as const
 
 export async function retryProvisioningStepAction(
-  input: ProvisioningInput,
+  organizationId: string,
   etapa: keyof typeof RETRY_STEPS,
 ): Promise<ProvisioningStepResult> {
   await assertPlatformAdmin()
@@ -54,11 +54,45 @@ export async function retryProvisioningStepAction(
     .from("integracao_sistema")
     .select("cliente_id")
     .eq("sistema", "lidera_mais")
-    .eq("identificador_externo", input.organizationId)
+    .eq("identificador_externo", organizationId)
     .maybeSingle()
 
   if (error || !integracao) {
     return { status: "erro", mensagem: "Cadastro Mestre ainda não foi provisionado para este cliente — não é possível repetir esta etapa isoladamente." }
+  }
+
+  // Reconstrói o ProvisioningInput a partir dos dados reais da organização no
+  // Lidera+ em vez de confiar no que o navegador reenviar — o input original
+  // (CreateClientActionState.provisioningInput) só existiu no state do
+  // client component, e um retry com dados client-side obsoletos ou
+  // adulterados poderia gravar nome/cidade errados ou convidar o e-mail
+  // errado nos outros sistemas.
+  const admin = createAdminClient()
+  const org = await getOrganizationById(admin, organizationId)
+  if (!org) {
+    return { status: "erro", mensagem: "Organização não encontrada." }
+  }
+
+  const { data: adminProfile, error: adminProfileError } = await admin
+    .from("users_profiles")
+    .select("full_name, email")
+    .eq("organization_id", organizationId)
+    .eq("role", "admin_geral")
+    .maybeSingle()
+
+  if (adminProfileError) {
+    return { status: "erro", mensagem: `Falha ao buscar o responsável da organização: ${adminProfileError.message}` }
+  }
+  if (!adminProfile || !adminProfile.email) {
+    return { status: "erro", mensagem: "Nenhum Admin Geral encontrado para esta organização — não é possível repetir esta etapa." }
+  }
+
+  const input: ProvisioningInput = {
+    organizationId,
+    nome: org.name,
+    cidade: org.cidade ?? "",
+    adminEmail: adminProfile.email,
+    adminNome: adminProfile.full_name,
   }
 
   try {
@@ -126,7 +160,7 @@ export async function createClientAction(
     return { error: `Não foi possível salvar o perfil do responsável: ${profileError.message}.` }
   }
 
-  const provisioningInput = {
+  const provisioningInput: ProvisioningInput = {
     organizationId: org.id,
     nome: name,
     cidade,
@@ -151,7 +185,7 @@ export async function createClientAction(
   }
 
   revalidatePath("/clientes")
-  return { error: null, success: true, slug: org.slug, provisioning, provisioningInput }
+  return { error: null, success: true, slug: org.slug, provisioning, organizationId: org.id }
 }
 
 export type UpdateClientActionState = { error: string | null; success?: boolean }

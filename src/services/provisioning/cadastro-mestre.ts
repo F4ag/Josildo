@@ -24,5 +24,9 @@ export async function provisionarCadastroMestre(
     return { status: "erro", mensagem: `Falha ao provisionar cliente: ${error.message}` }
   }
 
+  if (typeof clienteId !== "string") {
+    return { status: "erro", mensagem: "RPC não retornou um clienteId válido." }
+  }
+
   return { status: "ok", clienteId }
 }
