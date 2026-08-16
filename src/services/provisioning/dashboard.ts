@@ -14,8 +14,10 @@ async function limparRpasClonadas(
   rpaIds: string[],
 ): Promise<void> {
   if (rpaIds.length === 0) return
-  await dashboard.from("bairros").delete().in("rpa_id", rpaIds)
-  await dashboard.from("rpas").delete().in("id", rpaIds)
+  const { error: rollbackBairrosError } = await dashboard.from("bairros").delete().in("rpa_id", rpaIds)
+  if (rollbackBairrosError) console.error("[provisioning:dashboard] falha ao desfazer bairros clonados:", rollbackBairrosError)
+  const { error: rollbackRpasError } = await dashboard.from("rpas").delete().in("id", rpaIds)
+  if (rollbackRpasError) console.error("[provisioning:dashboard] falha ao desfazer RPAs clonadas:", rollbackRpasError)
 }
 
 async function clonarTerritorioDaCidade(
@@ -138,7 +140,8 @@ export async function provisionarDashboard(
   if (clonagem.status === "erro") {
     // clonarTerritorioDaCidade já desfez o que criou internamente — falta só
     // desfazer o perfil e o convite deste passo.
-    await dashboard.from("perfis").delete().eq("id", invited.user.id)
+    const { error: rollbackPerfilError } = await dashboard.from("perfis").delete().eq("id", invited.user.id)
+    if (rollbackPerfilError) console.error("[provisioning:dashboard] falha ao desfazer perfil (rollback clonagem):", rollbackPerfilError)
     await dashboard.auth.admin.deleteUser(invited.user.id)
     return clonagem
   }
@@ -160,7 +163,8 @@ export async function provisionarDashboard(
       // Não sabemos quais rpas apagar — não tratamos como "nenhuma" (isso
       // deixaria o território clonado órfão em silêncio). Sinaliza o erro
       // combinado; perfil/usuário ainda são desfeitos abaixo.
-      await dashboard.from("perfis").delete().eq("id", invited.user.id)
+      const { error: rollbackPerfilError } = await dashboard.from("perfis").delete().eq("id", invited.user.id)
+      if (rollbackPerfilError) console.error("[provisioning:dashboard] falha ao desfazer perfil (rollback integração, sem saber quais rpas apagar):", rollbackPerfilError)
       await dashboard.auth.admin.deleteUser(invited.user.id)
       return {
         status: "erro",
@@ -168,7 +172,8 @@ export async function provisionarDashboard(
       }
     }
     await limparRpasClonadas(dashboard, (rpasDoCliente ?? []).map((rpa) => rpa.id))
-    await dashboard.from("perfis").delete().eq("id", invited.user.id)
+    const { error: rollbackPerfilError } = await dashboard.from("perfis").delete().eq("id", invited.user.id)
+    if (rollbackPerfilError) console.error("[provisioning:dashboard] falha ao desfazer perfil (rollback integração):", rollbackPerfilError)
     await dashboard.auth.admin.deleteUser(invited.user.id)
     return { status: "erro", mensagem: `Dashboard (registrar integração): ${integracaoError.message}` }
   }

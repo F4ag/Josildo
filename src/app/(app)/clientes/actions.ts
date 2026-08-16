@@ -96,7 +96,7 @@ export async function createClientAction(
     return { error: `O e-mail "${admin_email}" já pertence a uma conta existente (de qualquer cliente).` }
   }
 
-  const org = await createOrganizationRow(admin, name, slug)
+  const org = await createOrganizationRow(admin, name, slug, cidade)
 
   // Convite do primeiro admin_geral do cliente novo — mesmo fluxo/redirectTo
   // de configuracoes/usuarios/actions.ts (inviteUser).

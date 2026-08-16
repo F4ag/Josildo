@@ -47,7 +47,8 @@ export async function provisionarCadastroMestre(
     .insert({ cliente_id: cliente.id, nome: "Campanha", status: "planejamento" })
 
   if (campanhaError) {
-    await cm.from("cliente").delete().eq("id", cliente.id)
+    const { error: rollbackClienteError } = await cm.from("cliente").delete().eq("id", cliente.id)
+    if (rollbackClienteError) console.error("[provisioning:cadastro-mestre] falha ao desfazer cliente (rollback campanha):", rollbackClienteError)
     return { status: "erro", mensagem: `Falha ao criar campanha: ${campanhaError.message}` }
   }
 
@@ -58,8 +59,10 @@ export async function provisionarCadastroMestre(
   })
 
   if (integracaoError) {
-    await cm.from("campanha").delete().eq("cliente_id", cliente.id)
-    await cm.from("cliente").delete().eq("id", cliente.id)
+    const { error: rollbackCampanhaError } = await cm.from("campanha").delete().eq("cliente_id", cliente.id)
+    if (rollbackCampanhaError) console.error("[provisioning:cadastro-mestre] falha ao desfazer campanha (rollback integração):", rollbackCampanhaError)
+    const { error: rollbackClienteError } = await cm.from("cliente").delete().eq("id", cliente.id)
+    if (rollbackClienteError) console.error("[provisioning:cadastro-mestre] falha ao desfazer cliente (rollback integração):", rollbackClienteError)
     return { status: "erro", mensagem: `Falha ao registrar integração: ${integracaoError.message}` }
   }
 

@@ -28,7 +28,8 @@ export async function provisionarOrigem(
     .from("brand_projects")
     .insert({ organization_id: org.id, name: input.nome, status: "draft" })
   if (projectError) {
-    await origem.from("organizations").delete().eq("id", org.id)
+    const { error: rollbackOrgError } = await origem.from("organizations").delete().eq("id", org.id)
+    if (rollbackOrgError) console.error("[provisioning:origem] falha ao desfazer organização (rollback projeto de marca):", rollbackOrgError)
     return { status: "erro", mensagem: `Origem (projeto de marca): ${projectError.message}` }
   }
 
@@ -37,8 +38,10 @@ export async function provisionarOrigem(
     // brand_projects (filho, referencia organization_id) precisa sair antes
     // da organização (pai) — o exemplo original só apagava a organização e
     // deixava o brand_project órfão.
-    await origem.from("brand_projects").delete().eq("organization_id", org.id)
-    await origem.from("organizations").delete().eq("id", org.id)
+    const { error: rollbackProjectError } = await origem.from("brand_projects").delete().eq("organization_id", org.id)
+    if (rollbackProjectError) console.error("[provisioning:origem] falha ao desfazer projeto de marca (rollback convite):", rollbackProjectError)
+    const { error: rollbackOrgError } = await origem.from("organizations").delete().eq("id", org.id)
+    if (rollbackOrgError) console.error("[provisioning:origem] falha ao desfazer organização (rollback convite):", rollbackOrgError)
     return { status: "erro", mensagem: `Origem (convite): ${inviteError?.message ?? "erro desconhecido"}` }
   }
 
@@ -47,8 +50,10 @@ export async function provisionarOrigem(
     .insert({ organization_id: org.id, user_id: invited.user.id, role: "owner" })
   if (memberError) {
     await origem.auth.admin.deleteUser(invited.user.id)
-    await origem.from("brand_projects").delete().eq("organization_id", org.id)
-    await origem.from("organizations").delete().eq("id", org.id)
+    const { error: rollbackProjectError } = await origem.from("brand_projects").delete().eq("organization_id", org.id)
+    if (rollbackProjectError) console.error("[provisioning:origem] falha ao desfazer projeto de marca (rollback membro):", rollbackProjectError)
+    const { error: rollbackOrgError } = await origem.from("organizations").delete().eq("id", org.id)
+    if (rollbackOrgError) console.error("[provisioning:origem] falha ao desfazer organização (rollback membro):", rollbackOrgError)
     return { status: "erro", mensagem: `Origem (membro): ${memberError.message}` }
   }
 
@@ -63,10 +68,13 @@ export async function provisionarOrigem(
     // olha integracao_sistema (que é o insert que acabou de falhar). Ordem:
     // organization_members (filho de org+user) -> usuário de auth ->
     // brand_projects (filho de org) -> organizations (pai).
-    await origem.from("organization_members").delete().eq("organization_id", org.id)
+    const { error: rollbackMemberError } = await origem.from("organization_members").delete().eq("organization_id", org.id)
+    if (rollbackMemberError) console.error("[provisioning:origem] falha ao desfazer membro (rollback integração):", rollbackMemberError)
     await origem.auth.admin.deleteUser(invited.user.id)
-    await origem.from("brand_projects").delete().eq("organization_id", org.id)
-    await origem.from("organizations").delete().eq("id", org.id)
+    const { error: rollbackProjectError } = await origem.from("brand_projects").delete().eq("organization_id", org.id)
+    if (rollbackProjectError) console.error("[provisioning:origem] falha ao desfazer projeto de marca (rollback integração):", rollbackProjectError)
+    const { error: rollbackOrgError } = await origem.from("organizations").delete().eq("id", org.id)
+    if (rollbackOrgError) console.error("[provisioning:origem] falha ao desfazer organização (rollback integração):", rollbackOrgError)
     return { status: "erro", mensagem: `Origem (registrar integração): ${integracaoError.message}` }
   }
 

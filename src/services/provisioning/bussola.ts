@@ -26,11 +26,18 @@ export async function provisionarBussola(
 
   const { data: invited, error: inviteError } = await bussola.auth.admin.inviteUserByEmail(input.adminEmail)
   if (inviteError || !invited.user) {
-    await bussola.from("organizacoes").delete().eq("id", org.id)
+    const { error: rollbackOrgError } = await bussola.from("organizacoes").delete().eq("id", org.id)
+    if (rollbackOrgError) console.error("[provisioning:bussola] falha ao desfazer organização (rollback convite):", rollbackOrgError)
     return { status: "erro", mensagem: `Bússola (convite): ${inviteError?.message ?? "erro desconhecido"}` }
   }
 
-  const { error: perfilError } = await bussola.from("perfis").insert({
+  // upsert (não insert): o próprio Bússola tem um trigger em auth.users que,
+  // assim que inviteUserByEmail acima cria o usuário, já insere um stub em
+  // perfis com esse mesmo id (papel 'analista', ativo false,
+  // organization_id null) — um insert aqui colidiria sempre com
+  // perfis_pkey. O upsert sobrescreve o stub com os valores corretos de
+  // admin.
+  const { error: perfilError } = await bussola.from("perfis").upsert({
     id: invited.user.id,
     nome: input.adminNome,
     email: input.adminEmail,
@@ -40,7 +47,8 @@ export async function provisionarBussola(
   })
   if (perfilError) {
     await bussola.auth.admin.deleteUser(invited.user.id)
-    await bussola.from("organizacoes").delete().eq("id", org.id)
+    const { error: rollbackOrgError } = await bussola.from("organizacoes").delete().eq("id", org.id)
+    if (rollbackOrgError) console.error("[provisioning:bussola] falha ao desfazer organização (rollback perfil):", rollbackOrgError)
     return { status: "erro", mensagem: `Bússola (perfil): ${perfilError.message}` }
   }
 
@@ -55,9 +63,11 @@ export async function provisionarBussola(
     // que é justamente o insert que falhou aqui. Ordem: filho (perfis) antes
     // do pai (organizacoes); usuário de auth apagado no meio pois perfis.id
     // referencia ele.
-    await bussola.from("perfis").delete().eq("id", invited.user.id)
+    const { error: rollbackPerfilError } = await bussola.from("perfis").delete().eq("id", invited.user.id)
+    if (rollbackPerfilError) console.error("[provisioning:bussola] falha ao desfazer perfil (rollback integração):", rollbackPerfilError)
     await bussola.auth.admin.deleteUser(invited.user.id)
-    await bussola.from("organizacoes").delete().eq("id", org.id)
+    const { error: rollbackOrgError } = await bussola.from("organizacoes").delete().eq("id", org.id)
+    if (rollbackOrgError) console.error("[provisioning:bussola] falha ao desfazer organização (rollback integração):", rollbackOrgError)
     return { status: "erro", mensagem: `Bússola (registrar integração): ${integracaoError.message}` }
   }
 
