@@ -564,6 +564,13 @@ alter table organizations
 comment on column organizations.election_candidate_number is
   'Número do candidato conforme registrado no TSE (mesmo formato do arquivo "Votação por seção eleitoral", ex: "12345").';
 
+-- cidade — usada para propagar ao Cadastro Mestre e, no Dashboard, decidir
+-- se reaproveita uma estrutura territorial já mapeada (ver provisionamento
+-- cross-sistema, docs/superpowers/plans/2026-08-15-provisionamento-cross-sistema.md).
+alter table organizations add column cidade text;
+comment on column organizations.cidade is
+  'Cidade onde este cliente atua — usada para provisionar o cliente nos outros sistemas do ecossistema.';
+
 -- election_results_sections — resultado REAL de votação por seção, para o
 -- candidato de cada organização. Multi-tenant (diferente de
 -- electoral_zones/polling_locations/electoral_sections logo acima, que são
