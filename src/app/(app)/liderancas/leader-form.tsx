@@ -31,19 +31,6 @@ type LeaderFormProps = {
   defaultValues?: Partial<Leader>
   /** Liderança editando o próprio cadastro: esconde campos administrativos. */
   isOwnRecord?: boolean
-  /** Liderança cadastrando uma NOVA liderança (sua "filha" na hierarquia):
-   * mesma restrição visual de isOwnRecord — quem decide influência/status/
-   * permissão de ver atendimentos é sempre Admin Geral/Equipe, nunca quem
-   * recrutou. A Server Action zera esses campos de qualquer forma (ver
-   * liderancas/actions.ts), isto aqui é só pra não mostrar campo que a
-   * escrita vai ignorar. */
-  hideAdminFields?: boolean
-  /** Só no cadastro (não na edição) e só pra quem pode convidar login
-   * (admin_geral — mesma restrição de configuracoes/usuarios/actions.ts) —
-   * mostra a opção de já criar o acesso e disparar o convite por e-mail
-   * junto com o cadastro, sem precisar do passo separado em Configurações >
-   * Usuários depois. */
-  showInviteLoginOption?: boolean
   /** Rótulo já formatado do local de votação vinculado (calculado pela página
    * a partir de defaultValues.polling_location_id via
    * services/polling-locations.ts#formatPollingLocationLabel), pois o
@@ -54,8 +41,7 @@ type LeaderFormProps = {
 }
 
 export function LeaderForm({
-  action, defaultValues, isOwnRecord = false, hideAdminFields = false,
-  showInviteLoginOption = false, pollingLocationDefaultLabel, cancelHref,
+  action, defaultValues, isOwnRecord = false, pollingLocationDefaultLabel, cancelHref,
 }: LeaderFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const d = defaultValues
@@ -108,26 +94,7 @@ export function LeaderForm({
           <label htmlFor="email" className="mb-1 block text-sm font-medium">E-mail</label>
           <input id="email" name="email" type="email" defaultValue={d?.email ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
-          {showInviteLoginOption && (
-            <p className="mt-1 text-xs text-foreground/50">
-              Necessário se você marcar &quot;criar acesso de login&quot; abaixo — é pra esse e-mail que o convite vai.
-            </p>
-          )}
         </div>
-
-        {showInviteLoginOption && (
-          <div className="sm:col-span-2 flex items-start gap-2 rounded-md border border-black/10 bg-black/[0.02] p-3">
-            <input id="create_login" name="create_login" type="checkbox" className="mt-0.5 h-4 w-4" />
-            <label htmlFor="create_login" className="text-sm">
-              <span className="font-medium text-foreground">Criar acesso de login agora e enviar convite por e-mail</span>
-              <br />
-              <span className="text-xs text-foreground/50">
-                Assim que ela definir a senha, já pode entrar no sistema e cadastrar apoiadores na própria rede —
-                sem precisar de um segundo passo em Configurações &gt; Usuários.
-              </span>
-            </label>
-          </div>
-        )}
 
         <div>
           <label htmlFor="birth_date" className="mb-1 block text-sm font-medium">Data de nascimento</label>
@@ -241,7 +208,7 @@ export function LeaderForm({
           </p>
         </div>
 
-        {!isOwnRecord && !hideAdminFields && (
+        {!isOwnRecord && (
           <>
             <div>
               <label htmlFor="influence_level" className="mb-1 block text-sm font-medium">Nível de influência</label>
