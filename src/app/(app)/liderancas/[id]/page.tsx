@@ -2,9 +2,11 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { Download } from "lucide-react"
+import { headers } from "next/headers"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getLeaderById } from "@/services/leaders"
+import { buildLeaderAccessLink } from "@/services/leader-access"
 import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
 import {
   LEADER_STATUS_LABELS, LEADER_STATUS_COLOR, LEADER_TYPE_LABELS, INFLUENCE_LEVEL_LABELS,
@@ -14,7 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { WhatsAppButton } from "@/components/whatsapp-button"
 import { DeleteButton } from "@/components/delete-button"
 import { can } from "@/lib/permissions"
-import { deleteLeaderAction } from "../actions"
+import { deleteLeaderAction, generateLeaderAccessLinkAction, revokeLeaderAccessAction } from "../actions"
 
 export const metadata: Metadata = { title: "Liderança · Lidera+" }
 
@@ -23,10 +25,10 @@ export default async function LiderancaDetalhePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ convite?: string; promovido?: string; apoiador_mantido?: string }>
+  searchParams: Promise<{ convite?: string; promovido?: string; apoiador_mantido?: string; erro_link?: string }>
 }) {
   const { id } = await params
-  const { convite, promovido, apoiador_mantido: apoiadorMantido } = await searchParams
+  const { convite, promovido, apoiador_mantido: apoiadorMantido, erro_link: erroLink } = await searchParams
   const supabase = await createClient()
   const [leader, session] = await Promise.all([getLeaderById(supabase, id), getSessionUser()])
 
@@ -60,6 +62,12 @@ export default async function LiderancaDetalhePage({
   const canGenerateReports = can(role, "generate_reports")
   const hasLinkedRecords = (supporterCount ?? 0) > 0 || (demandCount ?? 0) > 0
 
+  const host = (await headers()).get("host") ?? ""
+  const accessLink = leader.access_token ? buildLeaderAccessLink(host, leader.access_token) : null
+  const accessMessage = accessLink
+    ? `Oi, ${leader.name}! Aqui está seu acesso ao Lidera+: ${accessLink}\nÉ só clicar para entrar — não precisa de senha.`
+    : ""
+
   return (
     <div className="space-y-6">
       {convite === "enviado" && (
@@ -75,6 +83,12 @@ export default async function LiderancaDetalhePage({
             ? " Como já tinha demanda(s)/atendimento(s) vinculados, o cadastro de apoiador original foi mantido — os dois cadastros existem em paralelo."
             : " O cadastro de apoiador original foi removido."}
           {" "}Complete o cadastro abaixo com tipo de liderança, nível de influência e expectativa de votos.
+        </div>
+      )}
+      {erroLink === "1" && (
+        <div className="rounded-lg border border-status-atrasada/30 bg-status-atrasada/10 p-4 text-sm text-status-atrasada">
+          {leader.name} foi cadastrada, mas não foi possível gerar o link de acesso automaticamente. Gere
+          manualmente no bloco &quot;Acesso ao sistema&quot; abaixo.
         </div>
       )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -181,6 +195,40 @@ export default async function LiderancaDetalhePage({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {role === "admin_geral" && (
+        <div className="rounded-lg border border-black/5 bg-white p-6">
+          <p className="mb-1 text-sm font-medium text-foreground">Acesso ao sistema</p>
+          {accessLink ? (
+            <>
+              <p className="mb-3 text-xs text-foreground/50">
+                Link de acesso ativo — {leader.name} entra direto pelo link, sem senha.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <WhatsAppButton phone={leader.phone} message={accessMessage} label="Enviar link pelo WhatsApp" />
+                <DeleteButton
+                  action={revokeLeaderAccessAction.bind(null, id)}
+                  label="Revogar acesso"
+                  tone="danger"
+                  confirmMessage={`Revogar o acesso de ${leader.name}? O link atual para de funcionar e qualquer sessão aberta é encerrada em seguida.`}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-xs text-foreground/50">
+                {leader.name} ainda não tem link de acesso — gere um para que ela entre no sistema sem senha.
+              </p>
+              <DeleteButton
+                action={generateLeaderAccessLinkAction.bind(null, id)}
+                label="Gerar link de acesso"
+                tone="primary"
+                confirmMessage={`Gerar um link de acesso para ${leader.name}?`}
+              />
+            </>
+          )}
         </div>
       )}
 
