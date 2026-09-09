@@ -69,21 +69,47 @@ liderança sai do escopo dela.
 
 ## 4. Modelo de dados
 
-### 4.1 Nova coluna em `leaders`
+### 4.1 Tabela própria `leader_access_tokens` (revisado após revisão final — ver §10)
+
+O token **não** fica numa coluna de `leaders`. A revisão final do
+branch (§10) encontrou que RLS é uma trava por linha, não por coluna —
+qualquer policy de select em `leaders` (mesmo restrita a "só o que eu
+cadastrei" ou "só minhas subordinadas") acabaria devolvendo o token junto
+com o resto da linha pra quem tem select naquela linha, permitindo que
+admin_equipe ou uma liderança "avó" lessem o token de outra conta e
+assumissem a sessão dela. Uma tabela própria, com RLS ativa e **nenhuma
+policy**, resolve isso de vez: ninguém autenticado consegue ler/escrever
+essa tabela por nenhum caminho — só o client de service_role (que ignora
+RLS por completo) chega nela, e todo acesso já passa por
+`src/services/leader-access.ts`/Server Actions `admin_geral`-only mesmo.
 
 ```sql
-alter table leaders add column access_token text unique;
+create table leader_access_tokens (
+  leader_id uuid primary key references leaders(id) on delete cascade,
+  token text not null unique,
+  created_at timestamptz not null default now()
+);
+alter table leader_access_tokens enable row level security;
+-- De propósito: nenhuma policy aqui. RLS ativa + zero policies = ninguém
+-- autenticado (nem admin_geral, nem admin_equipe, nem lideranca) consegue
+-- ler ou escrever esta tabela por PostgREST; só o client de service_role
+-- (que ignora RLS) acessa, sempre a partir de services/leader-access.ts.
 ```
 
-- `access_token`: string aleatória e única (gerada com um gerador
+- `token`: string aleatória e única (gerada com um gerador
   criptograficamente seguro, ex.: 32 bytes em base64url) por liderança.
-  `null` = liderança sem link ativo (nunca gerado, ou revogado).
+  Ausência de linha para aquele `leader_id` = liderança sem link ativo
+  (nunca gerado, ou revogado).
 - O link final tem o formato:
-  `https://<subdominio-do-cliente>/acesso-lideranca/<access_token>`.
-- **Gerar novo link** = sobrescrever `access_token` com um valor novo (o
-  antigo para de bater com qualquer linha e vira automaticamente inválido).
-- **Revogar** = `access_token = null` + banir o login por trás (ver §8 sobre
-  o efeito em sessão já aberta).
+  `https://<subdominio-do-cliente>/acesso-lideranca/<token>`.
+- **Gerar novo link** = `upsert` substituindo a linha daquele `leader_id`
+  com um `token` novo (o antigo para de bater com qualquer linha e vira
+  automaticamente inválido).
+- **Revogar** = apagar a linha daquele `leader_id` + banir o login por trás
+  (ver §8 e §10 sobre o efeito em sessão já aberta e em login antigo por
+  senha).
+- `on delete cascade`: excluir a liderança (depois de excluir o login por
+  trás, ver §10) já limpa a linha de token sozinho, sem passo manual extra.
 
 ### 4.2 Login por trás do link
 
@@ -97,11 +123,19 @@ O Supabase exige um e-mail (ou telefone) único por usuário de autenticação.
 O campo "E-mail" no cadastro de liderança é opcional (e continua sendo). Para
 liderança sem e-mail preenchido, o sistema gera um e-mail interno sintético
 (ex.: `lideranca-<id-da-lideranca>@interno.lideramais.app.br`) só para
-satisfazer essa exigência técnica — não é enviado nenhum e-mail para esse
-endereço, ele nunca é exibido em nenhuma tela, é um detalhe interno do
-mecanismo de login. Se a liderança tiver e-mail de verdade cadastrado, esse é
-o e-mail usado no login por trás — mas, de novo, ninguém precisa checar
+satisfazer essa exigência técnica em `auth.users` — não é enviado nenhum
+e-mail para esse endereço. Esse e-mail sintético **nunca é gravado em
+`users_profiles.email`** (fica `null` ali) — é só um detalhe interno de
+`auth.users`, nunca aparece em nenhuma tela (nem em Configurações >
+Usuários, ver §9). Se a liderança tiver e-mail de verdade cadastrado, esse é
+o e-mail usado no login por trás e também o que aparece em
+`users_profiles.email` normalmente — mas, de novo, ninguém precisa checar
 caixa de entrada: o acesso é só pelo link.
+
+Se o e-mail informado pela liderança já pertencer a outra conta de login
+existente (ex.: duas lideranças cadastradas com o mesmo e-mail de família),
+a criação do login com aquele e-mail falha — nesse caso o sistema cai
+automaticamente para o e-mail sintético em vez de travar o cadastro.
 
 ---
 
@@ -137,12 +171,24 @@ Visível só para **admin_geral**, em `/liderancas/[id]`:
   admin_equipe ou de liderança bem antiga — esse botão cria o login
   primeiro (mesma lógica de quando admin_geral cadastra) e só então gera o
   token. Se já existir um login (ex.: liderança com senha de antes desta
-  mudança), reaproveita esse login e só adiciona o `access_token` — a senha
-  continua valendo em paralelo, como uma segunda forma de entrar.
-- **Com `access_token` ativo:** botão "Enviar pelo WhatsApp" (abre `wa.me`
-  com o telefone da própria liderança já preenchido e uma mensagem padrão
-  contendo o link — mesmo padrão de `lib/whatsapp.ts`) e botão "Revogar
-  acesso" (com confirmação, já que também bane o login por trás — ver §8).
+  mudança), reaproveita esse login e só adiciona a linha em
+  `leader_access_tokens` — a senha continua valendo em paralelo enquanto o
+  link não for revogado.
+- **Sem telefone cadastrado:** o botão "Enviar pelo WhatsApp" não aparece
+  (mesmo comportamento de `WhatsAppButton` em qualquer outra tela do
+  sistema). Nesse caso o link é mostrado como texto selecionável na própria
+  tela, pra o admin_geral copiar e mandar por qualquer outro canal — sem
+  isso, uma liderança sem telefone ficaria com "acesso gerado" mas
+  impossível de entregar.
+- **Com link ativo:** botão "Enviar pelo WhatsApp" (abre `wa.me` com o
+  telefone da própria liderança já preenchido e uma mensagem padrão contendo
+  o link — mesmo padrão de `lib/whatsapp.ts`) e botão "Revogar acesso". A
+  confirmação desse botão avisa explicitamente que revogar **bane o login
+  inteiro** — se essa liderança também tinha senha de antes desta mudança,
+  a senha para de funcionar junto (decisão explícita: revogar significa
+  "esta pessoa não entra mais de jeito nenhum", não só "este link específico
+  não vale mais" — ver §10). Quem revogar por engano usa "Gerar link de
+  acesso" de novo pra reabrir tudo (link novo + login desbanido).
 
 Mensagem padrão sugerida para o WhatsApp (editável na hora de enviar, como
 já é hoje o padrão de `wa.me`):
@@ -164,11 +210,12 @@ Nova rota pública (adicionada a `PUBLIC_PATHS` em
 
 Ao ser acessada:
 
-1. Busca em `leaders` uma linha com `access_token = token`. Não encontrar =
-   token inválido ou já revogado.
-2. Se encontrar, localiza o usuário de autenticação vinculado
-   (`leaders.user_id` → `users_profiles`/`auth.users`) e o e-mail dele
-   (real ou sintético, ver §4.2).
+1. Busca em `leader_access_tokens` uma linha com `token = token` (client de
+   service_role — ver §4.1/§10). Não encontrar = token inválido ou já
+   revogado.
+2. Se encontrar, usa o `leader_id` pra pegar `leaders.user_id` e, a partir
+   dele, o usuário de autenticação vinculado (`users_profiles`/`auth.users`)
+   e o e-mail dele (real ou sintético, ver §4.2).
 3. No servidor, usa o client administrativo do Supabase para gerar um
    magic link (`auth.admin.generateLink({ type: "magiclink", email })`) e
    imediatamente resgatá-lo (`auth.verifyOtp`) usando o client de sessão da
@@ -219,6 +266,52 @@ cada link foi usado, limite de dispositivos simultâneos.
 - Nada muda na relação apoiador ↔ liderança (`supporters.leader_id`) nem
   nas políticas de RLS que já isolam cada liderança à própria rede.
 - Nada muda no fluxo de convite de `admin_geral`/`admin_equipe`
-  (Configurações > Usuários continua com e-mail/senha, como hoje).
+  (Configurações > Usuários continua com e-mail/senha, como hoje). A lista
+  de usuários passa a incluir toda liderança que já tem login por trás
+  (antes só aparecia quem tinha marcado o checkbox de convite) — decisão
+  explícita (§10): faz sentido mostrar ali todo mundo com algum tipo de
+  acesso, incluindo por link.
 - Lideranças com login antigo (e-mail/senha) não são migradas
   automaticamente.
+
+---
+
+## 10. Revisão pós-implementação (correções antes de aplicar a migração)
+
+A revisão final do branch (depois das 7 tasks implementadas, antes de
+aplicar a migração de banco de verdade) encontrou dois problemas que
+mudam este desenho, resolvidos nesta conversa antes de corrigir o código:
+
+1. **Vazamento do token via RLS (crítico).** `access_token` como coluna de
+   `leaders` é legível por qualquer policy de select naquela tabela — o que
+   inclui `admin_equipe` (vê o que cadastrou) e `lideranca` (vê
+   sub-lideranças antigas que ela cadastrou). Ler o token de outra conta =
+   assumir a sessão dela. Corrigido movendo o token pra uma tabela própria
+   sem nenhuma policy de RLS (§4.1) — só o service_role chega lá.
+2. **Exclusão de liderança quebrada (crítico).** Toda liderança cadastrada
+   por admin_geral agora ganha login (`users_profiles`) automaticamente —
+   antes só quem tinha o checkbox de convite marcado. A FK de
+   `users_profiles` pra `leaders` (via `leader_id`) não tem `on delete
+   cascade`/`set null`, então excluir a liderança sem excluir o login antes
+   passou a falhar sempre, com uma mensagem que erra o motivo (parece erro
+   de apoiador/demanda vinculado, mas é o login). Corrigido: excluir
+   liderança agora sempre apaga o login por trás primeiro (mesma lógica que
+   já existia pro rollback do fluxo antigo de convite), antes de excluir a
+   linha de `leaders`.
+
+Três decisões de comportamento, confirmadas nesta conversa:
+
+- **Revogar bane tudo, sem exceção** (não só "este link específico") — se a
+  liderança também tinha senha de antes desta mudança, revogar derruba a
+  senha junto. Ver §6.
+- **Toda liderança com login aparece em Configurações > Usuários**, mesmo
+  que só tenha acesso por link (antes só quem tinha convite por e-mail
+  aparecia ali). O e-mail sintético nunca é exibido (fica em branco) — ver
+  §4.2 e §9.
+- **E-mail duplicado nunca trava o cadastro** — se o e-mail da liderança já
+  pertence a outro login, o sistema usa o e-mail sintético como
+  alternativa automática. Ver §4.2.
+
+Também corrigido nesse mesmo momento (achado importante, sem decisão de
+produto necessária): liderança sem telefone cadastrado ganha um jeito de
+copiar o link na tela — ver §6.
