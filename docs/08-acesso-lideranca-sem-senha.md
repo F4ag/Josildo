@@ -33,8 +33,9 @@ e-mail nem senha.
    cria uma sessão de verdade (igual à de quem loga com senha) e a redireciona
    para `/dashboard`, já com a role `lideranca` e a rede dela.
 5. O link **não expira sozinho** — continua funcionando enquanto não for
-   revogado. Se vazar, o admin_geral revoga (e qualquer sessão já aberta com
-   aquele acesso é encerrada na hora) e gera um novo.
+   revogado. Se vazar, o admin_geral revoga (o que também bloqueia qualquer
+   sessão já aberta com aquele acesso dentro de pouco tempo, ver §8) e gera
+   um novo.
 
 Esse mecanismo troca **apenas a forma de entrar**. Depois de autenticada, a
 liderança é tratada exatamente como hoje: mesma role, mesmo `leader_id`
@@ -81,8 +82,8 @@ alter table leaders add column access_token text unique;
   `https://<subdominio-do-cliente>/acesso-lideranca/<access_token>`.
 - **Gerar novo link** = sobrescrever `access_token` com um valor novo (o
   antigo para de bater com qualquer linha e vira automaticamente inválido).
-- **Revogar** = `access_token = null` (ver §7 sobre também encerrar sessão
-  ativa).
+- **Revogar** = `access_token = null` + banir o login por trás (ver §8 sobre
+  o efeito em sessão já aberta).
 
 ### 4.2 Login por trás do link
 
@@ -141,7 +142,7 @@ Visível só para **admin_geral**, em `/liderancas/[id]`:
 - **Com `access_token` ativo:** botão "Enviar pelo WhatsApp" (abre `wa.me`
   com o telefone da própria liderança já preenchido e uma mensagem padrão
   contendo o link — mesmo padrão de `lib/whatsapp.ts`) e botão "Revogar
-  acesso" (com confirmação, já que também encerra sessão aberta — ver §7).
+  acesso" (com confirmação, já que também bane o login por trás — ver §8).
 
 Mensagem padrão sugerida para o WhatsApp (editável na hora de enviar, como
 já é hoje o padrão de `wa.me`):
@@ -192,10 +193,15 @@ de segurança por praticidade, já validada nesta conversa. Mitigações
 incluídas no desenho:
 
 - Token longo o suficiente para não ser adivinhável (32 bytes aleatórios).
-- Revogar não é só "apagar o link" — também derruba qualquer sessão já
-  aberta com aquele acesso (`auth.admin.signOut(userId, "global")`), então
-  revogação tem efeito imediato mesmo que o dispositivo da liderança já
-  estivesse logado.
+- Revogar não é só "apagar o link" — também bane o login por trás dele
+  (`auth.admin.updateUserById(userId, { ban_duration: "876000h" })`). Isso
+  não mata uma sessão já aberta na hora exata do clique (o token de sessão
+  em uso continua válido até expirar sozinho), mas impede qualquer renovação
+  futura — na prática a sessão morre dentro do tempo de vida do token de
+  acesso do Supabase, tipicamente menos de uma hora. O Supabase não oferece
+  uma forma de derrubar instantaneamente uma sessão de outra pessoa a partir
+  do id dela (só a partir do próprio token de quem está logado), então esse
+  é o limite real de "imediato" aceito aqui.
 - A responsabilidade de mandar o link pro número certo é do admin_geral (o
   sistema não envia nada sozinho) — mesma responsabilidade que ele já tem
   hoje ao mandar qualquer mensagem sensível pelo WhatsApp.
