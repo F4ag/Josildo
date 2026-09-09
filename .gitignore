@@ -7,6 +7,9 @@ out
 *.tsbuildinfo
 next-env.d.ts
 
+# Worktrees de trabalho isolado (superpowers:using-git-worktrees) — nunca commitar.
+.worktrees
+
 # Gerados pelo next-pwa em build time (next.config.js) — nunca commitar.
 public/sw.js
 public/sw.js.map
