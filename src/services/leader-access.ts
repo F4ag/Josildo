@@ -7,7 +7,7 @@
 
 import "server-only"
 import { randomBytes } from "node:crypto"
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type { AuthError, SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database.types"
 
 type AdminDB = SupabaseClient<Database, "public", any>
@@ -26,6 +26,16 @@ export function generateAccessToken(): string {
  * único por login, quando a liderança não tem e-mail cadastrado. */
 function buildSyntheticEmail(leaderId: string): string {
   return `lideranca-${leaderId}@interno.${ROOT_DOMAIN}`
+}
+
+/** Duas lideranças cadastradas com o mesmo e-mail (o da família, por
+ * exemplo) não podem travar o cadastro da segunda — daí precisar reconhecer
+ * esse caso específico entre os erros do Supabase. `code` é o caminho
+ * estável (a versão instalada do auth-js expõe "email_exists"); a mensagem
+ * fica como rede de segurança pra respostas antigas que vêm sem code. */
+function isEmailAlreadyRegistered(error: AuthError): boolean {
+  if (error.code === "email_exists") return true
+  return /already\s+(been\s+)?registered/i.test(error.message)
 }
 
 export type LeaderForAccess = {
@@ -55,12 +65,24 @@ export async function ensureLeaderLogin(
     return { userId: leader.user_id, email: data.user.email }
   }
 
-  const email = leader.email || buildSyntheticEmail(leader.id)
+  const syntheticEmail = buildSyntheticEmail(leader.id)
+  let email = leader.email || syntheticEmail
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email,
-    email_confirm: true,
-  })
+  let attempt = await admin.auth.admin.createUser({ email, email_confirm: true })
+
+  // E-mail já usado por outro login não pode travar o cadastro: cai pro
+  // e-mail sintético e segue (ver docs/08-acesso-lideranca-sem-senha.md
+  // §4.2). Se o sintético também falhar, mantém o erro original — é o que
+  // explica de verdade o que aconteceu com o e-mail informado.
+  if (attempt.error && email !== syntheticEmail && isEmailAlreadyRegistered(attempt.error)) {
+    const retry = await admin.auth.admin.createUser({ email: syntheticEmail, email_confirm: true })
+    if (!retry.error && retry.data.user) {
+      email = syntheticEmail
+      attempt = retry
+    }
+  }
+
+  const { data: created, error: createError } = attempt
   if (createError || !created.user) {
     throw new Error(`Falha ao criar o login da liderança: ${createError?.message ?? "erro desconhecido"}.`)
   }
@@ -69,7 +91,11 @@ export async function ensureLeaderLogin(
     id: created.user.id,
     organization_id: organizationId,
     full_name: leader.name,
-    email,
+    // O e-mail sintético existe só pra satisfazer o auth.users — gravá-lo
+    // aqui faria um endereço inventado aparecer em Configurações > Usuários
+    // como se fosse o contato da pessoa (§4.2). E-mail de verdade continua
+    // sendo gravado normalmente.
+    email: email === syntheticEmail ? null : email,
     phone: leader.phone,
     role: "lideranca",
     leader_id: leader.id,
@@ -106,10 +132,33 @@ export async function generateLeaderAccessToken(
   }
 
   const token = generateAccessToken()
-  const { error } = await admin.from("leaders").update({ access_token: token }).eq("id", leader.id)
+  // upsert e não insert: gerar um link novo pra quem já tinha substitui a
+  // linha, e o token antigo deixa de bater com qualquer linha — ou seja,
+  // vira inválido sozinho (ver docs/08-acesso-lideranca-sem-senha.md §4.1).
+  const { error } = await admin
+    .from("leader_access_tokens")
+    .upsert({ leader_id: leader.id, token }, { onConflict: "leader_id" })
   if (error) throw new Error(`Falha ao salvar o link de acesso: ${error.message}.`)
 
   return token
+}
+
+/**
+ * Token ativo da liderança, ou null se ela não tem link (nunca gerado ou
+ * revogado). Exige o client ADMIN de propósito: `leader_access_tokens` tem
+ * RLS ativa e nenhuma policy, então nem o Server Component logado como
+ * admin_geral consegue ler a tabela com o client de sessão — quem chama
+ * precisa ter checado a role antes (ver liderancas/[id]/page.tsx).
+ */
+export async function getLeaderAccessToken(admin: AdminDB, leaderId: string): Promise<string | null> {
+  const { data, error } = await admin
+    .from("leader_access_tokens")
+    .select("token")
+    .eq("leader_id", leaderId)
+    .maybeSingle()
+  if (error) throw new Error(`Falha ao buscar o link de acesso: ${error.message}.`)
+
+  return data?.token ?? null
 }
 
 /**
@@ -122,7 +171,7 @@ export async function generateLeaderAccessToken(
  * idiomático do Supabase pra "banido permanentemente".
  */
 export async function revokeLeaderAccess(admin: AdminDB, leaderId: string, userId: string | null): Promise<void> {
-  const { error } = await admin.from("leaders").update({ access_token: null }).eq("id", leaderId)
+  const { error } = await admin.from("leader_access_tokens").delete().eq("leader_id", leaderId)
   if (error) throw new Error(`Falha ao revogar o link de acesso: ${error.message}.`)
 
   if (userId) {

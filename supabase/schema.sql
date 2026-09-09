@@ -142,11 +142,7 @@ create table leaders (
   notes text,
   created_by uuid references users_profiles(id),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  -- Token de acesso permanente (ver docs/08-acesso-lideranca-sem-senha.md):
-  -- link único que autentica a liderança sem senha. null = sem link ativo
-  -- (nunca gerado ou revogado). Único pra impedir colisão entre lideranças.
-  access_token text unique
+  updated_at timestamptz not null default now()
 );
 create trigger trg_leaders_updated_at before update on leaders
   for each row execute function set_updated_at();
@@ -163,6 +159,27 @@ create index idx_leaders_org on leaders(organization_id);
 alter table users_profiles
   add constraint fk_users_profiles_leader foreign key (leader_id) references leaders(id);
 create index idx_users_profiles_leader on users_profiles(leader_id);
+
+-- ----------------------------------------------------------------------------
+-- leader_access_tokens — acesso de liderança por link (ver
+-- docs/08-acesso-lideranca-sem-senha.md §4.1)
+-- ----------------------------------------------------------------------------
+-- Tabela separada de propósito: RLS no Postgres filtra linha, não coluna —
+-- se o token morasse numa coluna de leaders, qualquer policy de select
+-- naquela linha (admin_equipe no que ele cadastrou, liderança nas
+-- sub-lideranças antigas) devolveria o token junto, e ler o token de outra
+-- conta é assumir a sessão dela. Aqui a RLS fica ativa com ZERO policies:
+-- ninguém autenticado lê ou escreve por PostgREST, só o client de
+-- service_role (que ignora RLS) — sempre via services/leader-access.ts, a
+-- partir de Server Actions restritas a admin_geral ou da rota pública de
+-- resgate, que se autentica pela posse do próprio token.
+-- Ausência de linha = liderança sem link ativo (nunca gerado ou revogado).
+-- on delete cascade: excluir a liderança limpa o token sozinho.
+create table leader_access_tokens (
+  leader_id uuid primary key references leaders(id) on delete cascade,
+  token text not null unique,
+  created_at timestamptz not null default now()
+);
 
 -- ----------------------------------------------------------------------------
 -- supporters — Módulo 4 (apoiador / base de pessoas)

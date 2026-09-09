@@ -180,6 +180,20 @@ create policy ld_lideranca_select_subordinates on leaders
   );
 
 -- ============================================================================
+-- leader_access_tokens
+-- ============================================================================
+alter table leader_access_tokens enable row level security;
+
+-- Nenhuma policy aqui, de propósito. RLS ativa + zero policies = ninguém
+-- autenticado (nem admin_geral, nem admin_equipe, nem lideranca) lê ou
+-- escreve esta tabela por PostgREST. O token é a credencial de acesso da
+-- liderança: quem lê o token de outra conta assume a sessão dela, e RLS
+-- filtra linha e não coluna — foi por isso que ele saiu de leaders e veio
+-- pra cá (ver docs/08-acesso-lideranca-sem-senha.md §4.1/§10). Só o client
+-- de service_role (que ignora RLS) chega nesta tabela, sempre via
+-- services/leader-access.ts.
+
+-- ============================================================================
 -- supporters
 -- ============================================================================
 alter table supporters enable row level security;

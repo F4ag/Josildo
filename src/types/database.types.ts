@@ -600,9 +600,34 @@ export type Database = {
           },
         ]
       }
+      leader_access_tokens: {
+        Row: {
+          created_at: string
+          leader_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          leader_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          leader_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leader_access_tokens_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: true
+            referencedRelation: "leaders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leaders: {
         Row: {
-          access_token: string | null
           address: string | null
           admin_estimated_votes: number | null
           birth_date: string | null
@@ -639,7 +664,6 @@ export type Database = {
           zip_code: string | null
         }
         Insert: {
-          access_token?: string | null
           address?: string | null
           admin_estimated_votes?: number | null
           birth_date?: string | null
@@ -676,7 +700,6 @@ export type Database = {
           zip_code?: string | null
         }
         Update: {
-          access_token?: string | null
           address?: string | null
           admin_estimated_votes?: number | null
           birth_date?: string | null

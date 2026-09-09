@@ -7,9 +7,11 @@ import type { Database } from "@/types/database.types"
  *
  * USO RESTRITO: só dentro de Server Actions que já checaram
  * `requireSessionUser().profile.role === "admin_geral"` antes de chamar isto
- * (ver src/app/(app)/configuracoes/usuarios/actions.ts). Nunca importar este
- * arquivo de um Client Component — o pacote "server-only" quebra o build se
- * isso acontecer por engano.
+ * (ver src/app/(app)/configuracoes/usuarios/actions.ts). A exceção é
+ * src/app/acesso-lideranca/[token]/route.ts: rota pública, sem sessão pra
+ * checar role — a autorização ali é a posse do token, que não é adivinhável.
+ * Nunca importar este arquivo de um Client Component — o pacote
+ * "server-only" quebra o build se isso acontecer por engano.
  *
  * Necessário para duas operações que a chave pública não pode fazer:
  *   1) auth.admin.inviteUserByEmail / createUser (criar login de outra pessoa)

@@ -5,8 +5,9 @@ import { Download } from "lucide-react"
 import { headers } from "next/headers"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getLeaderById } from "@/services/leaders"
-import { buildLeaderAccessLink } from "@/services/leader-access"
+import { buildLeaderAccessLink, getLeaderAccessToken } from "@/services/leader-access"
 import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
 import {
   LEADER_STATUS_LABELS, LEADER_STATUS_COLOR, LEADER_TYPE_LABELS, INFLUENCE_LEVEL_LABELS,
@@ -25,10 +26,10 @@ export default async function LiderancaDetalhePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ convite?: string; promovido?: string; apoiador_mantido?: string; erro_link?: string }>
+  searchParams: Promise<{ promovido?: string; apoiador_mantido?: string; erro_link?: string }>
 }) {
   const { id } = await params
-  const { convite, promovido, apoiador_mantido: apoiadorMantido, erro_link: erroLink } = await searchParams
+  const { promovido, apoiador_mantido: apoiadorMantido, erro_link: erroLink } = await searchParams
   const supabase = await createClient()
   const [leader, session] = await Promise.all([getLeaderById(supabase, id), getSessionUser()])
 
@@ -63,19 +64,19 @@ export default async function LiderancaDetalhePage({
   const hasLinkedRecords = (supporterCount ?? 0) > 0 || (demandCount ?? 0) > 0
 
   const host = (await headers()).get("host") ?? ""
-  const accessLink = leader.access_token ? buildLeaderAccessLink(host, leader.access_token) : null
+  // leader_access_tokens tem RLS ativa e nenhuma policy, então nem o client
+  // de sessão do admin_geral lê essa tabela — a leitura passa pelo client
+  // administrativo, autorizada pela checagem de role logo acima (mesmo
+  // contrato das Server Actions de acesso). Só busca pra admin_geral: é o
+  // único perfil que vê o bloco "Acesso ao sistema" mais abaixo.
+  const accessToken = role === "admin_geral" ? await getLeaderAccessToken(createAdminClient(), id) : null
+  const accessLink = accessToken ? buildLeaderAccessLink(host, accessToken) : null
   const accessMessage = accessLink
     ? `Oi, ${leader.name}! Aqui está seu acesso ao Lidera+: ${accessLink}\nÉ só clicar para entrar — não precisa de senha.`
     : ""
 
   return (
     <div className="space-y-6">
-      {convite === "enviado" && (
-        <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4 text-sm text-secondary">
-          Convite de acesso enviado{leader.email ? ` para ${leader.email}` : ""}. Assim que {leader.name} definir a
-          senha, já vai poder entrar no sistema e cadastrar apoiadores na própria rede.
-        </div>
-      )}
       {promovido === "1" && (
         <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4 text-sm text-secondary">
           {leader.name} foi transformado(a) de apoiador(a) em liderança.
@@ -206,13 +207,30 @@ export default async function LiderancaDetalhePage({
               <p className="mb-3 text-xs text-foreground/50">
                 Link de acesso ativo — {leader.name} entra direto pelo link, sem senha.
               </p>
+              {/* Sem telefone o WhatsAppButton não renderiza nada (ver
+                  components/whatsapp-button.tsx) — sem esta caixa a
+                  liderança ficaria com link gerado e impossível de entregar
+                  (docs/08-acesso-lideranca-sem-senha.md §6). */}
+              {!leader.phone && (
+                <div className="mb-3">
+                  <p className="mb-1 text-xs text-foreground/50">
+                    {leader.name} não tem telefone cadastrado — copie o link abaixo e envie pelo canal que preferir.
+                  </p>
+                  <input
+                    readOnly
+                    value={accessLink}
+                    aria-label={`Link de acesso de ${leader.name}`}
+                    className="w-full rounded-md border border-black/10 px-3 py-2 text-xs text-foreground/70"
+                  />
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <WhatsAppButton phone={leader.phone} message={accessMessage} label="Enviar link pelo WhatsApp" />
                 <DeleteButton
                   action={revokeLeaderAccessAction.bind(null, id)}
                   label="Revogar acesso"
                   tone="danger"
-                  confirmMessage={`Revogar o acesso de ${leader.name}? O link atual para de funcionar e qualquer sessão aberta é encerrada em seguida.`}
+                  confirmMessage={`Revogar o acesso de ${leader.name}? Isso bloqueia o login por completo — inclusive a senha antiga, se ela tiver uma —, o link atual para de funcionar e qualquer sessão aberta é encerrada em seguida.`}
                 />
               </div>
             </>

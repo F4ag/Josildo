@@ -202,7 +202,38 @@ export async function deleteLeaderAction(
   }
 
   const supabase = await createClient()
+  const leader = await getLeaderById(supabase, leaderId)
+  if (!leader) {
+    return { error: "Liderança não encontrada." }
+  }
+
   try {
+    // Toda liderança cadastrada por admin_geral ganha login automaticamente
+    // agora (antes era só quem tinha convite por e-mail), e
+    // users_profiles.leader_id aponta pra ela sem cascade — sem apagar o
+    // login primeiro, o delete abaixo falharia sempre, com a mensagem de
+    // "apoiadores/demandas vinculados" errando o motivo. A referência é
+    // circular (leaders.user_id -> users_profiles.id e
+    // users_profiles.leader_id -> leaders.id), então o vínculo é desfeito
+    // antes: sem isso, apagar o perfil esbarra em leaders_user_id_fkey.
+    // Apagar o usuário de auth já leva o perfil junto
+    // (users_profiles_id_fkey é on delete cascade — mesma lógica de
+    // services/organizations.ts).
+    if (leader.user_id) {
+      const admin = createAdminClient()
+      const { error: unlinkError } = await admin.from("leaders").update({ user_id: null }).eq("id", leaderId)
+      if (unlinkError) {
+        return { error: `Falha ao desvincular o login da liderança: ${unlinkError.message}` }
+      }
+
+      const { error: authError } = await admin.auth.admin.deleteUser(leader.user_id)
+      if (authError) {
+        return { error: `Falha ao excluir o login da liderança: ${authError.message}` }
+      }
+    }
+
+    // A linha de leader_access_tokens sai junto por cascata daqui (ver
+    // supabase/schema.sql).
     await deleteLeader(supabase, leaderId)
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Falha ao excluir liderança." }

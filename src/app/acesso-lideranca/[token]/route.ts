@@ -1,5 +1,6 @@
-// Troca o token de acesso permanente de uma liderança (leaders.access_token,
-// ver src/services/leader-access.ts) por uma sessão de verdade: gera um
+// Troca o token de acesso permanente de uma liderança
+// (leader_access_tokens, ver src/services/leader-access.ts) por uma sessão
+// de verdade: gera um
 // magic link do Supabase na hora (admin.generateLink) e delega a
 // verificação (verifyOtp) pra rota já existente /auth/confirm, que já faz
 // exatamente isso pra outros fluxos de e-mail deste projeto — ver
@@ -12,10 +13,24 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { token } = await params
   const admin = createAdminClient()
 
+  // Duas consultas em vez de um join: leader_access_tokens tem RLS ativa e
+  // nenhuma policy (só o client de service_role chega nela), então ela fica
+  // isolada de propósito — é o que impede qualquer outra conta de ler o
+  // token daqui (ver docs/08-acesso-lideranca-sem-senha.md §4.1).
+  const { data: accessToken } = await admin
+    .from("leader_access_tokens")
+    .select("leader_id")
+    .eq("token", token)
+    .maybeSingle()
+
+  if (!accessToken) {
+    redirect("/login?erro=link_invalido")
+  }
+
   const { data: leader } = await admin
     .from("leaders")
     .select("user_id")
-    .eq("access_token", token)
+    .eq("id", accessToken.leader_id)
     .maybeSingle()
 
   if (!leader?.user_id) {

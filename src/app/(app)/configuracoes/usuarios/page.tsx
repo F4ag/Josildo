@@ -48,7 +48,10 @@ export default async function UsuariosPage() {
                     {user.status === "ativo" ? "Ativo" : "Inativo"}
                   </Badge>
                 </div>
-                <p className="text-sm text-foreground/60">{user.email}</p>
+                {/* Liderança que só entra por link não tem e-mail no perfil
+                    (o sintético do auth.users nunca é gravado aqui) — mesmo
+                    traço usado nas outras colunas vazias. */}
+                <p className="text-sm text-foreground/60">{user.email || "—"}</p>
                 <p className="text-sm text-foreground/60">
                   {USER_ROLE_LABELS[user.role as UserRole]}
                   {user.leaders?.name ? ` · ${user.leaders.name}` : ""}
@@ -79,7 +82,7 @@ export default async function UsuariosPage() {
                 {users.map((user) => (
                   <tr key={user.id} className="border-t border-black/5">
                     <td className="px-4 py-3 font-medium">{user.full_name}</td>
-                    <td className="px-4 py-3 text-foreground/70">{user.email}</td>
+                    <td className="px-4 py-3 text-foreground/70">{user.email || "—"}</td>
                     <td className="px-4 py-3">{USER_ROLE_LABELS[user.role as UserRole]}</td>
                     <td className="px-4 py-3 text-foreground/70">{user.leaders?.name ?? "—"}</td>
                     <td className="px-4 py-3">
