@@ -142,7 +142,11 @@ create table leaders (
   notes text,
   created_by uuid references users_profiles(id),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- Token de acesso permanente (ver docs/08-acesso-lideranca-sem-senha.md):
+  -- link único que autentica a liderança sem senha. null = sem link ativo
+  -- (nunca gerado ou revogado). Único pra impedir colisão entre lideranças.
+  access_token text unique
 );
 create trigger trg_leaders_updated_at before update on leaders
   for each row execute function set_updated_at();

@@ -602,6 +602,7 @@ export type Database = {
       }
       leaders: {
         Row: {
+          access_token: string | null
           address: string | null
           admin_estimated_votes: number | null
           birth_date: string | null
@@ -638,6 +639,7 @@ export type Database = {
           zip_code: string | null
         }
         Insert: {
+          access_token?: string | null
           address?: string | null
           admin_estimated_votes?: number | null
           birth_date?: string | null
@@ -674,6 +676,7 @@ export type Database = {
           zip_code?: string | null
         }
         Update: {
+          access_token?: string | null
           address?: string | null
           admin_estimated_votes?: number | null
           birth_date?: string | null

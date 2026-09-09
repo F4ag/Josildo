@@ -165,19 +165,11 @@ create policy ld_lideranca_update_self on leaders
   -- esta policy, a aplicação precisa esconder esse campo específico de quem
   -- é role lideranca (ver liderancas/[id]/page.tsx e leader-form.tsx).
 
--- Hierarquia (migration leaders_parent_hierarchy): liderança pode cadastrar
--- outra liderança "abaixo" dela (parent_leader_id = seu próprio leader_id)
--- e ver as que ela mesma cadastrou — nunca lideranças soltas nem de outra
--- rede. App zera influence_level/status/can_view_attendances nesse cadastro
--- (ver liderancas/actions.ts) — RLS não impede a liderança de mandar esses
--- valores, é defesa em profundidade, não a barreira principal.
-create policy ld_lideranca_insert_subordinate on leaders
-  for insert
-  with check (
-    private.current_user_role() = 'lideranca'
-    and organization_id = private.current_user_org_id()
-    and parent_leader_id = private.current_user_leader_id()
-  );
+-- ld_lideranca_insert_subordinate foi removida (migration leader_access_link):
+-- liderança não cadastra mais outra liderança, só apoiador — ver
+-- docs/08-acesso-lideranca-sem-senha.md §3. ld_lideranca_select_subordinates
+-- continua abaixo, de propósito: lideranças já cadastradas antes dessa
+-- mudança continuam visíveis pra quem as cadastrou.
 
 create policy ld_lideranca_select_subordinates on leaders
   for select
