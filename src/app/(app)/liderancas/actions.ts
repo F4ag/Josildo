@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createLeader, updateLeader, deleteLeader, type LeaderInput } from "@/services/leaders"
+import { createLeader, updateLeader, deleteLeader, getLeaderById, type LeaderInput } from "@/services/leaders"
+import { generateLeaderAccessToken, revokeLeaderAccess } from "@/services/leader-access"
 import { leaderSchema } from "@/lib/validations/leader"
 import { can } from "@/lib/permissions"
 import { geocodeAddress } from "@/lib/geocoding"
@@ -88,33 +89,7 @@ export async function createLeaderAction(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
-  // Criar o acesso de login junto com o cadastro é restrito a admin_geral —
-  // mesma restrição de configuracoes/usuarios/actions.ts (assertAdminGeral),
-  // já que isso usa o client de service_role. O formulário já esconde o
-  // checkbox pra qualquer outro perfil (showInviteLoginOption em
-  // liderancas/novo/page.tsx); isto aqui é a segunda barreira.
-  const wantsLogin = role === "admin_geral" && formData.get("create_login") === "on"
-  if (wantsLogin && !parsed.data.email) {
-    return { error: "Informe o e-mail da liderança para criar o acesso de login." }
-  }
-
   const coords = await resolveCoords(parsed.data)
-
-  // Convite acontece ANTES de criar a linha em leaders: se o e-mail já tiver
-  // conta ou o convite falhar por qualquer motivo, a liderança nunca chega a
-  // ser criada "pela metade" (cadastrada, mas sem explicação de por que o
-  // login não saiu). Ver o mesmo cuidado em configuracoes/usuarios/actions.ts.
-  let invitedUserId: string | null = null
-  if (wantsLogin) {
-    const admin = createAdminClient()
-    const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email!, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
-    })
-    if (inviteError || !invited.user) {
-      return { error: `Não foi possível convidar este e-mail: ${inviteError?.message ?? "erro desconhecido"}.` }
-    }
-    invitedUserId = invited.user.id
-  }
 
   const supabase = await createClient()
   const input: LeaderInput = {
@@ -128,87 +103,33 @@ export async function createLeaderAction(
     expected_votes: parseVotes(parsed.data.expected_votes),
     admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
     polling_location_id: parsed.data.polling_location_id || null,
-    // user_id NÃO entra aqui: a FK leaders_user_id_fkey aponta pra
-    // users_profiles(id), e essa linha só é criada MAIS ABAIXO (depois da
-    // liderança existir, pois users_profiles.leader_id aponta pra leaders).
-    // Setar user_id já nesta inserção violava a FK (leader criado antes do
-    // perfil existir) — vinculamos com um UPDATE só depois que o perfil for
-    // criado com sucesso.
   }
 
-  // Hierarquia: quando quem cadastra é a própria liderança, a nova linha
-  // vira "filha" dela automaticamente (parent_leader_id) — o formulário nem
-  // expõe esse campo, e a RLS (ld_lideranca_insert_subordinate) recusaria
-  // qualquer outro valor mesmo que alguém tentasse forjar a requisição.
-  // Também zera os campos administrativos: uma liderança não decide o
-  // próprio nível de influência/status de quem ela recruta (mesma barreira
-  // já aplicada em updateLeaderAction pra edição do próprio cadastro).
-  // admin_estimated_votes segue a mesma regra — mesmo que o formulário nem
-  // exiba esse campo pra role lideranca, zera aqui também como segunda
-  // barreira (defesa em profundidade, igual ao restante do bloco).
-  if (role === "lideranca") {
-    input.parent_leader_id = session.profile.leader_id
-    input.influence_level = null
-    input.status = "ativa"
-    input.can_view_attendances = false
-    input.admin_estimated_votes = null
-  }
+  const leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
 
-  let leader: Awaited<ReturnType<typeof createLeader>>
-  if (invitedUserId) {
-    // Convite já saiu — se a criação da liderança falhar agora, desfaz o
-    // convite pra não deixar um login sem liderança nem perfil vinculados.
-    try {
-      leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
-    } catch (err) {
-      await createAdminClient().auth.admin.deleteUser(invitedUserId)
-      return { error: err instanceof Error ? err.message : "Falha ao cadastrar liderança." }
-    }
-  } else {
-    leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
-  }
-
-  if (invitedUserId) {
+  // Só admin_geral ganha o link de acesso automaticamente ao cadastrar —
+  // admin_equipe também cadastra liderança, mas o link fica pendente até um
+  // admin_geral gerar na tela de detalhe (mesma trava que já existia pro
+  // convite por e-mail antes desta mudança). Ver
+  // docs/08-acesso-lideranca-sem-senha.md §5.
+  if (role === "admin_geral") {
     const admin = createAdminClient()
-    // Mesmo shape de configuracoes/usuarios/actions.ts (inviteUser): cria o
-    // perfil vinculado à liderança recém-criada, já com role lideranca (que
-    // já tem supporters.create:true na matriz de permissões — ver
-    // lib/permissions.ts — por isso não precisa de mais nenhuma autorização
-    // separada pra ela cadastrar apoiadores).
-    const { error: profileError } = await admin.from("users_profiles").insert({
-      id: invitedUserId,
-      organization_id: session.profile.organization_id,
-      full_name: leader.name,
-      email: leader.email,
-      phone: leader.phone,
-      role: "lideranca",
-      leader_id: leader.id,
-    })
-
-    if (profileError) {
-      // Não deixar login nem liderança órfãos: desfaz os dois e avisa.
-      await admin.auth.admin.deleteUser(invitedUserId)
-      await deleteLeader(supabase, leader.id).catch(() => {})
-      return { error: `Não foi possível concluir o cadastro: falha ao criar o acesso de login (${profileError.message}).` }
+    try {
+      await generateLeaderAccessToken(admin, leader, session.profile.organization_id)
+    } catch {
+      // A liderança já foi criada com sucesso — não desfaz o cadastro por
+      // uma falha ao gerar o link; ela só fica "sem acesso" até o
+      // admin_geral tentar de novo na tela de detalhe (botão "Gerar link de
+      // acesso").
+      revalidatePath("/liderancas")
+      revalidatePath("/mapa")
+      redirect(`/liderancas/${leader.id}?erro_link=1`)
     }
-
-    // Só agora o perfil existe de fato — completa o vínculo bidirecional
-    // atualizando leaders.user_id (usa o client de service_role pra não
-    // depender de nenhuma policy de update específica pra esse campo).
-    const { error: linkError } = await admin.from("leaders").update({ user_id: invitedUserId }).eq("id", leader.id)
-    if (linkError) {
-      await admin.auth.admin.deleteUser(invitedUserId)
-      await admin.from("users_profiles").delete().eq("id", invitedUserId)
-      await deleteLeader(supabase, leader.id).catch(() => {})
-      return { error: `Não foi possível concluir o cadastro: falha ao vincular o login à liderança (${linkError.message}).` }
-    }
-
-    revalidatePath("/configuracoes/usuarios")
   }
 
   revalidatePath("/liderancas")
   revalidatePath("/mapa")
-  redirect(`/liderancas/${leader.id}${invitedUserId ? "?convite=enviado" : ""}`)
+  redirect(`/liderancas/${leader.id}`)
 }
 
 export async function updateLeaderAction(
@@ -290,4 +211,59 @@ export async function deleteLeaderAction(
   revalidatePath("/liderancas")
   revalidatePath("/mapa")
   redirect("/liderancas")
+}
+
+/** Restrição igual à de configuracoes/usuarios/actions.ts (assertAdminGeral):
+ * gerenciar o acesso de outra pessoa usa o client de service_role, então só
+ * admin_geral pode chegar até aqui. */
+export async function generateLeaderAccessLinkAction(
+  leaderId: string,
+  _prevState: ActionState,
+): Promise<ActionState> {
+  const session = await requireSessionUser()
+  if (session.profile.role !== "admin_geral") {
+    return { error: "Apenas o Admin Geral pode gerenciar o acesso de lideranças." }
+  }
+
+  const supabase = await createClient()
+  const leader = await getLeaderById(supabase, leaderId)
+  if (!leader) {
+    return { error: "Liderança não encontrada." }
+  }
+
+  const admin = createAdminClient()
+  try {
+    await generateLeaderAccessToken(admin, leader, session.profile.organization_id)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao gerar o link de acesso." }
+  }
+
+  revalidatePath(`/liderancas/${leaderId}`)
+  return { error: null }
+}
+
+export async function revokeLeaderAccessAction(
+  leaderId: string,
+  _prevState: ActionState,
+): Promise<ActionState> {
+  const session = await requireSessionUser()
+  if (session.profile.role !== "admin_geral") {
+    return { error: "Apenas o Admin Geral pode gerenciar o acesso de lideranças." }
+  }
+
+  const supabase = await createClient()
+  const leader = await getLeaderById(supabase, leaderId)
+  if (!leader) {
+    return { error: "Liderança não encontrada." }
+  }
+
+  const admin = createAdminClient()
+  try {
+    await revokeLeaderAccess(admin, leaderId, leader.user_id)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao revogar o acesso." }
+  }
+
+  revalidatePath(`/liderancas/${leaderId}`)
+  return { error: null }
 }
