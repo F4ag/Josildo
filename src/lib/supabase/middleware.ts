@@ -12,7 +12,7 @@ import { canAccessRoute } from "@/lib/permissions"
 import { resolveCookieDomain } from "@/lib/supabase/cookie-domain"
 import type { UserRole } from "@/types/domain"
 
-const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/redefinir-senha", "/auth/confirm"]
+const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/redefinir-senha", "/auth/confirm", "/acesso-lideranca"]
 
 // Domínio raiz do produto. A organização do cliente atual (Lidera+) atende
 // pelo próprio domínio raiz, sem subdomínio — para não quebrar nenhum

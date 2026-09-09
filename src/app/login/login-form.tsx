@@ -26,6 +26,7 @@ export function LoginForm() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirect")
   const contaInativa = searchParams.get("erro") === "conta_inativa"
+  const linkInvalido = searchParams.get("erro") === "link_invalido"
 
   // Navegação de página inteira (não router.push) de propósito: o
   // middleware pode precisar trocar de subdomínio (organização com domínio
@@ -45,6 +46,12 @@ export function LoginForm() {
       {contaInativa && (
         <p className="rounded-md bg-status-atrasada/10 px-3 py-2 text-sm text-status-atrasada">
           Sua conta está inativa. Fale com o Admin Geral da sua campanha.
+        </p>
+      )}
+
+      {linkInvalido && (
+        <p className="rounded-md bg-status-atrasada/10 px-3 py-2 text-sm text-status-atrasada">
+          Esse link de acesso não é mais válido. Peça ao Admin Geral da sua campanha para gerar um novo.
         </p>
       )}
 
