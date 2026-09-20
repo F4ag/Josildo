@@ -64,7 +64,10 @@ export async function isEmailTaken(admin: AdminDB, email: string): Promise<boole
 export type OrganizationCreateInput = {
   name: string
   slug: string
-  election_city?: string | null
+  // Obrigatório (não string | null): o provisionamento cross-sistema
+  // depende de uma cidade real — ver createOrganizationSchema em
+  // lib/validations/organization.ts, que já barra o formulário sem ela.
+  election_city: string
   election_state?: string | null
 }
 

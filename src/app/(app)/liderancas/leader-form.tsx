@@ -149,7 +149,10 @@ export function LeaderForm({
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
-        <NeighborhoodSelect ref={neighborhoodSelectRef} neighborhoods={neighborhoods} defaultId={d?.neighborhood_id} />
+        <NeighborhoodSelect
+          ref={neighborhoodSelectRef} neighborhoods={neighborhoods}
+          defaultId={d?.neighborhood_id} defaultText={d?.neighborhood}
+        />
 
         <div>
           <label htmlFor="city" className="mb-1 block text-sm font-medium">Cidade</label>

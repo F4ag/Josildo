@@ -597,12 +597,19 @@ alter table organizations
 comment on column organizations.election_candidate_number is
   'Número do candidato conforme registrado no TSE (mesmo formato do arquivo "Votação por seção eleitoral", ex: "12345").';
 
--- cidade — usada para propagar ao Cadastro Mestre e, no Dashboard, decidir
--- se reaproveita uma estrutura territorial já mapeada (ver provisionamento
--- cross-sistema, docs/superpowers/plans/2026-08-15-provisionamento-cross-sistema.md).
+-- cidade — LEGADO, sem uso a partir da reconciliação com election_city (ver
+-- docs/08-acesso-lideranca-sem-senha.md e commit "merge: reconcilia
+-- cidade/UF do cliente e seletor de bairro com o main"). Usada originalmente
+-- pra propagar ao Cadastro Mestre e, no Dashboard, decidir se reaproveitava
+-- uma estrutura territorial já mapeada (provisionamento cross-sistema,
+-- docs/superpowers/plans/2026-08-15-provisionamento-cross-sistema.md) — esse
+-- papel passou a ser de election_city (mais abaixo, já existia antes desta
+-- coluna). Mantida sem dropar pra não perder o valor já gravado em clientes
+-- criados antes da reconciliação; nenhum código a partir de agora lê nem
+-- escreve nela.
 alter table organizations add column cidade text;
 comment on column organizations.cidade is
-  'Cidade onde este cliente atua — usada para provisionar o cliente nos outros sistemas do ecossistema.';
+  'LEGADO — sem uso desde a unificação com election_city. Ver comentário acima da coluna no schema.sql.';
 
 -- election_results_sections — resultado REAL de votação por seção, para o
 -- candidato de cada organização. Multi-tenant (diferente de

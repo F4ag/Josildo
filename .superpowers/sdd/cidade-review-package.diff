@@ -1,0 +1,1225 @@
+ src/app/(app)/apoiadores/[id]/editar/page.tsx      |  3 +
+ src/app/(app)/apoiadores/actions.ts                |  3 +
+ src/app/(app)/apoiadores/novo/page.tsx             |  3 +
+ src/app/(app)/apoiadores/supporter-form.tsx        | 18 ++---
+ .../clientes/[id]/editar/client-edit-form.tsx      | 32 ++++++++-
+ src/app/(app)/clientes/[id]/editar/page.tsx        |  5 +-
+ src/app/(app)/clientes/actions.ts                  | 29 ++++++--
+ src/app/(app)/clientes/novo/client-form.tsx        | 35 +++++++---
+ src/app/(app)/liderancas/[id]/editar/page.tsx      |  3 +
+ src/app/(app)/liderancas/actions.ts                |  3 +
+ src/app/(app)/liderancas/leader-form.tsx           | 27 ++++----
+ src/app/(app)/liderancas/novo/page.tsx             | 10 ++-
+ src/components/neighborhood-select.tsx             | 81 ++++++++++++++++++++++
+ src/lib/validations/leader.ts                      |  5 ++
+ src/lib/validations/organization.ts                | 14 +++-
+ src/lib/validations/supporter.ts                   |  4 ++
+ src/services/neighborhoods.ts                      | 19 +++++
+ src/services/organizations.ts                      | 20 +++++-
+ supabase/schema.sql                                | 14 +++-
+ 19 files changed, 284 insertions(+), 44 deletions(-)
+
+diff --git a/src/app/(app)/apoiadores/[id]/editar/page.tsx b/src/app/(app)/apoiadores/[id]/editar/page.tsx
+index 318d1c3..4b8f1da 100644
+--- a/src/app/(app)/apoiadores/[id]/editar/page.tsx
++++ b/src/app/(app)/apoiadores/[id]/editar/page.tsx
+@@ -1,16 +1,17 @@
+ import type { Metadata } from "next"
+ import { notFound, redirect } from "next/navigation"
+ import { getSessionUser } from "@/lib/auth"
+ import { createClient } from "@/lib/supabase/server"
+ import { getSupporterById } from "@/services/supporters"
+ import { listLeaders } from "@/services/leaders"
++import { listNeighborhoods } from "@/services/neighborhoods"
+ import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
+ import { can } from "@/lib/permissions"
+ import type { UserRole } from "@/types/domain"
+ import { SupporterForm } from "../../supporter-form"
+ import { updateSupporterAction } from "../../actions"
+ 
+ export const metadata: Metadata = { title: "Editar apoiador · Lidera+" }
+ 
+ export default async function EditarApoiadorPage({
+   params,
+@@ -25,29 +26,31 @@ export default async function EditarApoiadorPage({
+   if (!supporter) notFound()
+ 
+   const role = session?.profile.role as UserRole
+   const isOwnNetwork = role === "lideranca" && supporter.leader_id === session?.profile.leader_id
+   if (!can(role, "update", "supporters") && !isOwnNetwork) {
+     redirect(`/apoiadores/${id}`)
+   }
+ 
+   const isLideranca = role === "lideranca"
+   const leaders = isLideranca ? [] : await listLeaders(supabase)
++  const neighborhoods = await listNeighborhoods(supabase)
+   const pollingLocation = supporter.polling_location_id
+     ? await getPollingLocationById(supabase, supporter.polling_location_id)
+     : null
+   const boundAction = updateSupporterAction.bind(null, id)
+ 
+   return (
+     <div className="space-y-6">
+       <h1 className="text-xl font-semibold text-foreground">Editar apoiador</h1>
+       <SupporterForm
+         action={boundAction}
+         defaultValues={supporter}
+         leaders={leaders.map((l) => ({ id: l.id, name: l.name }))}
++        neighborhoods={neighborhoods.map((n) => ({ id: n.id, name: n.name }))}
+         lockedToOwnNetwork={isLideranca}
+         pollingLocationDefaultLabel={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null}
+         cancelHref={`/apoiadores/${id}`}
+       />
+     </div>
+   )
+ }
+diff --git a/src/app/(app)/apoiadores/actions.ts b/src/app/(app)/apoiadores/actions.ts
+index 065700e..56fe0b5 100644
+--- a/src/app/(app)/apoiadores/actions.ts
++++ b/src/app/(app)/apoiadores/actions.ts
+@@ -49,20 +49,21 @@ function parseSupporterForm(formData: FormData) {
+   return supporterSchema.safeParse({
+     name: formData.get("name"),
+     phone: formData.get("phone"),
+     birth_date: formData.get("birth_date"),
+     cpf: formData.get("cpf") || undefined,
+     mother_name: formData.get("mother_name") || undefined,
+     address: formData.get("address"),
+     complement: formData.get("complement") || undefined,
+     email: formData.get("email") || "",
+     neighborhood: formData.get("neighborhood") || undefined,
++    neighborhood_id: formData.get("neighborhood_id") || "",
+     city: formData.get("city") || undefined,
+     state: formData.get("state") || undefined,
+     zip_code: formData.get("zip_code") || undefined,
+     polling_location_id: formData.get("polling_location_id") || "",
+     electoral_zone: formData.get("electoral_zone") || undefined,
+     electoral_section: formData.get("electoral_section") || undefined,
+     latitude: formData.get("latitude") || "",
+     longitude: formData.get("longitude") || "",
+     leader_id: formData.get("leader_id") || "",
+     origin: formData.get("origin") || "",
+@@ -119,20 +120,21 @@ export async function createSupporterAction(
+   const coords = await resolveCoords(parsed.data)
+ 
+   const input: SupporterInput = {
+     ...parsed.data,
+     email: parsed.data.email || null,
+     origin: parsed.data.origin || null,
+     leader_id: leaderId,
+     latitude: coords.latitude,
+     longitude: coords.longitude,
+     polling_location_id: parsed.data.polling_location_id || null,
++    neighborhood_id: parsed.data.neighborhood_id || null,
+     consent_date: new Date().toISOString(),
+     consent_origin: "cadastro_interno",
+   }
+ 
+   const supporter = await createSupporter(supabase, input, session.id, session.profile.organization_id)
+   revalidatePath("/apoiadores")
+   revalidatePath("/mapa")
+   redirect(`/apoiadores/${supporter.id}`)
+ }
+ 
+@@ -162,20 +164,21 @@ export async function updateSupporterAction(
+ 
+   const coords = await resolveCoords(parsed.data)
+ 
+   const input: Partial<SupporterInput> = {
+     ...parsed.data,
+     email: parsed.data.email || null,
+     origin: parsed.data.origin || null,
+     latitude: coords.latitude,
+     longitude: coords.longitude,
+     polling_location_id: parsed.data.polling_location_id || null,
++    neighborhood_id: parsed.data.neighborhood_id || null,
+   }
+   // Liderança não transfere o apoiador para outra rede.
+   if (role === "lideranca") delete input.leader_id
+ 
+   await updateSupporter(supabase, supporterId, input)
+   revalidatePath("/apoiadores")
+   revalidatePath(`/apoiadores/${supporterId}`)
+   revalidatePath("/mapa")
+   redirect(`/apoiadores/${supporterId}`)
+ }
+diff --git a/src/app/(app)/apoiadores/novo/page.tsx b/src/app/(app)/apoiadores/novo/page.tsx
+index bdb6dea..b80dbea 100644
+--- a/src/app/(app)/apoiadores/novo/page.tsx
++++ b/src/app/(app)/apoiadores/novo/page.tsx
+@@ -1,41 +1,44 @@
+ import type { Metadata } from "next"
+ import { redirect } from "next/navigation"
+ import { getSessionUser } from "@/lib/auth"
+ import { createClient } from "@/lib/supabase/server"
+ import { listLeaders } from "@/services/leaders"
++import { listNeighborhoods } from "@/services/neighborhoods"
+ import { can } from "@/lib/permissions"
+ import type { UserRole } from "@/types/domain"
+ import { SupporterForm } from "../supporter-form"
+ import { createSupporterAction } from "../actions"
+ 
+ export const metadata: Metadata = { title: "Novo apoiador · Lidera+" }
+ 
+ export default async function NovoApoiadorPage() {
+   const session = await getSessionUser()
+   const role = session?.profile.role as UserRole
+ 
+   if (!session || !can(role, "create", "supporters")) {
+     redirect("/apoiadores")
+   }
+ 
+   const isLideranca = role === "lideranca"
+   const supabase = await createClient()
+   const leaders = isLideranca ? [] : await listLeaders(supabase)
++  const neighborhoods = await listNeighborhoods(supabase)
+ 
+   return (
+     <div className="space-y-6">
+       <div>
+         <h1 className="text-xl font-semibold text-foreground">Novo apoiador</h1>
+         {isLideranca && (
+           <p className="text-sm text-foreground/60">Cadastrado automaticamente na sua rede.</p>
+         )}
+       </div>
+       <SupporterForm
+         action={createSupporterAction}
+         leaders={leaders.map((l) => ({ id: l.id, name: l.name }))}
++        neighborhoods={neighborhoods.map((n) => ({ id: n.id, name: n.name }))}
+         lockedToOwnNetwork={isLideranca}
+         cancelHref="/apoiadores"
+       />
+     </div>
+   )
+ }
+diff --git a/src/app/(app)/apoiadores/supporter-form.tsx b/src/app/(app)/apoiadores/supporter-form.tsx
+index 179f5e7..b3b32f7 100644
+--- a/src/app/(app)/apoiadores/supporter-form.tsx
++++ b/src/app/(app)/apoiadores/supporter-form.tsx
+@@ -1,18 +1,19 @@
+ "use client"
+ 
+ import { useRef, useState } from "react"
+ import { useFormState, useFormStatus } from "react-dom"
+ import Link from "next/link"
+ import { SUPPORTER_ORIGINS, SUPPORTER_ORIGIN_LABELS, type Supporter } from "@/types/domain"
+ import { fetchAddressByZipCode } from "@/lib/viacep"
+ import { PollingLocationAutocomplete } from "@/components/polling-location-autocomplete"
++import { NeighborhoodSelect, type NeighborhoodSelectHandle } from "@/components/neighborhood-select"
+ import type { SupporterActionState } from "./actions"
+ 
+ const initialState: SupporterActionState = { error: null }
+ 
+ function SubmitButton({ label = "Salvar" }: { label?: string }) {
+   const { pending } = useFormStatus()
+   return (
+     <button type="submit" disabled={pending}
+       className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60">
+       {pending ? "Salvando..." : label}
+@@ -23,45 +24,50 @@ function SubmitButton({ label = "Salvar" }: { label?: string }) {
+ type SupporterFormProps = {
+   action: (prevState: SupporterActionState, formData: FormData) => Promise<SupporterActionState>
+   defaultValues?: Partial<Supporter>
+   leaders?: { id: string; name: string }[]
+   /** Liderança logada cadastrando na própria rede: some o seletor de liderança. */
+   lockedToOwnNetwork?: boolean
+   /** Mesma lógica de leader-form.tsx: rótulo já formatado do local de
+    * votação vinculado, calculado pela página a partir do
+    * polling_location_id (o registro de Supporter só guarda o id). */
+   pollingLocationDefaultLabel?: string | null
++  /** Bairros cadastrados (`neighborhoods`) da organização, já ordenados por
++   * nome — ver services/neighborhoods.ts. Alimenta o NeighborhoodSelect
++   * abaixo. */
++  neighborhoods: { id: string; name: string }[]
+   cancelHref: string
+ }
+ 
+ export function SupporterForm({
+-  action, defaultValues, leaders, lockedToOwnNetwork = false, pollingLocationDefaultLabel, cancelHref,
++  action, defaultValues, leaders, lockedToOwnNetwork = false, pollingLocationDefaultLabel, neighborhoods,
++  cancelHref,
+ }: SupporterFormProps) {
+   const [state, formAction] = useFormState(action, initialState)
+   const [forceDuplicate, setForceDuplicate] = useState(false)
+   const d = defaultValues
+ 
+   // Mesmo padrão de liderancas/leader-form.tsx: refs pra permitir que o
+   // autopreenchimento do CEP (onBlur) escreva nos campos sem depender de
+   // controlar cada input via estado do React.
+   const addressRef = useRef<HTMLInputElement>(null)
+-  const neighborhoodRef = useRef<HTMLInputElement>(null)
++  const neighborhoodSelectRef = useRef<NeighborhoodSelectHandle>(null)
+   const cityRef = useRef<HTMLInputElement>(null)
+   const stateRef = useRef<HTMLInputElement>(null)
+ 
+   async function handleZipCodeBlur(event: React.FocusEvent<HTMLInputElement>) {
+     const found = await fetchAddressByZipCode(event.target.value)
+     if (!found) return
+     if (addressRef.current) addressRef.current.value = found.logradouro
+-    if (neighborhoodRef.current) neighborhoodRef.current.value = found.bairro
+     if (cityRef.current) cityRef.current.value = found.localidade
+     if (stateRef.current) stateRef.current.value = found.uf
++    neighborhoodSelectRef.current?.trySelectByName(found.bairro)
+   }
+ 
+   return (
+     <form action={formAction} className="max-w-2xl space-y-4 rounded-lg border border-black/5 bg-white p-6">
+       {state.duplicates && state.duplicates.length > 0 && (
+         <div className="rounded-md border border-accent/40 bg-accent/10 p-4 text-sm">
+           <p className="font-medium text-accent-foreground">
+             Encontramos {state.duplicates.length} possível(is) duplicidade(s):
+           </p>
+           <ul className="mt-2 list-disc space-y-1 pl-5">
+@@ -127,25 +133,21 @@ export function SupporterForm({
+           <input id="address" name="address" ref={addressRef} required defaultValue={d?.address}
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+         </div>
+ 
+         <div>
+           <label htmlFor="complement" className="mb-1 block text-sm font-medium">Complemento</label>
+           <input id="complement" name="complement" placeholder="Casa, apartamento, bloco..." defaultValue={d?.complement ?? undefined}
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+         </div>
+ 
+-        <div>
+-          <label htmlFor="neighborhood" className="mb-1 block text-sm font-medium">Bairro</label>
+-          <input id="neighborhood" name="neighborhood" ref={neighborhoodRef} defaultValue={d?.neighborhood ?? undefined}
+-            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+-        </div>
++        <NeighborhoodSelect ref={neighborhoodSelectRef} neighborhoods={neighborhoods} defaultId={d?.neighborhood_id} />
+ 
+         <div>
+           <label htmlFor="city" className="mb-1 block text-sm font-medium">Cidade</label>
+           <input id="city" name="city" ref={cityRef} defaultValue={d?.city ?? undefined}
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+         </div>
+ 
+         <div>
+           <label htmlFor="state" className="mb-1 block text-sm font-medium">Estado (UF)</label>
+           <input id="state" name="state" ref={stateRef} maxLength={2} placeholder="PE" defaultValue={d?.state ?? undefined}
+diff --git a/src/app/(app)/clientes/[id]/editar/client-edit-form.tsx b/src/app/(app)/clientes/[id]/editar/client-edit-form.tsx
+index e1bf60d..f1682ce 100644
+--- a/src/app/(app)/clientes/[id]/editar/client-edit-form.tsx
++++ b/src/app/(app)/clientes/[id]/editar/client-edit-form.tsx
+@@ -22,21 +22,24 @@ function SubmitButton() {
+       disabled={pending}
+       className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+     >
+       {pending ? "Salvando..." : "Salvar"}
+     </button>
+   )
+ }
+ 
+ type ClientEditFormProps = {
+   action: (prevState: UpdateClientActionState, formData: FormData) => Promise<UpdateClientActionState>
+-  defaultValues: { name: string; slug: string; status: string; plan: string }
++  defaultValues: {
++    name: string; slug: string; status: string; plan: string
++    election_city: string | null; election_state: string | null
++  }
+ }
+ 
+ export function ClientEditForm({ action, defaultValues }: ClientEditFormProps) {
+   const [state, formAction] = useFormState(action, initialState)
+ 
+   if (state.success) {
+     return (
+       <div className="max-w-lg rounded-lg border border-black/5 bg-white p-6">
+         <p className="text-sm text-foreground/80">Cliente atualizado.</p>
+         <Link href="/clientes" className="mt-4 inline-block text-sm text-secondary hover:underline">
+@@ -85,20 +88,47 @@ export function ClientEditForm({ action, defaultValues }: ClientEditFormProps) {
+         <label htmlFor="plan" className="mb-1 block text-sm font-medium">Plano</label>
+         <input
+           id="plan" name="plan" required defaultValue={defaultValues.plan}
+           className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+         />
+         <p className="mt-1 text-xs text-foreground/50">
+           Campo livre (ex.: padrao, premium) — não afeta permissões, é só rótulo interno por enquanto.
+         </p>
+       </div>
+ 
++      <div className="border-t border-black/5 pt-4">
++        <p className="mb-1 text-sm font-medium text-foreground">Cidade/UF da eleição</p>
++        <p className="mb-3 text-xs text-foreground/50">
++          Fortemente recomendado manter preenchido: alimenta o provisionamento territorial (bairros)
++          usado nos cadastros de liderança e apoiador deste cliente.
++        </p>
++
++        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
++          <div>
++            <label htmlFor="election_city" className="mb-1 block text-sm font-medium">Cidade</label>
++            <input
++              id="election_city" name="election_city" defaultValue={defaultValues.election_city ?? undefined}
++              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
++            />
++          </div>
++
++          <div>
++            <label htmlFor="election_state" className="mb-1 block text-sm font-medium">Estado (UF)</label>
++            <input
++              id="election_state" name="election_state" maxLength={2} placeholder="PE"
++              defaultValue={defaultValues.election_state ?? undefined}
++              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none"
++            />
++          </div>
++        </div>
++      </div>
++
+       {state.error && (
+         <p role="alert" className="text-sm text-status-atrasada">{state.error}</p>
+       )}
+ 
+       <div className="flex items-center gap-3 pt-2">
+         <SubmitButton />
+         <Link href="/clientes" className="text-sm text-foreground/60 hover:underline">
+           Cancelar
+         </Link>
+       </div>
+diff --git a/src/app/(app)/clientes/[id]/editar/page.tsx b/src/app/(app)/clientes/[id]/editar/page.tsx
+index 5fd7c8b..c82e4b5 100644
+--- a/src/app/(app)/clientes/[id]/editar/page.tsx
++++ b/src/app/(app)/clientes/[id]/editar/page.tsx
+@@ -21,15 +21,18 @@ export default async function EditarClientePage({
+   const org = await getOrganizationById(admin, id)
+   if (!org) notFound()
+ 
+   const boundAction = updateClientAction.bind(null, id)
+ 
+   return (
+     <div className="space-y-6">
+       <h1 className="text-xl font-semibold text-foreground">Editar cliente</h1>
+       <ClientEditForm
+         action={boundAction}
+-        defaultValues={{ name: org.name, slug: org.slug, status: org.status, plan: org.plan }}
++        defaultValues={{
++          name: org.name, slug: org.slug, status: org.status, plan: org.plan,
++          election_city: org.election_city, election_state: org.election_state,
++        }}
+       />
+     </div>
+   )
+ }
+diff --git a/src/app/(app)/clientes/actions.ts b/src/app/(app)/clientes/actions.ts
+index 5820ce3..f8fed20 100644
+--- a/src/app/(app)/clientes/actions.ts
++++ b/src/app/(app)/clientes/actions.ts
+@@ -83,61 +83,66 @@ export async function retryProvisioningStepAction(
+   if (adminProfileError) {
+     return { status: "erro", mensagem: `Falha ao buscar o responsável da organização: ${adminProfileError.message}` }
+   }
+   if (!adminProfile || !adminProfile.email) {
+     return { status: "erro", mensagem: "Nenhum Admin Geral encontrado para esta organização — não é possível repetir esta etapa." }
+   }
+ 
+   const input: ProvisioningInput = {
+     organizationId,
+     nome: org.name,
+-    cidade: org.cidade ?? "",
++    // Ver comentário equivalente em createClientAction: election_city é a
++    // fonte única (substitui o antigo campo "cidade" separado).
++    cidade: org.election_city ?? "",
+     adminEmail: adminProfile.email,
+     adminNome: adminProfile.full_name,
+   }
+ 
+   try {
+     return await RETRY_STEPS[etapa](input, integracao.cliente_id)
+   } catch (err) {
+     return { status: "erro", mensagem: `Falha inesperada ao provisionar: ${err instanceof Error ? err.message : "erro desconhecido"}` }
+   }
+ }
+ 
+ export async function createClientAction(
+   _prevState: CreateClientActionState,
+   formData: FormData,
+ ): Promise<CreateClientActionState> {
+   await assertPlatformAdmin()
+ 
+   const parsed = createOrganizationSchema.safeParse({
+     name: formData.get("name"),
+     slug: formData.get("slug"),
+-    cidade: formData.get("cidade"),
+     admin_full_name: formData.get("admin_full_name"),
+     admin_email: formData.get("admin_email"),
++    election_city: formData.get("election_city"),
++    election_state: formData.get("election_state") || undefined,
+   })
+ 
+   if (!parsed.success) {
+     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
+   }
+ 
+-  const { name, slug, cidade, admin_full_name, admin_email } = parsed.data
++  const { name, slug, admin_full_name, admin_email, election_city, election_state } = parsed.data
+   const admin = createAdminClient()
+ 
+   if (await isSlugTaken(admin, slug)) {
+     return { error: `O subdomínio "${slug}" já está em uso por outro cliente.` }
+   }
+   if (await isEmailTaken(admin, admin_email)) {
+     return { error: `O e-mail "${admin_email}" já pertence a uma conta existente (de qualquer cliente).` }
+   }
+ 
+-  const org = await createOrganizationRow(admin, name, slug, cidade)
++  const org = await createOrganizationRow(admin, {
++    name, slug, election_city, election_state: election_state || null,
++  })
+ 
+   // Convite do primeiro admin_geral do cliente novo — mesmo fluxo/redirectTo
+   // de configuracoes/usuarios/actions.ts (inviteUser).
+   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(admin_email, {
+     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
+   })
+ 
+   if (inviteError || !invited.user) {
+     // Não deixar uma organização órfã sem admin.
+     await admin.from("organizations").delete().eq("id", org.id)
+@@ -156,21 +161,27 @@ export async function createClientAction(
+   if (profileError) {
+     // Não deixar auth.users nem organization órfãos.
+     await admin.auth.admin.deleteUser(invited.user.id)
+     await admin.from("organizations").delete().eq("id", org.id)
+     return { error: `Não foi possível salvar o perfil do responsável: ${profileError.message}.` }
+   }
+ 
+   const provisioningInput: ProvisioningInput = {
+     organizationId: org.id,
+     nome: name,
+-    cidade,
++    // O provisionamento cross-sistema usava um campo "cidade" próprio, sem
++    // UF — unificado com election_city (cidade/UF da eleição, ver
++    // docs/08-acesso-lideranca-sem-senha.md) pra não ter duas perguntas de
++    // cidade parecidas na mesma tela. election_city é obrigatório no
++    // schema de criação exatamente por isso: sem ele, provisionar nos
++    // outros sistemas falharia.
++    cidade: election_city,
+     adminEmail: admin_email,
+     adminNome: admin_full_name,
+   }
+ 
+   let provisioning: ProvisioningReport
+   try {
+     provisioning = await provisionarClienteCrossSistema(provisioningInput)
+   } catch (err) {
+     // A organização, o convite e o perfil no Lidera+ já foram commitados com
+     // sucesso neste ponto — um erro inesperado aqui (ex.: env var de service
+@@ -195,39 +206,43 @@ export async function updateClientAction(
+   _prevState: UpdateClientActionState,
+   formData: FormData,
+ ): Promise<UpdateClientActionState> {
+   await assertPlatformAdmin()
+ 
+   const parsed = updateOrganizationSchema.safeParse({
+     name: formData.get("name"),
+     slug: formData.get("slug"),
+     status: formData.get("status"),
+     plan: formData.get("plan"),
++    election_city: formData.get("election_city") || undefined,
++    election_state: formData.get("election_state") || undefined,
+   })
+ 
+   if (!parsed.success) {
+     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
+   }
+ 
+-  const { name, slug, status, plan } = parsed.data
++  const { name, slug, status, plan, election_city, election_state } = parsed.data
+   const admin = createAdminClient()
+ 
+   const current = await getOrganizationById(admin, organizationId)
+   if (!current) {
+     return { error: "Cliente não encontrado." }
+   }
+ 
+   if (slug !== current.slug && (await isSlugTaken(admin, slug))) {
+     return { error: `O subdomínio "${slug}" já está em uso por outro cliente.` }
+   }
+ 
+-  await updateOrganizationRow(admin, organizationId, { name, slug, status, plan })
++  await updateOrganizationRow(admin, organizationId, {
++    name, slug, status, plan, election_city: election_city || null, election_state: election_state || null,
++  })
+ 
+   revalidatePath("/clientes")
+   return { error: null, success: true }
+ }
+ 
+ /**
+  * Apaga a organização inteira (lideranças, apoiadores, demandas,
+  * atendimentos, agenda, mensagens, interações, notificações, anexos e todos
+  * os logins) — irreversível. Duas travas antes de chegar no
+  * deleteOrganizationCascade: nunca a organização raiz (lidera-mais) e nunca
+diff --git a/src/app/(app)/clientes/novo/client-form.tsx b/src/app/(app)/clientes/novo/client-form.tsx
+index 1da6d37..bd0ac06 100644
+--- a/src/app/(app)/clientes/novo/client-form.tsx
++++ b/src/app/(app)/clientes/novo/client-form.tsx
+@@ -87,30 +87,47 @@ export function ClientForm() {
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+           />
+           <span className="whitespace-nowrap text-sm text-foreground/50">.{ROOT_DOMAIN}</span>
+         </div>
+         <p className="mt-1 text-xs text-foreground/50">
+           Só letras minúsculas, números e hífen. É o endereço que esse cliente vai usar pra acessar
+           o sistema.
+         </p>
+       </div>
+ 
+-      <div>
+-        <label htmlFor="cidade" className="mb-1 block text-sm font-medium">Cidade</label>
+-        <input
+-          id="cidade" name="cidade" required
+-          placeholder="Ex.: Olinda"
+-          className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+-        />
+-        <p className="mt-1 text-xs text-foreground/50">
+-          Cidade onde este cliente atua — usada para provisionar o cliente nos outros sistemas do ecossistema.
++      <div className="border-t border-black/5 pt-4">
++        <p className="mb-1 text-sm font-medium text-foreground">Cidade/UF da eleição</p>
++        <p className="mb-3 text-xs text-foreground/50">
++          A cidade é usada tanto para provisionar o cliente nos outros sistemas do ecossistema (Cadastro
++          Mestre/Bússola/Origem/Dashboard) quanto para o provisionamento territorial (bairros) aqui no
++          Lidera+ — por isso é obrigatória. O estado (UF) é só recomendado: ajuda a desambiguar cidades de
++          mesmo nome no provisionamento territorial.
+         </p>
++
++        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
++          <div>
++            <label htmlFor="election_city" className="mb-1 block text-sm font-medium">Cidade</label>
++            <input
++              id="election_city" name="election_city" required
++              placeholder="Ex.: Olinda"
++              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
++            />
++          </div>
++
++          <div>
++            <label htmlFor="election_state" className="mb-1 block text-sm font-medium">Estado (UF)</label>
++            <input
++              id="election_state" name="election_state" maxLength={2} placeholder="PE"
++              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none"
++            />
++          </div>
++        </div>
+       </div>
+ 
+       <div className="border-t border-black/5 pt-4">
+         <p className="mb-3 text-sm font-medium text-foreground">Responsável (Admin Geral)</p>
+ 
+         <div className="space-y-4">
+           <div>
+             <label htmlFor="admin_full_name" className="mb-1 block text-sm font-medium">Nome completo</label>
+             <input
+               id="admin_full_name" name="admin_full_name" required
+diff --git a/src/app/(app)/liderancas/[id]/editar/page.tsx b/src/app/(app)/liderancas/[id]/editar/page.tsx
+index f8a7626..0f2c946 100644
+--- a/src/app/(app)/liderancas/[id]/editar/page.tsx
++++ b/src/app/(app)/liderancas/[id]/editar/page.tsx
+@@ -1,15 +1,16 @@
+ import type { Metadata } from "next"
+ import { notFound, redirect } from "next/navigation"
+ import { getSessionUser } from "@/lib/auth"
+ import { createClient } from "@/lib/supabase/server"
+ import { getLeaderById } from "@/services/leaders"
++import { listNeighborhoods } from "@/services/neighborhoods"
+ import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
+ import { can } from "@/lib/permissions"
+ import type { UserRole } from "@/types/domain"
+ import { LeaderForm } from "../../leader-form"
+ import { updateLeaderAction } from "../../actions"
+ 
+ export const metadata: Metadata = { title: "Editar liderança · Lidera+" }
+ 
+ export default async function EditarLiderancaPage({
+   params,
+@@ -21,20 +22,21 @@ export default async function EditarLiderancaPage({
+   const supabase = await createClient()
+   const leader = await getLeaderById(supabase, id)
+ 
+   if (!leader) notFound()
+ 
+   // O cadastro só guarda o polling_location_id — sem isso, o autocomplete
+   // apareceria vazio na edição mesmo com um local já selecionado.
+   const pollingLocation = leader.polling_location_id
+     ? await getPollingLocationById(supabase, leader.polling_location_id)
+     : null
++  const neighborhoods = await listNeighborhoods(supabase)
+ 
+   const role = session?.profile.role as UserRole
+   const isOwnRecord = role === "lideranca" && session?.profile.leader_id === id
+   // Liderança só edita o próprio cadastro, nunca o de uma sub-liderança que
+   // ela cadastrou (RLS ld_lideranca_update_self não cobre isso) — ver nota
+   // igual em liderancas/[id]/page.tsx.
+   const canEdit = role === "lideranca" ? isOwnRecord : can(role, "update", "leaders")
+   if (!canEdit) {
+     redirect(`/liderancas/${id}`)
+   }
+@@ -42,15 +44,16 @@ export default async function EditarLiderancaPage({
+   const boundAction = updateLeaderAction.bind(null, id)
+ 
+   return (
+     <div className="space-y-6">
+       <h1 className="text-xl font-semibold text-foreground">Editar liderança</h1>
+       <LeaderForm
+         action={boundAction}
+         defaultValues={leader}
+         isOwnRecord={isOwnRecord}
+         pollingLocationDefaultLabel={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null}
++        neighborhoods={neighborhoods.map((n) => ({ id: n.id, name: n.name }))}
+         cancelHref={`/liderancas/${id}`}
+       />
+     </div>
+   )
+ }
+diff --git a/src/app/(app)/liderancas/actions.ts b/src/app/(app)/liderancas/actions.ts
+index 85042f4..1c6bd8e 100644
+--- a/src/app/(app)/liderancas/actions.ts
++++ b/src/app/(app)/liderancas/actions.ts
+@@ -24,20 +24,21 @@ function parseLeaderForm(formData: FormData) {
+     name: formData.get("name"),
+     nickname: formData.get("nickname") || undefined,
+     phone: formData.get("phone") || undefined,
+     email: formData.get("email") || "",
+     birth_date: formData.get("birth_date") || "",
+     cpf: formData.get("cpf") || undefined,
+     mother_name: formData.get("mother_name") || undefined,
+     address: formData.get("address") || undefined,
+     complement: formData.get("complement") || undefined,
+     neighborhood: formData.get("neighborhood") || undefined,
++    neighborhood_id: formData.get("neighborhood_id") || "",
+     city: formData.get("city") || undefined,
+     state: formData.get("state") || undefined,
+     zip_code: formData.get("zip_code") || undefined,
+     polling_location_id: formData.get("polling_location_id") || "",
+     electoral_zone: formData.get("electoral_zone") || undefined,
+     electoral_section: formData.get("electoral_section") || undefined,
+     latitude: formData.get("latitude") || "",
+     longitude: formData.get("longitude") || "",
+     leader_type: formData.get("leader_type") || "",
+     influence_level: formData.get("influence_level") || "",
+@@ -100,20 +101,21 @@ export async function createLeaderAction(
+     ...parsed.data,
+     email: parsed.data.email || null,
+     birth_date: parsed.data.birth_date || null,
+     latitude: coords.latitude,
+     longitude: coords.longitude,
+     leader_type: parsed.data.leader_type || null,
+     influence_level: parsed.data.influence_level || null,
+     expected_votes: parseVotes(parsed.data.expected_votes),
+     admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
+     polling_location_id: parsed.data.polling_location_id || null,
++    neighborhood_id: parsed.data.neighborhood_id || null,
+   }
+ 
+   const leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
+ 
+   // Só admin_geral ganha o link de acesso automaticamente ao cadastrar —
+   // admin_equipe também cadastra liderança, mas o link fica pendente até um
+   // admin_geral gerar na tela de detalhe (mesma trava que já existia pro
+   // convite por e-mail antes desta mudança). Ver
+   // docs/08-acesso-lideranca-sem-senha.md §5.
+   if (role === "admin_geral") {
+@@ -164,20 +166,21 @@ export async function updateLeaderAction(
+     ...parsed.data,
+     email: parsed.data.email || null,
+     birth_date: parsed.data.birth_date || null,
+     latitude: coords.latitude,
+     longitude: coords.longitude,
+     leader_type: parsed.data.leader_type || null,
+     influence_level: parsed.data.influence_level || null,
+     expected_votes: parseVotes(parsed.data.expected_votes),
+     admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
+     polling_location_id: parsed.data.polling_location_id || null,
++    neighborhood_id: parsed.data.neighborhood_id || null,
+   }
+ 
+   // Liderança não pode se auto-promover a status "estratégica" nem alterar
+   // o próprio nível de influência — RLS permite a escrita, então a barreira
+   // fica aqui (nota também deixada em rls_policies.sql). admin_estimated_votes
+   // segue a mesma regra: é a avaliação real do admin sobre a liderança, ela
+   // não pode nem ver nem mexer no próprio cadastro.
+   if (isOwnRecord) {
+     delete input.influence_level
+     delete input.status
+diff --git a/src/app/(app)/liderancas/leader-form.tsx b/src/app/(app)/liderancas/leader-form.tsx
+index 1336027..431b066 100644
+--- a/src/app/(app)/liderancas/leader-form.tsx
++++ b/src/app/(app)/liderancas/leader-form.tsx
+@@ -2,20 +2,21 @@
+ 
+ import { useRef } from "react"
+ import { useFormState, useFormStatus } from "react-dom"
+ import Link from "next/link"
+ import {
+   LEADER_TYPES, LEADER_TYPE_LABELS, INFLUENCE_LEVELS, INFLUENCE_LEVEL_LABELS,
+   LEADER_STATUSES, LEADER_STATUS_LABELS, type Leader,
+ } from "@/types/domain"
+ import { fetchAddressByZipCode } from "@/lib/viacep"
+ import { PollingLocationAutocomplete } from "@/components/polling-location-autocomplete"
++import { NeighborhoodSelect, type NeighborhoodSelectHandle } from "@/components/neighborhood-select"
+ import type { ActionState } from "@/app/login/actions"
+ 
+ const initialState: ActionState = { error: null }
+ 
+ function SubmitButton() {
+   const { pending } = useFormStatus()
+   return (
+     <button
+       type="submit"
+       disabled={pending}
+@@ -30,50 +31,56 @@ type LeaderFormProps = {
+   action: (prevState: ActionState, formData: FormData) => Promise<ActionState>
+   defaultValues?: Partial<Leader>
+   /** Liderança editando o próprio cadastro: esconde campos administrativos. */
+   isOwnRecord?: boolean
+   /** Rótulo já formatado do local de votação vinculado (calculado pela página
+    * a partir de defaultValues.polling_location_id via
+    * services/polling-locations.ts#formatPollingLocationLabel), pois o
+    * registro de Leader só guarda o id — sem isso o campo apareceria vazio
+    * na edição mesmo com um local já selecionado. */
+   pollingLocationDefaultLabel?: string | null
++  /** Bairros cadastrados (`neighborhoods`) da organização, já ordenados por
++   * nome — ver services/neighborhoods.ts. Alimenta o NeighborhoodSelect
++   * abaixo. */
++  neighborhoods: { id: string; name: string }[]
+   cancelHref: string
+ }
+ 
+ export function LeaderForm({
+-  action, defaultValues, isOwnRecord = false, pollingLocationDefaultLabel, cancelHref,
++  action, defaultValues, isOwnRecord = false, pollingLocationDefaultLabel, neighborhoods, cancelHref,
+ }: LeaderFormProps) {
+   const [state, formAction] = useFormState(action, initialState)
+   const d = defaultValues
+ 
+   // Preenchidos à mão OU pelo autopreenchimento de CEP abaixo — por isso
+   // são refs (inputs não controlados) em vez de estado do React: mais
+   // simples de combinar com defaultValue/Server Actions sem duplicar a
+   // fonte da verdade do valor de cada campo.
+   const addressRef = useRef<HTMLInputElement>(null)
+-  const neighborhoodRef = useRef<HTMLInputElement>(null)
++  const neighborhoodSelectRef = useRef<NeighborhoodSelectHandle>(null)
+   const cityRef = useRef<HTMLInputElement>(null)
+   const stateRef = useRef<HTMLInputElement>(null)
+ 
+   // Dispara ao sair do campo CEP (não a cada tecla, pra não martelar o
+-  // ViaCEP): busca o endereço nos Correios e preenche rua/bairro/cidade/UF
+-  // se a busca achar algo. Se a pessoa já tinha digitado esses campos à
+-  // mão, o autopreenchimento sobrescreve — é o comportamento padrão em
+-  // formulários com CEP, e dá pra corrigir à mão depois se estiver errado.
++  // ViaCEP): busca o endereço nos Correios e preenche rua/cidade/UF se a
++  // busca achar algo, e tenta selecionar o bairro correspondente na lista
++  // (por nome, sem acento/maiúsculas — só seleciona se achar bate exato).
++  // Se a pessoa já tinha preenchido esses campos à mão, o autopreenchimento
++  // sobrescreve — comportamento padrão em formulários com CEP, dá pra
++  // corrigir depois se estiver errado.
+   async function handleZipCodeBlur(event: React.FocusEvent<HTMLInputElement>) {
+     const found = await fetchAddressByZipCode(event.target.value)
+     if (!found) return
+     if (addressRef.current) addressRef.current.value = found.logradouro
+-    if (neighborhoodRef.current) neighborhoodRef.current.value = found.bairro
+     if (cityRef.current) cityRef.current.value = found.localidade
+     if (stateRef.current) stateRef.current.value = found.uf
++    neighborhoodSelectRef.current?.trySelectByName(found.bairro)
+   }
+ 
+   return (
+     <form action={formAction} className="max-w-2xl space-y-4 rounded-lg border border-black/5 bg-white p-6">
+       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+         <div className="sm:col-span-2">
+           <label htmlFor="name" className="mb-1 block text-sm font-medium">Nome completo *</label>
+           <input id="name" name="name" required defaultValue={d?.name}
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+         </div>
+@@ -135,25 +142,21 @@ export function LeaderForm({
+           <input id="address" name="address" ref={addressRef} defaultValue={d?.address ?? undefined}
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+         </div>
+ 
+         <div>
+           <label htmlFor="complement" className="mb-1 block text-sm font-medium">Complemento</label>
+           <input id="complement" name="complement" placeholder="Casa, apartamento, bloco..." defaultValue={d?.complement ?? undefined}
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+         </div>
+ 
+-        <div>
+-          <label htmlFor="neighborhood" className="mb-1 block text-sm font-medium">Bairro</label>
+-          <input id="neighborhood" name="neighborhood" ref={neighborhoodRef} defaultValue={d?.neighborhood ?? undefined}
+-            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+-        </div>
++        <NeighborhoodSelect ref={neighborhoodSelectRef} neighborhoods={neighborhoods} defaultId={d?.neighborhood_id} />
+ 
+         <div>
+           <label htmlFor="city" className="mb-1 block text-sm font-medium">Cidade</label>
+           <input id="city" name="city" ref={cityRef} defaultValue={d?.city ?? undefined}
+             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+         </div>
+ 
+         <div>
+           <label htmlFor="state" className="mb-1 block text-sm font-medium">Estado (UF)</label>
+           <input id="state" name="state" ref={stateRef} maxLength={2} placeholder="PE" defaultValue={d?.state ?? undefined}
+diff --git a/src/app/(app)/liderancas/novo/page.tsx b/src/app/(app)/liderancas/novo/page.tsx
+index 6952ec5..afec8ca 100644
+--- a/src/app/(app)/liderancas/novo/page.tsx
++++ b/src/app/(app)/liderancas/novo/page.tsx
+@@ -1,24 +1,32 @@
+ import type { Metadata } from "next"
+ import { redirect } from "next/navigation"
+ import { getSessionUser } from "@/lib/auth"
++import { createClient } from "@/lib/supabase/server"
++import { listNeighborhoods } from "@/services/neighborhoods"
+ import { can } from "@/lib/permissions"
+ import type { UserRole } from "@/types/domain"
+ import { LeaderForm } from "../leader-form"
+ import { createLeaderAction } from "../actions"
+ 
+ export const metadata: Metadata = { title: "Nova liderança · Lidera+" }
+ 
+ export default async function NovaLiderancaPage() {
+   const session = await getSessionUser()
+   const role = session?.profile.role as UserRole
+   if (!session || !can(role, "create", "leaders")) {
+     redirect("/liderancas")
+   }
+ 
++  const supabase = await createClient()
++  const neighborhoods = await listNeighborhoods(supabase)
++
+   return (
+     <div className="space-y-6">
+       <h1 className="text-xl font-semibold text-foreground">Nova liderança</h1>
+-      <LeaderForm action={createLeaderAction} cancelHref="/liderancas" />
++      <LeaderForm
++        action={createLeaderAction} cancelHref="/liderancas"
++        neighborhoods={neighborhoods.map((n) => ({ id: n.id, name: n.name }))}
++      />
+     </div>
+   )
+ }
+diff --git a/src/components/neighborhood-select.tsx b/src/components/neighborhood-select.tsx
+new file mode 100644
+index 0000000..4ef0e94
+--- /dev/null
++++ b/src/components/neighborhood-select.tsx
+@@ -0,0 +1,81 @@
++"use client"
++
++// Seletor de bairro sobre `neighborhoods` (cadastrados por organização) —
++// usado nos cadastros de Liderança e Apoiador. Diferente do campo de texto
++// livre que existia antes, aqui é obrigatório escolher da lista: o texto
++// exibido (guardado num input hidden ao lado do <select>) é o que a Edge
++// Function notifica_dashboard_sync -> sync-lideramais usa pra casar contra os
++// bairros do Dashboard (comparação sem acento/maiúsculas) — por isso o texto
++// salvo tem que ser exatamente o nome cadastrado em neighborhoods.name, nunca
++// digitado à mão.
++import { forwardRef, useImperativeHandle, useState } from "react"
++
++type NeighborhoodOption = { id: string; name: string }
++
++export type NeighborhoodSelectHandle = {
++  /** Usado pelo autopreenchimento de CEP (ViaCEP): tenta selecionar o bairro
++   * cujo nome bate com o texto retornado, ignorando acento/maiúsculas — não
++   * seleciona nada se não achar correspondência exata na lista. */
++  trySelectByName: (name: string) => void
++}
++
++type NeighborhoodSelectProps = {
++  neighborhoods: NeighborhoodOption[]
++  defaultId?: string | null
++  /** Nome do campo <select> com o id escolhido. */
++  idFieldName?: string
++  /** Nome do input hidden com o nome do bairro (texto), gravado ao lado do id. */
++  textFieldName?: string
++}
++
++function normalize(value: string): string {
++  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim()
++}
++
++export const NeighborhoodSelect = forwardRef<NeighborhoodSelectHandle, NeighborhoodSelectProps>(
++  function NeighborhoodSelect(
++    { neighborhoods, defaultId, idFieldName = "neighborhood_id", textFieldName = "neighborhood" },
++    ref,
++  ) {
++    const [selectedId, setSelectedId] = useState(defaultId ?? "")
++
++    useImperativeHandle(ref, () => ({
++      trySelectByName(name: string) {
++        const target = normalize(name)
++        const match = neighborhoods.find((n) => normalize(n.name) === target)
++        if (match) setSelectedId(match.id)
++      },
++    }))
++
++    if (neighborhoods.length === 0) {
++      return (
++        <div className="sm:col-span-2">
++          <label className="mb-1 block text-sm font-medium">Bairro</label>
++          <p className="rounded-md border border-dashed border-black/15 bg-black/[0.02] px-3 py-2 text-xs text-foreground/60">
++            Nenhum bairro cadastrado para esta organização ainda. Peça ao Admin Geral para cadastrar o
++            território (bairros) antes de vincular este cadastro a um bairro específico.
++          </p>
++        </div>
++      )
++    }
++
++    const selectedName = neighborhoods.find((n) => n.id === selectedId)?.name ?? ""
++
++    return (
++      <div>
++        <label htmlFor={idFieldName} className="mb-1 block text-sm font-medium">Bairro</label>
++        <select
++          id={idFieldName}
++          name={idFieldName}
++          value={selectedId}
++          onChange={(e) => setSelectedId(e.target.value)}
++          className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
++        >
++          <option value="">Selecione...</option>
++          {neighborhoods.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
++        </select>
++        <input type="hidden" name={textFieldName} value={selectedName} />
++      </div>
++    )
++  },
++)
+diff --git a/src/lib/validations/leader.ts b/src/lib/validations/leader.ts
+index 47aff31..718ef7f 100644
+--- a/src/lib/validations/leader.ts
++++ b/src/lib/validations/leader.ts
+@@ -8,20 +8,25 @@ export const leaderSchema = z.object({
+   name: z.string().min(3, "Informe o nome completo."),
+   nickname: z.string().optional(),
+   phone: z.string().optional(),
+   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
+   birth_date: z.string().optional().or(z.literal("")),
+   cpf: z.string().optional(),
+   mother_name: z.string().optional(),
+   address: z.string().optional(),
+   complement: z.string().optional(),
+   neighborhood: z.string().optional(),
++  // Bairro selecionado em components/neighborhood-select.tsx, sobre a lista
++  // de `neighborhoods` da organização — o texto acima ("neighborhood") vem
++  // preenchido junto pelo próprio componente, sempre com o nome exato do
++  // bairro escolhido (ver comentário lá sobre a Edge Function de sync).
++  neighborhood_id: z.string().uuid().optional().or(z.literal("")),
+   city: z.string().optional(),
+   state: z.string().optional(),
+   zip_code: z.string().optional(),
+   // Local de votação (autocomplete sobre polling_locations, dado do TSE) —
+   // o campo de texto é só exibição; o que realmente é salvo é o id
+   // selecionado, escrito num input hidden por
+   // components/polling-location-autocomplete.tsx.
+   polling_location_id: z.string().uuid().optional().or(z.literal("")),
+   // Zona/seção eleitoral informadas manualmente — complementar ao
+   // polling_location_id acima (ver comentário em supabase/schema.sql).
+diff --git a/src/lib/validations/organization.ts b/src/lib/validations/organization.ts
+index 54e1775..0abb0aa 100644
+--- a/src/lib/validations/organization.ts
++++ b/src/lib/validations/organization.ts
+@@ -1,41 +1,53 @@
+ import { z } from "zod"
+ 
+ // Slug vira subdomínio (slug.lideramais.app.br) — mesma regra do CHECK
+ // constraint organizations_slug_check no banco (supabase/schema.sql):
+ // minúsculas, números e hífen simples entre blocos, sem começar/terminar
+ // com hífen. Validar aqui também evita round-trip até o Postgres só pra
+ // descobrir que o slug é inválido.
+ const slugRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/
+ 
++// Cidade/UF de referência da eleição do cliente — não têm CHECK constraint no
++// banco (nullable, texto livre). Fonte única de "cidade" do cliente: além de
++// alimentar o provisionamento territorial no Dashboard (rpas/bairros) e a
++// tabela neighborhoods aqui no Lidera+, election_city também é o que
++// provisiona o cliente nos outros sistemas do ecossistema (Cadastro Mestre/
++// Bússola/Origem/Dashboard — ver createClientAction) — por isso é
++// obrigatório no cadastro (não dá pra provisionar sem cidade), mesmo sem
++// CHECK constraint no banco. election_state continua só recomendado: o
++// provisionamento cross-sistema não usa UF, só a tabela neighborhoods usa.
+ export const createOrganizationSchema = z.object({
+   name: z.string().min(2, "Informe o nome do cliente/organização."),
+   slug: z
+     .string()
+     .min(2, "Informe o subdomínio.")
+     .max(63, "Subdomínio muito longo.")
+     .regex(slugRegex, "Use só letras minúsculas, números e hífen (ex.: nome-do-cliente)."),
+-  cidade: z.string().min(2, "Informe a cidade onde o cliente atua."),
+   admin_full_name: z.string().min(3, "Informe o nome do responsável (Admin Geral)."),
+   admin_email: z.string().min(1, "Informe o e-mail do responsável.").email("E-mail inválido."),
++  election_city: z.string().min(2, "Informe a cidade onde o cliente atua."),
++  election_state: z.string().optional(),
+ })
+ 
+ export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>
+ 
+ // Edição toca todos os campos editáveis da organização (nome/subdomínio/
+ // status/plano) — o responsável (Admin Geral) é gerenciado à parte, em
+ // configuracoes/usuarios, pelo próprio cliente. Ver comentário em
+ // supabase/schema.sql: status é 'ativa' | 'suspensa' | 'cancelada' (CHECK
+ // constraint da tabela); "plan" não tem CHECK constraint no banco (texto
+ // livre, default 'padrao'), por isso aqui é só "não vazio".
+ export const updateOrganizationSchema = z.object({
+   name: z.string().min(2, "Informe o nome do cliente/organização."),
+   slug: z
+     .string()
+     .min(2, "Informe o subdomínio.")
+     .max(63, "Subdomínio muito longo.")
+     .regex(slugRegex, "Use só letras minúsculas, números e hífen (ex.: nome-do-cliente)."),
+   status: z.enum(["ativa", "suspensa", "cancelada"]),
+   plan: z.string().min(1, "Informe o plano."),
++  election_city: z.string().optional(),
++  election_state: z.string().optional(),
+ })
+ 
+ export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>
+diff --git a/src/lib/validations/supporter.ts b/src/lib/validations/supporter.ts
+index d03dd5d..c3cb0eb 100644
+--- a/src/lib/validations/supporter.ts
++++ b/src/lib/validations/supporter.ts
+@@ -6,20 +6,24 @@ import { SUPPORTER_ORIGINS } from "@/types/domain"
+ export const supporterSchema = z.object({
+   name: z.string().min(3, "Informe o nome completo."),
+   phone: z.string().min(8, "Informe um WhatsApp válido com DDD."),
+   birth_date: z.string().min(1, "Informe a data de nascimento."),
+   cpf: z.string().optional(),
+   mother_name: z.string().optional(),
+   address: z.string().min(3, "Informe o endereço."),
+   complement: z.string().optional(),
+   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
+   neighborhood: z.string().optional(),
++  // Mesma lógica de leader.ts: bairro escolhido em
++  // components/neighborhood-select.tsx, o texto acima ("neighborhood") vem
++  // preenchido junto pelo componente com o nome exato do bairro selecionado.
++  neighborhood_id: z.string().uuid().optional().or(z.literal("")),
+   city: z.string().optional(),
+   state: z.string().optional(),
+   zip_code: z.string().optional(),
+   // Local de votação (autocomplete sobre polling_locations, dado do TSE) —
+   // mesma lógica de leader.ts: o campo de texto é só exibição, o id
+   // selecionado vem de um input hidden preenchido pelo componente.
+   polling_location_id: z.string().uuid().optional().or(z.literal("")),
+   // Zona/seção eleitoral informadas manualmente — complementar ao
+   // polling_location_id acima (ver comentário em supabase/schema.sql).
+   electoral_zone: z.string().optional(),
+diff --git a/src/services/neighborhoods.ts b/src/services/neighborhoods.ts
+new file mode 100644
+index 0000000..0fa6fba
+--- /dev/null
++++ b/src/services/neighborhoods.ts
+@@ -0,0 +1,19 @@
++// Camada de acesso a `neighborhoods` — mesmo padrão de services/leaders.ts:
++// recebe o client Supabase por parâmetro, sem filtrar organization_id à mão
++// (a RLS já restringe select à organização do usuário logado — policy
++// nb_select_all em supabase/rls_policies.sql).
++
++import type { SupabaseClient } from "@supabase/supabase-js"
++import type { Database } from "@/types/database.types"
++import type { Neighborhood } from "@/types/domain"
++
++type DB = SupabaseClient<Database, "public", any>
++
++export async function listNeighborhoods(supabase: DB): Promise<Neighborhood[]> {
++  const { data, error } = await supabase
++    .from("neighborhoods")
++    .select("*")
++    .order("name", { ascending: true })
++  if (error) throw new Error(`Falha ao listar bairros: ${error.message}`)
++  return data
++}
+diff --git a/src/services/organizations.ts b/src/services/organizations.ts
+index f52ff0d..dfb5793 100644
+--- a/src/services/organizations.ts
++++ b/src/services/organizations.ts
+@@ -54,37 +54,51 @@ export async function isSlugTaken(admin: AdminDB, slug: string): Promise<boolean
+   if (error) throw new Error(`Falha ao checar subdomínio: ${error.message}`)
+   return data !== null
+ }
+ 
+ export async function isEmailTaken(admin: AdminDB, email: string): Promise<boolean> {
+   const { data, error } = await admin.from("users_profiles").select("id").eq("email", email).maybeSingle()
+   if (error) throw new Error(`Falha ao checar e-mail: ${error.message}`)
+   return data !== null
+ }
+ 
+-export async function createOrganizationRow(admin: AdminDB, name: string, slug: string, cidade: string) {
++export type OrganizationCreateInput = {
++  name: string
++  slug: string
++  election_city?: string | null
++  election_state?: string | null
++}
++
++export async function createOrganizationRow(admin: AdminDB, input: OrganizationCreateInput) {
+   const { data, error } = await admin
+     .from("organizations")
+-    .insert({ name, slug, cidade })
++    .insert(input)
+     .select()
+     .single()
+   if (error) throw new Error(`Falha ao criar organização: ${error.message}`)
+   return data
+ }
+ 
+ export async function getOrganizationById(admin: AdminDB, id: string) {
+   const { data, error } = await admin.from("organizations").select("*").eq("id", id).maybeSingle()
+   if (error) throw new Error(`Falha ao buscar organização: ${error.message}`)
+   return data
+ }
+ 
+-export type OrganizationUpdateInput = { name: string; slug: string; status: string; plan: string }
++export type OrganizationUpdateInput = {
++  name: string
++  slug: string
++  status: string
++  plan: string
++  election_city?: string | null
++  election_state?: string | null
++}
+ 
+ export async function updateOrganizationRow(admin: AdminDB, id: string, input: OrganizationUpdateInput) {
+   const { data, error } = await admin
+     .from("organizations")
+     .update(input)
+     .eq("id", id)
+     .select()
+     .single()
+   if (error) throw new Error(`Falha ao atualizar organização: ${error.message}`)
+   return data
+diff --git a/supabase/schema.sql b/supabase/schema.sql
+index e952774..f71dbe7 100644
+--- a/supabase/schema.sql
++++ b/supabase/schema.sql
+@@ -26,21 +26,33 @@ $$ language plpgsql set search_path = public;
+ -- cliente (liderança que contrata o Lidera+) é uma organização isolada por
+ -- RLS; identificada por subdomínio (slug.lideramais.app.br).
+ -- ----------------------------------------------------------------------------
+ create table organizations (
+   id uuid primary key default gen_random_uuid(),
+   name text not null,
+   slug text not null unique check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+   status text not null default 'ativa' check (status in ('ativa', 'suspensa', 'cancelada')),
+   plan text not null default 'padrao',
+   created_at timestamptz not null default now(),
+-  updated_at timestamptz not null default now()
++  updated_at timestamptz not null default now(),
++  -- Dados da eleição/território do cliente (migração
++  -- add_election_city_state_to_organizations e predecessoras) — alimentam o
++  -- provisionamento territorial no Dashboard (rpas/bairros) e, aqui no
++  -- Lidera+, a tabela neighborhoods usada nos cadastros de Liderança/Apoiador.
++  election_year int,
++  election_cargo text check (election_cargo in (
++    'prefeito', 'vice_prefeito', 'vereador', 'governador', 'vice_governador',
++    'senador', 'deputado_federal', 'deputado_estadual'
++  )),
++  election_candidate_number text,
++  election_city text,
++  election_state text
+ );
+ create trigger trg_organizations_updated_at before update on organizations
+   for each row execute function set_updated_at();
+ 
+ -- ----------------------------------------------------------------------------
+ -- users_profiles — espelha auth.users, guarda role e status
+ -- ----------------------------------------------------------------------------
+ create table users_profiles (
+   id uuid primary key references auth.users(id) on delete cascade,
+   organization_id uuid not null references organizations(id),

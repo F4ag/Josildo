@@ -7,6 +7,13 @@ import { z } from "zod"
 // descobrir que o slug é inválido.
 const slugRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
+// UF em maiúsculo sempre, mesmo que a pessoa digite minúsculo — o
+// text-transform:uppercase do campo é só visual, não muda o que é enviado no
+// FormData. Sem normalizar aqui, duas organizações da mesma cidade podiam
+// gravar "pe" e "PE" e o provisionamento territorial (que compara texto)
+// deixava de casar as duas.
+const ufSchema = z.string().trim().toUpperCase().optional()
+
 // Cidade/UF de referência da eleição do cliente — não têm CHECK constraint no
 // banco (nullable, texto livre). Fonte única de "cidade" do cliente: além de
 // alimentar o provisionamento territorial no Dashboard (rpas/bairros) e a
@@ -26,14 +33,17 @@ export const createOrganizationSchema = z.object({
   admin_full_name: z.string().min(3, "Informe o nome do responsável (Admin Geral)."),
   admin_email: z.string().min(1, "Informe o e-mail do responsável.").email("E-mail inválido."),
   election_city: z.string().min(2, "Informe a cidade onde o cliente atua."),
-  election_state: z.string().optional(),
+  election_state: ufSchema,
 })
 
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>
 
 // Edição toca todos os campos editáveis da organização (nome/subdomínio/
-// status/plano) — o responsável (Admin Geral) é gerenciado à parte, em
-// configuracoes/usuarios, pelo próprio cliente. Ver comentário em
+// status/plano/cidade/UF) — o responsável (Admin Geral) é gerenciado à
+// parte, em configuracoes/usuarios, pelo próprio cliente. election_city/
+// election_state continuam opcionais aqui (diferente do cadastro): editar
+// não deveria forçar preencher algo que o cliente pode só corrigir depois.
+// Ver comentário em
 // supabase/schema.sql: status é 'ativa' | 'suspensa' | 'cancelada' (CHECK
 // constraint da tabela); "plan" não tem CHECK constraint no banco (texto
 // livre, default 'padrao'), por isso aqui é só "não vazio".
@@ -47,7 +57,7 @@ export const updateOrganizationSchema = z.object({
   status: z.enum(["ativa", "suspensa", "cancelada"]),
   plan: z.string().min(1, "Informe o plano."),
   election_city: z.string().optional(),
-  election_state: z.string().optional(),
+  election_state: ufSchema,
 })
 
 export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>

@@ -91,8 +91,14 @@ export async function retryProvisioningStepAction(
     organizationId,
     nome: org.name,
     // Ver comentário equivalente em createClientAction: election_city é a
-    // fonte única (substitui o antigo campo "cidade" separado).
-    cidade: org.election_city ?? "",
+    // fonte única daqui pra frente (substitui o antigo campo "cidade"
+    // separado). Fallback pra org.cidade cobre organizações criadas ANTES
+    // desta mudança, que têm cidade preenchida mas nunca teriam
+    // election_city — sem isso, repetir a etapa de provisionamento pra elas
+    // mandaria cidade vazia e o Dashboard reportaria sucesso sem clonar
+    // território nenhum (falha silenciosa, ver clonarTerritorioDaCidade em
+    // services/provisioning/dashboard.ts).
+    cidade: org.election_city ?? org.cidade ?? "",
     adminEmail: adminProfile.email,
     adminNome: adminProfile.full_name,
   }
