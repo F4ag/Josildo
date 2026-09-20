@@ -10,6 +10,10 @@ next-env.d.ts
 # Worktrees de trabalho isolado (superpowers:using-git-worktrees) — nunca commitar.
 .worktrees
 
+# Artefatos de trabalho do fluxo subagent-driven-development (planos, ledger,
+# pacotes de revisão) — escopo local da sessão, nunca commitar.
+.superpowers
+
 # Gerados pelo next-pwa em build time (next.config.js) — nunca commitar.
 public/sw.js
 public/sw.js.map
