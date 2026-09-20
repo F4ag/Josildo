@@ -57,9 +57,6 @@ export default async function LiderancaDetalhePage({
   // submit real (RLS) recusaria.
   const canEdit = role === "lideranca" ? isOwnRecord : can(role, "update", "leaders")
   const canDelete = can(role, "delete", "leaders")
-  // Mesma restrição da rota /relatorios (ADMIN_ONLY_ROUTE_PREFIXES em
-  // lib/permissions.ts) — sem isso o botão apareceria pra liderança, que
-  // não tem acesso a /relatorios/ficha-individual/pdf (403).
   const canGenerateReports = can(role, "generate_reports")
   const hasLinkedRecords = (supporterCount ?? 0) > 0 || (demandCount ?? 0) > 0
 

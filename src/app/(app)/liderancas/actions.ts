@@ -49,12 +49,18 @@ function parseLeaderForm(formData: FormData) {
   })
 }
 
+/** "" -> null, "150" -> 150. Mesma regra do parseCoord acima: z.coerce.number()
+ * em cima de "" viraria 0, e 0 votos é um valor real, diferente de "não
+ * preenchido" — por isso a conversão é feita à mão aqui, não no schema. */
 function parseVotes(value: string | undefined): number | null {
   if (!value) return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
 }
 
+/** Só tenta geocodificar quando ninguém preencheu lat/lng à mão — o cadastro
+ * manual sempre vence a busca automática. Sem endereço nem CEP, nem tenta
+ * (evita uma chamada de geocoding fadada a não achar nada). */
 async function resolveCoords(data: { latitude?: string; longitude?: string; address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string }) {
   const latitude = parseCoord(data.latitude)
   const longitude = parseCoord(data.longitude)
@@ -205,26 +211,32 @@ export async function deleteLeaderAction(
     return { error: "Liderança não encontrada." }
   }
 
-  // O login vinculado (se houver) é apagado primeiro. leaders.user_id e
-  // fk_users_profiles_leader agora são "on delete set null" dos dois lados
-  // (ver supabase/schema.sql) — isso resolveu a referência circular que
-  // existia antes (leaders.user_id <-> users_profiles.leader_id, ambas sem
-  // cascade): apagar o usuário de auth já limpa users_profiles sozinho
-  // (users_profiles_id_fkey on delete cascade) e zera leaders.user_id sem
-  // precisar de nenhum passo manual de desvínculo antes.
-  if (leader.user_id) {
-    const { error: authError } = await createAdminClient().auth.admin.deleteUser(leader.user_id)
-    if (authError) {
-      return { error: `Falha ao excluir o login da liderança: ${authError.message}` }
-    }
-  }
-
+  // A liderança é excluída ANTES do login, não depois: é essa exclusão que
+  // pode legitimamente falhar (apoiadores/demandas ainda vinculados — ver
+  // deleteLeader em services/leaders.ts e a confirmação em
+  // [id]/page.tsx), e nesse caso não queremos ter apagado o acesso de login
+  // de alguém que continua cadastrada. Se apagássemos o login primeiro e
+  // deleteLeader falhasse depois, ficaria um efeito colateral parcial: a
+  // liderança sobrevive, mas sem login e sem token de acesso, e o link já
+  // enviado passa a "quebrar" sem nenhum aviso.
   try {
     // A linha de leader_access_tokens sai junto por cascata daqui (ver
     // supabase/schema.sql).
     await deleteLeader(supabase, leaderId)
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Falha ao excluir liderança." }
+  }
+
+  // Só chega aqui com a liderança já excluída de fato — agora sim apaga o
+  // login vinculado, se houver. leaders.user_id e fk_users_profiles_leader
+  // são "on delete set null" dos dois lados (ver supabase/schema.sql), então
+  // isso não esbarra mais na referência circular que existia antes; e como
+  // a liderança já não existe mais, uma falha aqui (ex.: instabilidade
+  // pontual da API de auth) não deve impedir a resposta de sucesso — por
+  // isso o catch silencioso, mesmo padrão já usado em
+  // promoteSupporterToLeaderAction (apoiadores/actions.ts).
+  if (leader.user_id) {
+    await createAdminClient().auth.admin.deleteUser(leader.user_id).catch(() => {})
   }
 
   revalidatePath("/liderancas")

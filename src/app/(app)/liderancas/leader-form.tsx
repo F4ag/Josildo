@@ -94,10 +94,12 @@ export function LeaderForm({
           <label htmlFor="email" className="mb-1 block text-sm font-medium">E-mail</label>
           <input id="email" name="email" type="email" defaultValue={d?.email ?? undefined}
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
-          <p className="mt-1 text-xs text-foreground/50">
-            Opcional — se deixar em branco, a liderança ainda ganha acesso normalmente (ver bloco &quot;Acesso ao
-            sistema&quot; na tela de detalhe, depois de salvar).
-          </p>
+          {!isOwnRecord && (
+            <p className="mt-1 text-xs text-foreground/50">
+              Opcional — se deixar em branco, a liderança ainda ganha acesso normalmente (ver bloco &quot;Acesso ao
+              sistema&quot; na tela de detalhe, depois de salvar).
+            </p>
+          )}
         </div>
 
         <div>
