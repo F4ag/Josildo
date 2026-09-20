@@ -28,7 +28,10 @@ export default async function EditarClientePage({
       <h1 className="text-xl font-semibold text-foreground">Editar cliente</h1>
       <ClientEditForm
         action={boundAction}
-        defaultValues={{ name: org.name, slug: org.slug, status: org.status, plan: org.plan }}
+        defaultValues={{
+          name: org.name, slug: org.slug, status: org.status, plan: org.plan,
+          election_city: org.election_city, election_state: org.election_state,
+        }}
       />
     </div>
   )

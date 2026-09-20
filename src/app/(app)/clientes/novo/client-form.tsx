@@ -94,16 +94,33 @@ export function ClientForm() {
         </p>
       </div>
 
-      <div>
-        <label htmlFor="cidade" className="mb-1 block text-sm font-medium">Cidade</label>
-        <input
-          id="cidade" name="cidade" required
-          placeholder="Ex.: Olinda"
-          className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
-        />
-        <p className="mt-1 text-xs text-foreground/50">
-          Cidade onde este cliente atua — usada para provisionar o cliente nos outros sistemas do ecossistema.
+      <div className="border-t border-black/5 pt-4">
+        <p className="mb-1 text-sm font-medium text-foreground">Cidade/UF da eleição</p>
+        <p className="mb-3 text-xs text-foreground/50">
+          A cidade é usada tanto para provisionar o cliente nos outros sistemas do ecossistema (Cadastro
+          Mestre/Bússola/Origem/Dashboard) quanto para o provisionamento territorial (bairros) aqui no
+          Lidera+ — por isso é obrigatória. O estado (UF) é só recomendado: ajuda a desambiguar cidades de
+          mesmo nome no provisionamento territorial.
         </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="election_city" className="mb-1 block text-sm font-medium">Cidade</label>
+            <input
+              id="election_city" name="election_city" required
+              placeholder="Ex.: Olinda"
+              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="election_state" className="mb-1 block text-sm font-medium">Estado (UF)</label>
+            <input
+              id="election_state" name="election_state" maxLength={2} placeholder="PE"
+              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="border-t border-black/5 pt-4">

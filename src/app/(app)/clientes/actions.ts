@@ -90,7 +90,9 @@ export async function retryProvisioningStepAction(
   const input: ProvisioningInput = {
     organizationId,
     nome: org.name,
-    cidade: org.cidade ?? "",
+    // Ver comentário equivalente em createClientAction: election_city é a
+    // fonte única (substitui o antigo campo "cidade" separado).
+    cidade: org.election_city ?? "",
     adminEmail: adminProfile.email,
     adminNome: adminProfile.full_name,
   }
@@ -111,16 +113,17 @@ export async function createClientAction(
   const parsed = createOrganizationSchema.safeParse({
     name: formData.get("name"),
     slug: formData.get("slug"),
-    cidade: formData.get("cidade"),
     admin_full_name: formData.get("admin_full_name"),
     admin_email: formData.get("admin_email"),
+    election_city: formData.get("election_city"),
+    election_state: formData.get("election_state") || undefined,
   })
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
-  const { name, slug, cidade, admin_full_name, admin_email } = parsed.data
+  const { name, slug, admin_full_name, admin_email, election_city, election_state } = parsed.data
   const admin = createAdminClient()
 
   if (await isSlugTaken(admin, slug)) {
@@ -130,7 +133,9 @@ export async function createClientAction(
     return { error: `O e-mail "${admin_email}" já pertence a uma conta existente (de qualquer cliente).` }
   }
 
-  const org = await createOrganizationRow(admin, name, slug, cidade)
+  const org = await createOrganizationRow(admin, {
+    name, slug, election_city, election_state: election_state || null,
+  })
 
   // Convite do primeiro admin_geral do cliente novo — mesmo fluxo/redirectTo
   // de configuracoes/usuarios/actions.ts (inviteUser).
@@ -163,7 +168,13 @@ export async function createClientAction(
   const provisioningInput: ProvisioningInput = {
     organizationId: org.id,
     nome: name,
-    cidade,
+    // O provisionamento cross-sistema usava um campo "cidade" próprio, sem
+    // UF — unificado com election_city (cidade/UF da eleição, ver
+    // docs/08-acesso-lideranca-sem-senha.md) pra não ter duas perguntas de
+    // cidade parecidas na mesma tela. election_city é obrigatório no
+    // schema de criação exatamente por isso: sem ele, provisionar nos
+    // outros sistemas falharia.
+    cidade: election_city,
     adminEmail: admin_email,
     adminNome: admin_full_name,
   }
@@ -202,13 +213,15 @@ export async function updateClientAction(
     slug: formData.get("slug"),
     status: formData.get("status"),
     plan: formData.get("plan"),
+    election_city: formData.get("election_city") || undefined,
+    election_state: formData.get("election_state") || undefined,
   })
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
-  const { name, slug, status, plan } = parsed.data
+  const { name, slug, status, plan, election_city, election_state } = parsed.data
   const admin = createAdminClient()
 
   const current = await getOrganizationById(admin, organizationId)
@@ -220,7 +233,9 @@ export async function updateClientAction(
     return { error: `O subdomínio "${slug}" já está em uso por outro cliente.` }
   }
 
-  await updateOrganizationRow(admin, organizationId, { name, slug, status, plan })
+  await updateOrganizationRow(admin, organizationId, {
+    name, slug, status, plan, election_city: election_city || null, election_state: election_state || null,
+  })
 
   revalidatePath("/clientes")
   return { error: null, success: true }

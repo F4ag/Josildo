@@ -9,6 +9,7 @@ import {
 } from "@/types/domain"
 import { fetchAddressByZipCode } from "@/lib/viacep"
 import { PollingLocationAutocomplete } from "@/components/polling-location-autocomplete"
+import { NeighborhoodSelect, type NeighborhoodSelectHandle } from "@/components/neighborhood-select"
 import type { ActionState } from "@/app/login/actions"
 
 const initialState: ActionState = { error: null }
@@ -37,11 +38,15 @@ type LeaderFormProps = {
    * registro de Leader só guarda o id — sem isso o campo apareceria vazio
    * na edição mesmo com um local já selecionado. */
   pollingLocationDefaultLabel?: string | null
+  /** Bairros cadastrados (`neighborhoods`) da organização, já ordenados por
+   * nome — ver services/neighborhoods.ts. Alimenta o NeighborhoodSelect
+   * abaixo. */
+  neighborhoods: { id: string; name: string }[]
   cancelHref: string
 }
 
 export function LeaderForm({
-  action, defaultValues, isOwnRecord = false, pollingLocationDefaultLabel, cancelHref,
+  action, defaultValues, isOwnRecord = false, pollingLocationDefaultLabel, neighborhoods, cancelHref,
 }: LeaderFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const d = defaultValues
@@ -51,22 +56,24 @@ export function LeaderForm({
   // simples de combinar com defaultValue/Server Actions sem duplicar a
   // fonte da verdade do valor de cada campo.
   const addressRef = useRef<HTMLInputElement>(null)
-  const neighborhoodRef = useRef<HTMLInputElement>(null)
+  const neighborhoodSelectRef = useRef<NeighborhoodSelectHandle>(null)
   const cityRef = useRef<HTMLInputElement>(null)
   const stateRef = useRef<HTMLInputElement>(null)
 
   // Dispara ao sair do campo CEP (não a cada tecla, pra não martelar o
-  // ViaCEP): busca o endereço nos Correios e preenche rua/bairro/cidade/UF
-  // se a busca achar algo. Se a pessoa já tinha digitado esses campos à
-  // mão, o autopreenchimento sobrescreve — é o comportamento padrão em
-  // formulários com CEP, e dá pra corrigir à mão depois se estiver errado.
+  // ViaCEP): busca o endereço nos Correios e preenche rua/cidade/UF se a
+  // busca achar algo, e tenta selecionar o bairro correspondente na lista
+  // (por nome, sem acento/maiúsculas — só seleciona se achar bate exato).
+  // Se a pessoa já tinha preenchido esses campos à mão, o autopreenchimento
+  // sobrescreve — comportamento padrão em formulários com CEP, dá pra
+  // corrigir depois se estiver errado.
   async function handleZipCodeBlur(event: React.FocusEvent<HTMLInputElement>) {
     const found = await fetchAddressByZipCode(event.target.value)
     if (!found) return
     if (addressRef.current) addressRef.current.value = found.logradouro
-    if (neighborhoodRef.current) neighborhoodRef.current.value = found.bairro
     if (cityRef.current) cityRef.current.value = found.localidade
     if (stateRef.current) stateRef.current.value = found.uf
+    neighborhoodSelectRef.current?.trySelectByName(found.bairro)
   }
 
   return (
@@ -142,11 +149,7 @@ export function LeaderForm({
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
-        <div>
-          <label htmlFor="neighborhood" className="mb-1 block text-sm font-medium">Bairro</label>
-          <input id="neighborhood" name="neighborhood" ref={neighborhoodRef} defaultValue={d?.neighborhood ?? undefined}
-            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
-        </div>
+        <NeighborhoodSelect ref={neighborhoodSelectRef} neighborhoods={neighborhoods} defaultId={d?.neighborhood_id} />
 
         <div>
           <label htmlFor="city" className="mb-1 block text-sm font-medium">Cidade</label>

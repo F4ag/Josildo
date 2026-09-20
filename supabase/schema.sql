@@ -33,7 +33,19 @@ create table organizations (
   status text not null default 'ativa' check (status in ('ativa', 'suspensa', 'cancelada')),
   plan text not null default 'padrao',
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- Dados da eleição/território do cliente (migração
+  -- add_election_city_state_to_organizations e predecessoras) — alimentam o
+  -- provisionamento territorial no Dashboard (rpas/bairros) e, aqui no
+  -- Lidera+, a tabela neighborhoods usada nos cadastros de Liderança/Apoiador.
+  election_year int,
+  election_cargo text check (election_cargo in (
+    'prefeito', 'vice_prefeito', 'vereador', 'governador', 'vice_governador',
+    'senador', 'deputado_federal', 'deputado_estadual'
+  )),
+  election_candidate_number text,
+  election_city text,
+  election_state text
 );
 create trigger trg_organizations_updated_at before update on organizations
   for each row execute function set_updated_at();

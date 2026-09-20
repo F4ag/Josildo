@@ -15,6 +15,11 @@ export const leaderSchema = z.object({
   address: z.string().optional(),
   complement: z.string().optional(),
   neighborhood: z.string().optional(),
+  // Bairro selecionado em components/neighborhood-select.tsx, sobre a lista
+  // de `neighborhoods` da organização — o texto acima ("neighborhood") vem
+  // preenchido junto pelo próprio componente, sempre com o nome exato do
+  // bairro escolhido (ver comentário lá sobre a Edge Function de sync).
+  neighborhood_id: z.string().uuid().optional().or(z.literal("")),
   city: z.string().optional(),
   state: z.string().optional(),
   zip_code: z.string().optional(),

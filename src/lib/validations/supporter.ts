@@ -13,6 +13,10 @@ export const supporterSchema = z.object({
   complement: z.string().optional(),
   email: z.string().email("E-mail inválido.").optional().or(z.literal("")),
   neighborhood: z.string().optional(),
+  // Mesma lógica de leader.ts: bairro escolhido em
+  // components/neighborhood-select.tsx, o texto acima ("neighborhood") vem
+  // preenchido junto pelo componente com o nome exato do bairro selecionado.
+  neighborhood_id: z.string().uuid().optional().or(z.literal("")),
   city: z.string().optional(),
   state: z.string().optional(),
   zip_code: z.string().optional(),

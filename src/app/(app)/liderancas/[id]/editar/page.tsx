@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { getLeaderById } from "@/services/leaders"
+import { listNeighborhoods } from "@/services/neighborhoods"
 import { getPollingLocationById, formatPollingLocationLabel } from "@/services/polling-locations"
 import { can } from "@/lib/permissions"
 import type { UserRole } from "@/types/domain"
@@ -28,6 +29,7 @@ export default async function EditarLiderancaPage({
   const pollingLocation = leader.polling_location_id
     ? await getPollingLocationById(supabase, leader.polling_location_id)
     : null
+  const neighborhoods = await listNeighborhoods(supabase)
 
   const role = session?.profile.role as UserRole
   const isOwnRecord = role === "lideranca" && session?.profile.leader_id === id
@@ -49,6 +51,7 @@ export default async function EditarLiderancaPage({
         defaultValues={leader}
         isOwnRecord={isOwnRecord}
         pollingLocationDefaultLabel={pollingLocation ? formatPollingLocationLabel(pollingLocation) : null}
+        neighborhoods={neighborhoods.map((n) => ({ id: n.id, name: n.name }))}
         cancelHref={`/liderancas/${id}`}
       />
     </div>

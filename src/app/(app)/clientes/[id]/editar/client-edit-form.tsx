@@ -29,7 +29,10 @@ function SubmitButton() {
 
 type ClientEditFormProps = {
   action: (prevState: UpdateClientActionState, formData: FormData) => Promise<UpdateClientActionState>
-  defaultValues: { name: string; slug: string; status: string; plan: string }
+  defaultValues: {
+    name: string; slug: string; status: string; plan: string
+    election_city: string | null; election_state: string | null
+  }
 }
 
 export function ClientEditForm({ action, defaultValues }: ClientEditFormProps) {
@@ -90,6 +93,33 @@ export function ClientEditForm({ action, defaultValues }: ClientEditFormProps) {
         <p className="mt-1 text-xs text-foreground/50">
           Campo livre (ex.: padrao, premium) — não afeta permissões, é só rótulo interno por enquanto.
         </p>
+      </div>
+
+      <div className="border-t border-black/5 pt-4">
+        <p className="mb-1 text-sm font-medium text-foreground">Cidade/UF da eleição</p>
+        <p className="mb-3 text-xs text-foreground/50">
+          Fortemente recomendado manter preenchido: alimenta o provisionamento territorial (bairros)
+          usado nos cadastros de liderança e apoiador deste cliente.
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="election_city" className="mb-1 block text-sm font-medium">Cidade</label>
+            <input
+              id="election_city" name="election_city" defaultValue={defaultValues.election_city ?? undefined}
+              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="election_state" className="mb-1 block text-sm font-medium">Estado (UF)</label>
+            <input
+              id="election_state" name="election_state" maxLength={2} placeholder="PE"
+              defaultValue={defaultValues.election_state ?? undefined}
+              className="w-full rounded-md border border-black/10 px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       {state.error && (

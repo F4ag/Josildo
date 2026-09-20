@@ -6,6 +6,7 @@ import Link from "next/link"
 import { SUPPORTER_ORIGINS, SUPPORTER_ORIGIN_LABELS, type Supporter } from "@/types/domain"
 import { fetchAddressByZipCode } from "@/lib/viacep"
 import { PollingLocationAutocomplete } from "@/components/polling-location-autocomplete"
+import { NeighborhoodSelect, type NeighborhoodSelectHandle } from "@/components/neighborhood-select"
 import type { SupporterActionState } from "./actions"
 
 const initialState: SupporterActionState = { error: null }
@@ -30,11 +31,16 @@ type SupporterFormProps = {
    * votação vinculado, calculado pela página a partir do
    * polling_location_id (o registro de Supporter só guarda o id). */
   pollingLocationDefaultLabel?: string | null
+  /** Bairros cadastrados (`neighborhoods`) da organização, já ordenados por
+   * nome — ver services/neighborhoods.ts. Alimenta o NeighborhoodSelect
+   * abaixo. */
+  neighborhoods: { id: string; name: string }[]
   cancelHref: string
 }
 
 export function SupporterForm({
-  action, defaultValues, leaders, lockedToOwnNetwork = false, pollingLocationDefaultLabel, cancelHref,
+  action, defaultValues, leaders, lockedToOwnNetwork = false, pollingLocationDefaultLabel, neighborhoods,
+  cancelHref,
 }: SupporterFormProps) {
   const [state, formAction] = useFormState(action, initialState)
   const [forceDuplicate, setForceDuplicate] = useState(false)
@@ -44,7 +50,7 @@ export function SupporterForm({
   // autopreenchimento do CEP (onBlur) escreva nos campos sem depender de
   // controlar cada input via estado do React.
   const addressRef = useRef<HTMLInputElement>(null)
-  const neighborhoodRef = useRef<HTMLInputElement>(null)
+  const neighborhoodSelectRef = useRef<NeighborhoodSelectHandle>(null)
   const cityRef = useRef<HTMLInputElement>(null)
   const stateRef = useRef<HTMLInputElement>(null)
 
@@ -52,9 +58,9 @@ export function SupporterForm({
     const found = await fetchAddressByZipCode(event.target.value)
     if (!found) return
     if (addressRef.current) addressRef.current.value = found.logradouro
-    if (neighborhoodRef.current) neighborhoodRef.current.value = found.bairro
     if (cityRef.current) cityRef.current.value = found.localidade
     if (stateRef.current) stateRef.current.value = found.uf
+    neighborhoodSelectRef.current?.trySelectByName(found.bairro)
   }
 
   return (
@@ -134,11 +140,7 @@ export function SupporterForm({
             className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         </div>
 
-        <div>
-          <label htmlFor="neighborhood" className="mb-1 block text-sm font-medium">Bairro</label>
-          <input id="neighborhood" name="neighborhood" ref={neighborhoodRef} defaultValue={d?.neighborhood ?? undefined}
-            className="w-full rounded-md border border-black/10 px-3 py-2 text-sm focus:border-primary focus:outline-none" />
-        </div>
+        <NeighborhoodSelect ref={neighborhoodSelectRef} neighborhoods={neighborhoods} defaultId={d?.neighborhood_id} />
 
         <div>
           <label htmlFor="city" className="mb-1 block text-sm font-medium">Cidade</label>

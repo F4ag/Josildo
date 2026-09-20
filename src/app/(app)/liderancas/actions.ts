@@ -31,6 +31,7 @@ function parseLeaderForm(formData: FormData) {
     address: formData.get("address") || undefined,
     complement: formData.get("complement") || undefined,
     neighborhood: formData.get("neighborhood") || undefined,
+    neighborhood_id: formData.get("neighborhood_id") || "",
     city: formData.get("city") || undefined,
     state: formData.get("state") || undefined,
     zip_code: formData.get("zip_code") || undefined,
@@ -107,6 +108,7 @@ export async function createLeaderAction(
     expected_votes: parseVotes(parsed.data.expected_votes),
     admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
     polling_location_id: parsed.data.polling_location_id || null,
+    neighborhood_id: parsed.data.neighborhood_id || null,
   }
 
   const leader = await createLeader(supabase, input, session.id, session.profile.organization_id)
@@ -171,6 +173,7 @@ export async function updateLeaderAction(
     expected_votes: parseVotes(parsed.data.expected_votes),
     admin_estimated_votes: parseVotes(parsed.data.admin_estimated_votes),
     polling_location_id: parsed.data.polling_location_id || null,
+    neighborhood_id: parsed.data.neighborhood_id || null,
   }
 
   // Liderança não pode se auto-promover a status "estratégica" nem alterar

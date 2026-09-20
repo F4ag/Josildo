@@ -61,10 +61,17 @@ export async function isEmailTaken(admin: AdminDB, email: string): Promise<boole
   return data !== null
 }
 
-export async function createOrganizationRow(admin: AdminDB, name: string, slug: string, cidade: string) {
+export type OrganizationCreateInput = {
+  name: string
+  slug: string
+  election_city?: string | null
+  election_state?: string | null
+}
+
+export async function createOrganizationRow(admin: AdminDB, input: OrganizationCreateInput) {
   const { data, error } = await admin
     .from("organizations")
-    .insert({ name, slug, cidade })
+    .insert(input)
     .select()
     .single()
   if (error) throw new Error(`Falha ao criar organização: ${error.message}`)
@@ -77,7 +84,14 @@ export async function getOrganizationById(admin: AdminDB, id: string) {
   return data
 }
 
-export type OrganizationUpdateInput = { name: string; slug: string; status: string; plan: string }
+export type OrganizationUpdateInput = {
+  name: string
+  slug: string
+  status: string
+  plan: string
+  election_city?: string | null
+  election_state?: string | null
+}
 
 export async function updateOrganizationRow(admin: AdminDB, id: string, input: OrganizationUpdateInput) {
   const { data, error } = await admin

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { getSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { listLeaders } from "@/services/leaders"
+import { listNeighborhoods } from "@/services/neighborhoods"
 import { can } from "@/lib/permissions"
 import type { UserRole } from "@/types/domain"
 import { SupporterForm } from "../supporter-form"
@@ -21,6 +22,7 @@ export default async function NovoApoiadorPage() {
   const isLideranca = role === "lideranca"
   const supabase = await createClient()
   const leaders = isLideranca ? [] : await listLeaders(supabase)
+  const neighborhoods = await listNeighborhoods(supabase)
 
   return (
     <div className="space-y-6">
@@ -33,6 +35,7 @@ export default async function NovoApoiadorPage() {
       <SupporterForm
         action={createSupporterAction}
         leaders={leaders.map((l) => ({ id: l.id, name: l.name }))}
+        neighborhoods={neighborhoods.map((n) => ({ id: n.id, name: n.name }))}
         lockedToOwnNetwork={isLideranca}
         cancelHref="/apoiadores"
       />
