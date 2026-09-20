@@ -6,7 +6,7 @@
 import type { LucideIcon } from "lucide-react"
 import {
   LayoutDashboard, Users, UserPlus, HeartHandshake, ClipboardList,
-  Stethoscope, Map, Cake, CalendarDays, FileBarChart, MessageCircle, Settings, Building2,
+  Stethoscope, Map, Cake, CalendarDays, FileBarChart, MessageCircle, Settings, Building2, Compass,
 } from "lucide-react"
 
 export type NavItem = {
@@ -32,4 +32,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/mensagens", label: "Mensagens", icon: MessageCircle },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
   { href: "/clientes", label: "Clientes", icon: Building2, platformAdminOnly: true },
+  { href: "/central-estrategia", label: "Central de Estratégia", icon: Compass, platformAdminOnly: true },
 ]

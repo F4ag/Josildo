@@ -60,10 +60,13 @@ const ADMIN_EQUIPE: ResourceMatrix = {
 
 // lideranca: só a própria rede (o "read: true" aqui é o teto — a RLS ainda
 // filtra por leader_id; ver is_own_supporter() em rls_policies.sql).
+// leaders.create: false — liderança cadastra apoiadores, não outras
+// lideranças; a hierarquia (parent_leader_id) que existia pra isso foi
+// desativada a pedido (ver também DROP da policy
+// ld_lideranca_insert_subordinate em rls_policies.sql, que fechava a mesma
+// porta no banco). read/update seguem valendo pra ela ver e editar o
+// próprio cadastro e o de sub-lideranças já existentes de antes da mudança.
 const LIDERANCA: ResourceMatrix = {
-  // create: false desde a remoção da hierarquia de sub-lideranças (migration
-  // leader_access_link) — liderança só cadastra apoiador agora. Ver
-  // docs/08-acesso-lideranca-sem-senha.md §3.
   leaders: { create: false, read: true, update: true /* só o próprio cadastro */, delete: false },
   supporters: { create: true, read: true, update: true, delete: false },
   demands: { create: true, read: true, update: false, delete: false, update_status: false },
@@ -91,7 +94,7 @@ const GLOBAL_PERMISSIONS: Record<UserRole, Partial<Record<PermissionAction, bool
     system_settings: false, export_data: true,
   },
   lideranca: {
-    generate_reports: false, send_messages: false, manage_users: false,
+    generate_reports: true, send_messages: false, manage_users: false,
     system_settings: false, export_data: false,
   },
 }
@@ -108,12 +111,13 @@ export function can(
 }
 
 /** Rotas que só admin_geral e admin_equipe podem abrir. */
-export const ADMIN_ONLY_ROUTE_PREFIXES = ["/configuracoes", "/relatorios", "/mensagens"] as const
+export const ADMIN_ONLY_ROUTE_PREFIXES = ["/configuracoes", "/mensagens"] as const
 
 /** Rotas fora do alcance de admin_equipe (só admin_geral). */
 export const ADMIN_GERAL_ONLY_ROUTE_PREFIXES = [
   "/configuracoes/usuarios",
   "/configuracoes/permissoes",
+  "/configuracoes/eleicao",
 ] as const
 
 export function canAccessRoute(role: UserRole, pathname: string): boolean {

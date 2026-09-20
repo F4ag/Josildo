@@ -7,8 +7,10 @@ import { getAttendanceById } from "@/services/attendances"
 import { ATTENDANCE_STATUS_LABELS, ATTENDANCE_TYPE_LABELS, PRIORITY_LABELS, type AttendanceStatus, type AttendanceType, type Priority, type UserRole } from "@/types/domain"
 import { Badge } from "@/components/ui/badge"
 import { WhatsAppButton } from "@/components/whatsapp-button"
+import { DeleteButton } from "@/components/delete-button"
 import { can } from "@/lib/permissions"
 import { StatusUpdateForm } from "../status-update-form"
+import { deleteAttendanceAction } from "../actions"
 
 export const metadata: Metadata = { title: "Atendimento · Lidera+" }
 
@@ -25,6 +27,7 @@ export default async function AtendimentoDetalhePage({
 
   const role = session?.profile.role as UserRole
   const canUpdateStatus = can(role, "update_status", "attendances")
+  const canDelete = can(role, "delete", "attendances")
 
   return (
     <div className="space-y-6">
@@ -36,6 +39,12 @@ export default async function AtendimentoDetalhePage({
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="azul">{ATTENDANCE_STATUS_LABELS[attendance.status as AttendanceStatus]}</Badge>
           <Badge tone="cinza">{PRIORITY_LABELS[attendance.priority as Priority]}</Badge>
+          {canDelete && (
+            <DeleteButton
+              action={deleteAttendanceAction.bind(null, id)}
+              confirmMessage={`Tem certeza que deseja excluir o atendimento "${attendance.title}"? Essa ação não pode ser desfeita.`}
+            />
+          )}
         </div>
       </div>
 

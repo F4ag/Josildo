@@ -14,6 +14,7 @@ export const createOrganizationSchema = z.object({
     .min(2, "Informe o subdomínio.")
     .max(63, "Subdomínio muito longo.")
     .regex(slugRegex, "Use só letras minúsculas, números e hífen (ex.: nome-do-cliente)."),
+  cidade: z.string().min(2, "Informe a cidade onde o cliente atua."),
   admin_full_name: z.string().min(3, "Informe o nome do responsável (Admin Geral)."),
   admin_email: z.string().min(1, "Informe o e-mail do responsável.").email("E-mail inválido."),
 })

@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createResetEmailClient } from "@/lib/supabase/reset-email-client"
 import { loginSchema, forgotPasswordSchema } from "@/lib/validations/auth"
 
 export type ActionState = { error: string | null; success?: boolean; redirectTo?: string }
@@ -45,15 +46,18 @@ export async function requestPasswordReset(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." }
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    // Aponta direto pra /redefinir-senha (não mais pra /auth/confirm) —
-    // com o template de e-mail padrão (ainda não customizado, ver conversa
-    // sobre SMTP/Resend), o Supabase devolve a sessão embutida no fragmento
-    // da URL (#access_token=...). Passando por /auth/confirm no meio, esse
-    // fragmento se perdia no redirecionamento de servidor daquela rota
+  // createResetEmailClient() (não createClient() normal) de propósito: ver
+  // comentário completo em lib/supabase/reset-email-client.ts. Resumo — o
+  // client normal (@supabase/ssr) força PKCE e grava o code_verifier no
+  // cookie de QUEM PEDE o reset; se a pessoa abrir o e-mail num navegador ou
+  // aparelho diferente do que usou aqui, a troca do link falha sempre. O
+  // client solto usa flowType implicit: a sessão vem embutida direto no
+  // fragmento da URL (#access_token=...), então funciona em qualquer
+  // navegador que abrir o link, sem depender de nada salvo neste request.
+  const { error } = await createResetEmailClient().auth.resetPasswordForEmail(parsed.data.email, {
+    // Aponta direto pra /redefinir-senha (não pra /auth/confirm): um
+    // redirecionamento de servidor no meio perderia o fragmento #access_token
     // antes de chegar em reset-password-form.tsx, que é quem sabe lê-lo.
-    // Indo direto num pulo só, o fragmento chega intacto.
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/redefinir-senha`,
   })
 

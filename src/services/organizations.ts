@@ -61,10 +61,10 @@ export async function isEmailTaken(admin: AdminDB, email: string): Promise<boole
   return data !== null
 }
 
-export async function createOrganizationRow(admin: AdminDB, name: string, slug: string) {
+export async function createOrganizationRow(admin: AdminDB, name: string, slug: string, cidade: string) {
   const { data, error } = await admin
     .from("organizations")
-    .insert({ name, slug })
+    .insert({ name, slug, cidade })
     .select()
     .single()
   if (error) throw new Error(`Falha ao criar organização: ${error.message}`)

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireSessionUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import {
-  createAttendance, getAttendanceById, updateAttendanceStatus, type AttendanceInput,
+  createAttendance, getAttendanceById, updateAttendanceStatus, deleteAttendance, type AttendanceInput,
 } from "@/services/attendances"
 import { attendanceSchema, attendanceStatusUpdateSchema } from "@/lib/validations/attendance"
 import { can } from "@/lib/permissions"
@@ -89,4 +89,28 @@ export async function updateAttendanceStatusAction(
   revalidatePath(`/atendimentos/${attendanceId}`)
   revalidatePath("/atendimentos")
   return { error: null, success: true }
+}
+
+/** Exclusão é ação sensível: só admin_geral (mesma regra da RLS —
+ * policy at_admin_geral_all — ver comentário em services/attendances.ts). */
+export async function deleteAttendanceAction(
+  attendanceId: string,
+  _prevState: ActionState,
+): Promise<ActionState> {
+  const session = await requireSessionUser()
+  const role = session.profile.role as UserRole
+
+  if (!can(role, "delete", "attendances")) {
+    return { error: "Seu perfil não pode excluir atendimentos." }
+  }
+
+  const supabase = await createClient()
+  try {
+    await deleteAttendance(supabase, attendanceId)
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao excluir atendimento." }
+  }
+
+  revalidatePath("/atendimentos")
+  redirect("/atendimentos")
 }

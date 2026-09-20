@@ -131,10 +131,14 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }
 
-    // /clientes é o painel cross-tenant de provisionamento (só Agência F4,
-    // is_platform_admin) — não é sobre role, então fica fora de
+    // /clientes e /central-estrategia são painéis cross-tenant (só Agência
+    // F4, is_platform_admin) — não é sobre role, então ficam fora de
     // canAccessRoute/ADMIN_GERAL_ONLY_ROUTE_PREFIXES (ver lib/permissions.ts).
-    if (pathname.startsWith("/clientes") && !profile.is_platform_admin) {
+    // central-estrategia especialmente NUNCA pode cair pro "OR role ===
+    // admin_geral" (admin_geral é escopado por organization_id, é o admin de
+    // UM cliente — deixar isso passar vazaria dado operacional de todos os
+    // clientes pro admin de qualquer um deles).
+    if ((pathname.startsWith("/clientes") || pathname.startsWith("/central-estrategia")) && !profile.is_platform_admin) {
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }
 

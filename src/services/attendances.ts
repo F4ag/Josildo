@@ -118,6 +118,16 @@ export async function updateAttendanceStatus(
   })
 }
 
+/** Restrita a admin_geral (ver can(role, "delete", "attendances") em
+ * permissions.ts e a policy at_admin_geral_all em rls_policies.sql — mesmo
+ * esquema de deleteDemand em services/demands.ts). Atendimento não tem
+ * tabela de histórico própria (diferente de demanda/demand_updates), então
+ * não há nada em cascata pra se preocupar aqui. */
+export async function deleteAttendance(supabase: DB, id: string) {
+  const { error } = await supabase.from("attendances").delete().eq("id", id)
+  if (error) throw new Error(`Falha ao excluir atendimento: ${error.message}`)
+}
+
 export type AttendanceStatusCounts = {
   total: number
   emAberto: number

@@ -49,25 +49,23 @@ function parseLeaderForm(formData: FormData) {
   })
 }
 
-/** "" -> null, "150" -> 150. Mesma regra do parseCoord acima. */
 function parseVotes(value: string | undefined): number | null {
-  return value ? Number(value) : null
+  if (!value) return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
 }
 
-/** Só tenta geocodificar quando ninguém preencheu lat/lng à mão — o
- * cadastro manual sempre vence a busca automática. */
-async function resolveCoords(data: {
-  latitude?: string; longitude?: string
-  address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string
-}): Promise<{ latitude: number | null; longitude: number | null }> {
-  const manualLat = parseCoord(data.latitude)
-  const manualLng = parseCoord(data.longitude)
-  if (manualLat !== null && manualLng !== null) {
-    return { latitude: manualLat, longitude: manualLng }
-  }
+async function resolveCoords(data: { latitude?: string; longitude?: string; address?: string; neighborhood?: string; city?: string; state?: string; zip_code?: string }) {
+  const latitude = parseCoord(data.latitude)
+  const longitude = parseCoord(data.longitude)
+  if (latitude != null && longitude != null) return { latitude, longitude }
+  if (!data.address && !data.zip_code) return { latitude: null, longitude: null }
 
   const found = await geocodeAddress({
-    address: data.address, neighborhood: data.neighborhood, city: data.city, state: data.state,
+    address: data.address,
+    neighborhood: data.neighborhood,
+    city: data.city,
+    state: data.state,
     zipCode: data.zip_code,
   })
   return { latitude: found?.latitude ?? null, longitude: found?.longitude ?? null }
@@ -207,31 +205,21 @@ export async function deleteLeaderAction(
     return { error: "Liderança não encontrada." }
   }
 
-  try {
-    // Toda liderança cadastrada por admin_geral ganha login automaticamente
-    // agora (antes era só quem tinha convite por e-mail), e
-    // users_profiles.leader_id aponta pra ela sem cascade — sem apagar o
-    // login primeiro, o delete abaixo falharia sempre, com a mensagem de
-    // "apoiadores/demandas vinculados" errando o motivo. A referência é
-    // circular (leaders.user_id -> users_profiles.id e
-    // users_profiles.leader_id -> leaders.id), então o vínculo é desfeito
-    // antes: sem isso, apagar o perfil esbarra em leaders_user_id_fkey.
-    // Apagar o usuário de auth já leva o perfil junto
-    // (users_profiles_id_fkey é on delete cascade — mesma lógica de
-    // services/organizations.ts).
-    if (leader.user_id) {
-      const admin = createAdminClient()
-      const { error: unlinkError } = await admin.from("leaders").update({ user_id: null }).eq("id", leaderId)
-      if (unlinkError) {
-        return { error: `Falha ao desvincular o login da liderança: ${unlinkError.message}` }
-      }
-
-      const { error: authError } = await admin.auth.admin.deleteUser(leader.user_id)
-      if (authError) {
-        return { error: `Falha ao excluir o login da liderança: ${authError.message}` }
-      }
+  // O login vinculado (se houver) é apagado primeiro. leaders.user_id e
+  // fk_users_profiles_leader agora são "on delete set null" dos dois lados
+  // (ver supabase/schema.sql) — isso resolveu a referência circular que
+  // existia antes (leaders.user_id <-> users_profiles.leader_id, ambas sem
+  // cascade): apagar o usuário de auth já limpa users_profiles sozinho
+  // (users_profiles_id_fkey on delete cascade) e zera leaders.user_id sem
+  // precisar de nenhum passo manual de desvínculo antes.
+  if (leader.user_id) {
+    const { error: authError } = await createAdminClient().auth.admin.deleteUser(leader.user_id)
+    if (authError) {
+      return { error: `Falha ao excluir o login da liderança: ${authError.message}` }
     }
+  }
 
+  try {
     // A linha de leader_access_tokens sai junto por cascata daqui (ver
     // supabase/schema.sql).
     await deleteLeader(supabase, leaderId)

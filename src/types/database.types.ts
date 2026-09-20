@@ -3,8 +3,7 @@
 // (vqrnjiwansfobxaeswnu) via generate_typescript_types.
 // NÃO editar à mão. Para regenerar após uma migration:
 //   npx supabase gen types typescript --project-id vqrnjiwansfobxaeswnu > src/types/database.types.ts
-// Última regeneração: coluna polling_location_id em leaders/supporters
-// (vínculo com local de votação — dado do TSE já importado em polling_locations).
+// Última regeneração: coluna organizations.cidade (provisionamento cross-sistema).
 // ============================================================================
 export type Json =
   | string
@@ -460,6 +459,48 @@ export type Database = {
             columns: ["supporter_id"]
             isOneToOne: false
             referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      election_results_sections: {
+        Row: {
+          id: string
+          imported_at: string
+          organization_id: string
+          section_id: string
+          turno: number
+          votos: number
+        }
+        Insert: {
+          id?: string
+          imported_at?: string
+          organization_id: string
+          section_id: string
+          turno: number
+          votos?: number
+        }
+        Update: {
+          id?: string
+          imported_at?: string
+          organization_id?: string
+          section_id?: string
+          turno?: number
+          votos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "election_results_sections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "election_results_sections_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "electoral_sections"
             referencedColumns: ["id"]
           },
         ]
@@ -934,7 +975,13 @@ export type Database = {
       }
       organizations: {
         Row: {
+          cidade: string | null
           created_at: string
+          election_candidate_number: string | null
+          election_cargo: string | null
+          election_city: string | null
+          election_state: string | null
+          election_year: number | null
           id: string
           name: string
           plan: string
@@ -943,7 +990,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cidade?: string | null
           created_at?: string
+          election_candidate_number?: string | null
+          election_cargo?: string | null
+          election_city?: string | null
+          election_state?: string | null
+          election_year?: number | null
           id?: string
           name: string
           plan?: string
@@ -952,7 +1005,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cidade?: string | null
           created_at?: string
+          election_candidate_number?: string | null
+          election_cargo?: string | null
+          election_city?: string | null
+          election_state?: string | null
+          election_year?: number | null
           id?: string
           name?: string
           plan?: string
@@ -1153,13 +1212,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "supporters_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "supporters_polling_location_id_fkey"
             columns: ["polling_location_id"]
             isOneToOne: false
@@ -1186,7 +1238,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name: string
-          id: string
+          id?: string
           is_platform_admin?: boolean
           leader_id?: string | null
           organization_id: string

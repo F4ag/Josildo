@@ -83,7 +83,14 @@ create index idx_neighborhoods_org on neighborhoods(organization_id);
 create table leaders (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id),
-  user_id uuid references users_profiles(id), -- se a liderança tem login
+  -- on delete set null: um login (users_profiles) pode ser apagado sem
+  -- travar por causa desta FK — a liderança só perde o vínculo de acesso,
+  -- continua existindo. Simétrico à FK inversa (users_profiles.leader_id,
+  -- ver fk_users_profiles_leader mais abaixo): sem os dois SET NULL, apagar
+  -- QUALQUER um dos dois lados (login OU liderança) travava indefinidamente
+  -- quando a liderança tinha acesso — cada FK bloqueava a exclusão do outro
+  -- lado (bug real, corrigido nesta migration — antes as duas eram NO ACTION).
+  user_id uuid references users_profiles(id) on delete set null, -- se a liderança tem login
   -- Hierarquia: quem cadastrou/indicou esta liderança (uma liderança com
   -- login pode cadastrar outras "abaixo" dela). Null = topo da hierarquia
   -- (cadastrada por admin_geral/admin_equipe). on delete set null pra não
@@ -156,8 +163,11 @@ create index idx_leaders_polling_location_id on leaders(polling_location_id);
 create index idx_leaders_created_by on leaders(created_by);
 create index idx_leaders_org on leaders(organization_id);
 
+-- on delete set null: ver mesma nota em leaders.user_id acima — sem isso,
+-- excluir uma liderança com login travava com FK violation mesmo sem
+-- nenhum apoiador/demanda vinculado, só por causa desta referência de volta.
 alter table users_profiles
-  add constraint fk_users_profiles_leader foreign key (leader_id) references leaders(id);
+  add constraint fk_users_profiles_leader foreign key (leader_id) references leaders(id) on delete set null;
 create index idx_users_profiles_leader on users_profiles(leader_id);
 
 -- ----------------------------------------------------------------------------
@@ -355,8 +365,16 @@ create table interactions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id),
   person_type text check (person_type in ('lideranca','apoiador')),
-  leader_id uuid references leaders(id),
-  supporter_id uuid references supporters(id),
+  -- on delete cascade: interactions é log/histórico, não registro primário —
+  -- ver mesmo raciocínio em demand_updates.demand_id acima. Sem isso, apagar
+  -- uma liderança/apoiador com histórico de interações (gerado automaticamente
+  -- a cada demanda/atendimento criado ou atualizado — ver logInteraction em
+  -- services/demands.ts e services/attendances.ts) falhava com FK violation
+  -- mesmo depois de remover as demandas/atendimentos, porque o rastro de
+  -- interações ficava órfão e sem CASCADE bloqueava a exclusão (bug real,
+  -- corrigido nesta migration — antes as duas FKs eram NO ACTION).
+  leader_id uuid references leaders(id) on delete cascade,
+  supporter_id uuid references supporters(id) on delete cascade,
   interaction_type text check (interaction_type in (
     'ligacao','whatsapp','email','visita','reuniao','evento',
     'demanda','atendimento','aniversario','outro'
@@ -542,6 +560,55 @@ create table electoral_sections (
   unique (municipio_codigo, zona_numero, secao_numero)
 );
 create index idx_electoral_sections_location on electoral_sections(location_id);
+
+-- ----------------------------------------------------------------------------
+-- Comparativo de votos (resultado real x expectativa) — organizations ganha
+-- os dados do candidato de cada cliente (cargo e número, conforme o TSE) e
+-- o ano da eleição. Usado pela Edge Function import-election-results (ver
+-- supabase/functions/import-election-results) pra saber QUAL candidato
+-- filtrar no arquivo de resultado por seção do TSE. Cada organização tem um
+-- único candidato. Configurado pelo Admin Geral em /configuracoes/eleicao.
+--
+-- Sem coluna de "turno" aqui de propósito: o arquivo de resultado do TSE já
+-- traz NR_TURNO por linha, então a function grava o turno que vier nos
+-- dados, em vez de depender de pré-configuração a atualizar entre turnos.
+-- ----------------------------------------------------------------------------
+alter table organizations
+  add column election_year integer,
+  add column election_cargo text check (election_cargo in (
+    'prefeito', 'vice_prefeito', 'vereador',
+    'governador', 'vice_governador', 'senador',
+    'deputado_federal', 'deputado_estadual'
+  )),
+  add column election_candidate_number text;
+
+comment on column organizations.election_candidate_number is
+  'Número do candidato conforme registrado no TSE (mesmo formato do arquivo "Votação por seção eleitoral", ex: "12345").';
+
+-- cidade — usada para propagar ao Cadastro Mestre e, no Dashboard, decidir
+-- se reaproveita uma estrutura territorial já mapeada (ver provisionamento
+-- cross-sistema, docs/superpowers/plans/2026-08-15-provisionamento-cross-sistema.md).
+alter table organizations add column cidade text;
+comment on column organizations.cidade is
+  'Cidade onde este cliente atua — usada para provisionar o cliente nos outros sistemas do ecossistema.';
+
+-- election_results_sections — resultado REAL de votação por seção, para o
+-- candidato de cada organização. Multi-tenant (diferente de
+-- electoral_zones/polling_locations/electoral_sections logo acima, que são
+-- referência geográfica pública única, sem organization_id). Populada pela
+-- Edge Function import-election-results, agendada via pg_cron (ver
+-- scheduled_jobs.sql).
+create table election_results_sections (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  section_id uuid not null references electoral_sections(id) on delete cascade,
+  turno integer not null check (turno in (1, 2)),
+  votos integer not null default 0,
+  imported_at timestamptz not null default now(),
+  unique (organization_id, section_id, turno)
+);
+create index idx_election_results_sections_org on election_results_sections(organization_id);
+create index idx_election_results_sections_section on election_results_sections(section_id);
 
 -- ============================================================================
 -- Seeds mínimos (modelos de mensagem citados no prompt master, Módulos 9 e 12)
